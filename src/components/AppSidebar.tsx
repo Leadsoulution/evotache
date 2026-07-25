@@ -1,0 +1,69 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { getNavItems } from "@/config/navigation";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { Avatar } from "@/components/ui/Avatar";
+import { Menu } from "@/components/ui/Menu";
+import { ROLE_CONFIG } from "@/config/roleMeta";
+import { ChevronDownIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
+import { ACCOUNT_MENU_OPTIONS, handleAccountMenuChange } from "@/config/accountMenu";
+
+export function AppSidebar() {
+  const { user, logout } = useAuth();
+  const pathname = usePathname();
+
+  if (!user) return null;
+  const navItems = getNavItems(user.role);
+
+  return (
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex dark:border-slate-800 dark:bg-slate-950">
+      <div className="px-4 py-4">
+        <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-50">EVOTASKS</span>
+      </div>
+      <nav className="flex flex-1 flex-col gap-0.5 px-2">
+        {navItems.map((item) => {
+          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium",
+                active
+                  ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-3 dark:border-slate-800">
+        <ThemeToggle />
+        <Menu
+          options={ACCOUNT_MENU_OPTIONS}
+          value={[]}
+          onChange={(next) => handleAccountMenuChange(next[0], logout)}
+          ariaLabel="Account menu"
+          renderTrigger={() => (
+            <span className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
+              <Avatar name={user.name} color={user.color} size="sm" />
+              <span className="flex min-w-0 flex-1 flex-col items-start leading-tight">
+                <span className="truncate text-xs font-medium text-slate-700 dark:text-slate-200">{user.name}</span>
+                <span className={cn("text-[10px] font-medium", ROLE_CONFIG[user.role].textColor)}>{ROLE_CONFIG[user.role].label}</span>
+              </span>
+              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            </span>
+          )}
+        />
+      </div>
+    </aside>
+  );
+}

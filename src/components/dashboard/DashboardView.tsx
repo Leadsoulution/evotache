@@ -1,0 +1,120 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useTasks } from "@/hooks/useTasks";
+import { useTaskMeta } from "@/hooks/useTaskMeta";
+import { useProjects } from "@/hooks/useProjects";
+import { StatTile } from "@/components/stats/StatTile";
+import { isDueSoon, isOverdue } from "@/lib/date";
+import {
+  AlertTriangleIcon,
+  CalendarIcon,
+  ChartBarIcon,
+  FolderIcon,
+  ListChecksIcon,
+  ScaleIcon,
+  SparklesIcon,
+} from "@/components/ui/icons";
+
+const QUICK_LINKS = [
+  { href: "/tasks", label: "Tasks", description: "Your task list, subtasks, and attachments.", icon: ListChecksIcon },
+  { href: "/projects", label: "Projects", description: "Group tasks under projects.", icon: FolderIcon },
+  { href: "/disputes", label: "Litiges", description: "Track disputes and claims.", icon: ScaleIcon },
+  { href: "/statistics", label: "Statistics", description: "Charts across statuses, priorities, and people.", icon: ChartBarIcon },
+  { href: "/assistant", label: "AI Assistant", description: "Generate tasks from a prompt.", icon: SparklesIcon },
+];
+
+export function DashboardView() {
+  const { user } = useAuth();
+  const { tasks, loadState: tasksLoadState } = useTasks("task");
+  const { tasks: disputes, loadState: disputesLoadState } = useTasks("dispute");
+  const { statuses } = useTaskMeta();
+  const { projects } = useProjects();
+
+  const doneStatusId = statuses[statuses.length - 1]?.id;
+
+  const openTasks = useMemo(() => tasks.filter((t) => t.status !== doneStatusId), [tasks, doneStatusId]);
+  const overdueCount = useMemo(() => openTasks.filter((t) => isOverdue(t.dueDate)).length, [openTasks]);
+  const dueSoonCount = useMemo(() => openTasks.filter((t) => isDueSoon(t.dueDate)).length, [openTasks]);
+  const openDisputeCount = useMemo(() => disputes.filter((d) => d.status !== doneStatusId).length, [disputes, doneStatusId]);
+
+  const isLoading = tasksLoadState === "loading" || disputesLoadState === "loading";
+
+  return (
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+          {user ? `Welcome back, ${user.name.split(" ")[0]}` : "Dashboard"}
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Here&apos;s what&apos;s happening across your work.</p>
+      </header>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-[76px] animate-pulse rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="Open tasks" value={openTasks.length} icon={<ListChecksIcon className="h-4.5 w-4.5" />} />
+          <StatTile label="Overdue" value={overdueCount} tone={overdueCount > 0 ? "critical" : "default"} icon={<AlertTriangleIcon className="h-4.5 w-4.5" />} />
+          <StatTile label="Due within 2 days" value={dueSoonCount} tone={dueSoonCount > 0 ? "warning" : "default"} icon={<CalendarIcon className="h-4.5 w-4.5" />} />
+          <StatTile label="Open litiges" value={openDisputeCount} icon={<ScaleIcon className="h-4.5 w-4.5" />} />
+        </div>
+      )}
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Jump back in</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {QUICK_LINKS.map((link) => {
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-indigo-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-700"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
+                  <Icon className="h-4.5 w-4.5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">{link.label}</span>
+                  <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{link.description}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      {projects.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Projects</h2>
+            <Link href="/projects" className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+              View all
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {projects.slice(0, 3).map((project) => (
+              <Link
+                key={project.id}
+                href={`/tasks?project=${project.id}`}
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-indigo-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-700"
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-slate-800 dark:text-slate-100">{project.name}</span>
+                  <span className="block truncate text-xs text-slate-400">{project.description || "No description"}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
