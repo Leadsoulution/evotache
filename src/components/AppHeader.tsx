@@ -15,7 +15,8 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-slate-200 bg-white/80 px-3 py-2.5 backdrop-blur md:hidden dark:border-slate-800 dark:bg-slate-950/80">
       <MobileNavDrawer />
-      <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-50">EVOTASKS</span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-horizontal.png" alt="EvoTask" className="h-11 w-auto rounded-md" />
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
         <Menu

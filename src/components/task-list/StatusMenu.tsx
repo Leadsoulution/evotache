@@ -2,6 +2,7 @@
 
 import { Menu } from "@/components/ui/Menu";
 import { cn } from "@/lib/cn";
+import { getBadgeStyle } from "@/lib/badgeColor";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import type { StatusDef } from "@/types/taskMeta";
 
@@ -21,8 +22,7 @@ export function StatusMenu({ value, statuses, onChange, readOnly }: StatusMenuPr
   }));
 
   const badge = (
-    <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: current?.color ?? "#94a3b8" }} />
+    <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold" style={getBadgeStyle(current?.color)}>
       {current?.label ?? "—"}
     </span>
   );
@@ -38,12 +38,9 @@ export function StatusMenu({ value, statuses, onChange, readOnly }: StatusMenuPr
       align="end"
       renderTrigger={({ open }) => (
         <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 transition-colors dark:bg-slate-800 dark:text-slate-200",
-            open && "ring-2 ring-indigo-400"
-          )}
+          className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold transition-shadow", open && "ring-2 ring-indigo-400")}
+          style={getBadgeStyle(current?.color)}
         >
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: current?.color ?? "#94a3b8" }} />
           {current?.label ?? "—"}
           <ChevronDownIcon className="h-3 w-3 opacity-60" />
         </span>

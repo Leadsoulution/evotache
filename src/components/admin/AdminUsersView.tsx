@@ -2,24 +2,27 @@
 
 import { useMemo, useState } from "react";
 import { useUsers } from "@/hooks/useUsers";
+import { useTeams } from "@/hooks/useTeams";
 import { useAuth } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { UsersToolbar } from "./UsersToolbar";
 import { UsersTable } from "./UsersTable";
-import { InviteUserDialog } from "./InviteUserDialog";
+import { UserFormDialog } from "./UserFormDialog";
 import { RolePermissionsCard } from "./RolePermissionsCard";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { ErrorState } from "@/components/task-list/ErrorState";
-import type { Role } from "@/types/user";
+import type { AppUser, Role } from "@/types/user";
 
 export function AdminUsersView() {
   const { user: currentUser } = useAuth();
   const { users, loadState, errorMessage, refetch, createUser, updateUser, deleteUser } = useUsers();
+  const { teams } = useTeams();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 200);
   const [roleFilter, setRoleFilter] = useState<Role[]>([]);
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const visibleUsers = useMemo(() => {
@@ -51,7 +54,10 @@ export function AdminUsersView() {
         onSearchChange={setSearch}
         roleFilter={roleFilter}
         onRoleFilterChange={setRoleFilter}
-        onInvite={() => setInviteOpen(true)}
+        onInvite={() => {
+          setEditingUser(null);
+          setFormOpen(true);
+        }}
         visibleCount={visibleUsers.length}
         totalCount={users.length}
       />
@@ -61,9 +67,15 @@ export function AdminUsersView() {
       {loadState === "success" && currentUser && (
         <UsersTable
           users={visibleUsers}
+          allUsers={users}
           currentUserId={currentUser.id}
           onChangeRole={(id, role) => updateUser(id, { role })}
           onChangeStatus={(id, status) => updateUser(id, { status })}
+          onChangeManager={(id, managerIds) => updateUser(id, { managerIds })}
+          onRequestEdit={(targetUser) => {
+            setEditingUser(targetUser);
+            setFormOpen(true);
+          }}
           onRequestDelete={setPendingDeleteId}
         />
       )}
@@ -73,7 +85,20 @@ export function AdminUsersView() {
         <RolePermissionsCard />
       </section>
 
-      <InviteUserDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onSubmit={createUser} />
+      <UserFormDialog
+        open={formOpen}
+        editingUser={editingUser}
+        users={users}
+        teams={teams}
+        onClose={() => setFormOpen(false)}
+        onSubmit={(input) => {
+          if (editingUser) {
+            const { password, ...rest } = input;
+            return updateUser(editingUser.id, password ? { ...rest, password } : rest).then(() => true);
+          }
+          return createUser(input);
+        }}
+      />
 
       <ConfirmDialog
         open={pendingDeleteId !== null}

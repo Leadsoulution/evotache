@@ -9,11 +9,14 @@ import { useTaskMeta } from "@/hooks/useTaskMeta";
 import { useCustomFields } from "@/hooks/useCustomFields";
 import { useViewPrefs } from "@/hooks/useViewPrefs";
 import { useProjects } from "@/hooks/useProjects";
+import { useTeams } from "@/hooks/useTeams";
 import { getTaskPermissions } from "@/lib/taskPermissions";
 import { TaskListToolbar } from "./TaskListToolbar";
+import type { TaskViewMode } from "./TaskListToolbar";
 import { TaskTable } from "./TaskTable";
 import type { TaskTableGroup } from "./TaskTable";
 import { TaskCardList } from "./TaskCardList";
+import { BoardView } from "./BoardView";
 import { TaskListSkeleton } from "./TaskListSkeleton";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
@@ -38,6 +41,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   const { fields: customFields } = useCustomFields();
   const { hiddenColumnIds, toggleColumn } = useViewPrefs();
   const { projects } = useProjects();
+  const { teams } = useTeams();
   const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
@@ -49,6 +53,11 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     const projectParam = searchParams.get("project");
     return projectParam ? [projectParam] : [];
   });
+  const [teamFilter, setTeamFilter] = useState<string[]>(() => {
+    const teamParam = searchParams.get("team");
+    return teamParam ? [teamParam] : [];
+  });
+  const [viewMode, setViewMode] = useState<TaskViewMode>("list");
   const [groupField, setGroupField] = useState<GroupField>("status");
   const [sortField, setSortField] = useState<SortField>("manual");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -73,7 +82,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   }, [tasks, attachmentRefreshKey]);
 
   const hasActiveFilters = Boolean(
-    debouncedSearch || statusFilter.length || priorityFilter.length || assigneeFilter.length || projectFilter.length
+    debouncedSearch || statusFilter.length || priorityFilter.length || assigneeFilter.length || projectFilter.length || teamFilter.length
   );
 
   const groups: TaskTableGroup[] = useMemo(() => {
@@ -83,6 +92,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
       priorities: priorityFilter,
       assigneeIds: assigneeFilter,
       projectIds: projectFilter,
+      teamIds: teamFilter,
     };
     const topLevel = tasks.filter((t) => t.parentId === null);
     const filteredTopLevel = filterTopLevelTasks(topLevel, tasks, filters, assigneeNameById);
@@ -102,6 +112,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     priorityFilter,
     assigneeFilter,
     projectFilter,
+    teamFilter,
     assigneeNameById,
     sortField,
     sortDirection,
@@ -111,6 +122,20 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     priorities,
     collapsedIds,
   ]);
+
+  const boardTasks = useMemo(() => {
+    const filters: TaskFilters = {
+      search: debouncedSearch,
+      statuses: statusFilter,
+      priorities: priorityFilter,
+      assigneeIds: assigneeFilter,
+      projectIds: projectFilter,
+      teamIds: teamFilter,
+    };
+    const topLevel = tasks.filter((t) => t.parentId === null);
+    const filteredTopLevel = filterTopLevelTasks(topLevel, tasks, filters, assigneeNameById);
+    return flattenVisibleTree(filteredTopLevel, tasks, new Set()).map((row) => row.task);
+  }, [tasks, debouncedSearch, statusFilter, priorityFilter, assigneeFilter, projectFilter, teamFilter, assigneeNameById]);
 
   const allRowIds = useMemo(() => groups.flatMap((g) => g.rows.map((r) => r.task.id)), [groups]);
   const totalRows = allRowIds.length;
@@ -154,6 +179,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     setPriorityFilter([]);
     setAssigneeFilter([]);
     setProjectFilter([]);
+    setTeamFilter([]);
   }
 
   function handleAddSubtask(parentId: string) {
@@ -214,8 +240,11 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         onAssigneeFilterChange={setAssigneeFilter}
         projectFilter={projectFilter}
         onProjectFilterChange={setProjectFilter}
+        teamFilter={teamFilter}
+        onTeamFilterChange={setTeamFilter}
         assignees={assignees}
         projects={projects}
+        teams={teams}
         statuses={statuses}
         priorities={priorities}
         customFields={customFields}
@@ -232,6 +261,8 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         onClearSelection={() => setSelectedIds(new Set())}
         visibleCount={totalRows}
         totalCount={tasks.length}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
       />
 
       {isLoading && <TaskListSkeleton />}
@@ -240,7 +271,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
 
       {isReady && totalRows === 0 && hasActiveFilters && <EmptyState onClearFilters={clearFilters} />}
 
-      {isReady && (totalRows > 0 || !hasActiveFilters) && (
+      {isReady && (totalRows > 0 || !hasActiveFilters) && viewMode === "list" && (
         <>
           <TaskTable
             groups={groups}
@@ -288,6 +319,21 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         </>
       )}
 
+      {isReady && (totalRows > 0 || !hasActiveFilters) && viewMode === "board" && (
+        <BoardView
+          tasks={boardTasks}
+          statuses={statuses}
+          priorities={priorities}
+          assignees={assignees}
+          attachmentCounts={attachmentCounts}
+          permissions={permissions}
+          onUpdate={updateTask}
+          onCreate={createTask}
+          onOpenDetail={setDetailTask}
+          onRequestDelete={(id) => setPendingDeleteIds([id])}
+        />
+      )}
+
       <TaskDetailDrawer
         task={openTask}
         assignees={assignees}
@@ -295,6 +341,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         priorities={priorities}
         customFields={customFields}
         projects={projects}
+        teams={teams}
         subtaskCount={openTask ? getChildren(tasks, openTask.id).length : 0}
         currentUserId={user?.id ?? ""}
         permissions={permissions}

@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects } from "@/hooks/useProjects";
+import { useTeams } from "@/hooks/useTeams";
 import { useTasks } from "@/hooks/useTasks";
-import { canManageWorkflow } from "@/config/roleMeta";
+import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { ProjectDialog } from "./ProjectDialog";
+import { ProjectAvatar } from "./ProjectAvatar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { FolderIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
@@ -14,13 +16,22 @@ import type { Project } from "@/types/project";
 
 export function ProjectsView() {
   const { user } = useAuth();
+  const isAdmin = user ? canManageUsers(user.role) : false;
   const canManage = user ? canManageWorkflow(user.role) : false;
-  const { projects, loadState, addProject, editProject, removeProject } = useProjects();
+  const { projects: allProjects, loadState, addProject, editProject, removeProject } = useProjects();
+  const { teams } = useTeams();
   const { tasks } = useTasks("task");
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  // Only admins get full org oversight — everyone else only sees projects
+  // owned by a team they belong to (a project with no team is unscoped and
+  // stays visible to everyone).
+  const myTeamIds = user ? teams.filter((team) => team.memberIds.includes(user.id)).map((team) => team.id) : [];
+  const projects =
+    isAdmin || !user ? allProjects : allProjects.filter((project) => project.teamIds.length === 0 || project.teamIds.some((id) => myTeamIds.includes(id)));
 
   const taskCountByProject = tasks.reduce<Record<string, number>>((acc, task) => {
     if (task.projectId) acc[task.projectId] = (acc[task.projectId] ?? 0) + 1;
@@ -69,7 +80,7 @@ export function ProjectsView() {
             >
               <Link href={`/tasks?project=${project.id}`} className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
+                  <ProjectAvatar project={project} size="md" />
                   <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{project.name}</span>
                 </div>
                 <p className="line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{project.description || "No description"}</p>
@@ -106,6 +117,7 @@ export function ProjectsView() {
       <ProjectDialog
         open={dialogOpen}
         project={editingProject}
+        teams={teams}
         onClose={() => setDialogOpen(false)}
         onSubmit={(input) => (editingProject ? editProject(editingProject.id, input).then(() => true) : addProject(input))}
       />

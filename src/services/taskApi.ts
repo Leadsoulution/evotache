@@ -14,6 +14,7 @@ export interface TaskScope {
   userId: string;
   isAdmin: boolean;
   module: TaskModule;
+  visibleUserIds: string[];
 }
 
 function delay(ms: number): Promise<void> {
@@ -79,7 +80,10 @@ export async function fetchTasks(scope: TaskScope): Promise<Task[]> {
   await delay(NETWORK_DELAY_MS);
   const tasks = readStore().filter((t) => t.module === scope.module);
   if (scope.isAdmin) return tasks;
-  return tasks.filter((t) => t.assigneeIds.includes(scope.userId));
+  // Visible to the assignee themselves and to their manager(s) (recursively,
+  // via visibleUserIds). Team membership alone no longer grants visibility —
+  // being on the same team as an assignee isn't enough to see their tasks.
+  return tasks.filter((t) => t.assigneeIds.some((id) => scope.visibleUserIds.includes(id)));
 }
 
 export async function fetchAssignees(): Promise<Assignee[]> {
@@ -99,6 +103,7 @@ export async function createTaskRequest(draft: TaskDraft): Promise<Task> {
     status: draft.status ?? "todo",
     priority: draft.priority ?? "none",
     assigneeIds: draft.assigneeIds ?? [],
+    teamIds: draft.teamIds ?? [],
     dueDate: draft.dueDate ?? null,
     parentId: draft.parentId ?? null,
     projectId: draft.projectId ?? null,

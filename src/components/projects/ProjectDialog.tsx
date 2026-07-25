@@ -1,27 +1,44 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { ColorSwatchPicker } from "@/components/admin/ColorSwatchPicker";
+import { ProjectAvatar } from "./ProjectAvatar";
+import { TeamMenu } from "@/components/task-list/TeamMenu";
 import { randomPaletteColor } from "@/config/colorPalette";
+import { ImageIcon, XIcon } from "@/components/ui/icons";
 import type { Project } from "@/types/project";
+import type { Team } from "@/types/team";
 
 interface ProjectDialogProps {
   open: boolean;
   project: Project | null;
+  teams: Team[];
   onClose: () => void;
-  onSubmit: (input: { name: string; description: string; color: string }) => Promise<boolean>;
+  onSubmit: (input: { name: string; description: string; color: string; logoDataUrl?: string | null; teamIds?: string[] }) => Promise<boolean>;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
 
-export function ProjectDialog({ open, project, onClose, onSubmit }: ProjectDialogProps) {
+export function ProjectDialog({ open, project, teams, onClose, onSubmit }: ProjectDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState(randomPaletteColor());
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
+  const [teamIds, setTeamIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [wasOpen, setWasOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +51,9 @@ export function ProjectDialog({ open, project, onClose, onSubmit }: ProjectDialo
       setName(project?.name ?? "");
       setDescription(project?.description ?? "");
       setColor(project?.color ?? randomPaletteColor());
+      setLogoDataUrl(project?.logoDataUrl ?? null);
+      setTeamIds(project?.teamIds ?? []);
+      setLogoError(null);
     }
   }
 
@@ -52,10 +72,26 @@ export function ProjectDialog({ open, project, onClose, onSubmit }: ProjectDialo
 
   if (!open) return null;
 
+  async function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Please choose an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError("Image must be smaller than 2 MB.");
+      return;
+    }
+    setLogoError(null);
+    setLogoDataUrl(await readFileAsDataUrl(file));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
-    const success = await onSubmit({ name: name.trim(), description: description.trim(), color });
+    const success = await onSubmit({ name: name.trim(), description: description.trim(), color, logoDataUrl, teamIds });
     setSubmitting(false);
     if (success) onClose();
   }
@@ -83,6 +119,31 @@ export function ProjectDialog({ open, project, onClose, onSubmit }: ProjectDialo
             <input ref={nameRef} value={name} onChange={(event) => setName(event.target.value)} required placeholder="Project name" className={inputClass} />
           </div>
 
+          <div className="flex items-center gap-3">
+            <ProjectAvatar project={{ name, color, logoDataUrl }} size="lg" />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  {logoDataUrl ? "Change logo" : "Upload logo"}
+                  <input type="file" accept="image/*" onChange={handleLogoChange} className="sr-only" />
+                </label>
+                {logoDataUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setLogoDataUrl(null)}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                    Remove
+                  </button>
+                )}
+              </div>
+              {logoError && <p className="text-xs text-red-600 dark:text-red-400">{logoError}</p>}
+              {!logoError && <p className="text-xs text-slate-400">Optional. Falls back to the color above.</p>}
+            </div>
+          </div>
+
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Description</span>
             <textarea
@@ -93,6 +154,13 @@ export function ProjectDialog({ open, project, onClose, onSubmit }: ProjectDialo
               className={inputClass}
             />
           </label>
+
+          {teams.length > 0 && (
+            <div className="block text-sm">
+              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Teams</span>
+              <TeamMenu teams={teams} value={teamIds} onChange={setTeamIds} />
+            </div>
+          )}
 
           <div className="mt-2 flex justify-end gap-2">
             <button

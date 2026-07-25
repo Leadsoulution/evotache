@@ -4,56 +4,60 @@ import { useMemo } from "react";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskMeta } from "@/hooks/useTaskMeta";
 import { useProjects } from "@/hooks/useProjects";
+import { useTeams } from "@/hooks/useTeams";
+import { useUsers } from "@/hooks/useUsers";
+import { useGlobalFilters } from "@/hooks/useGlobalFilters";
+import { GlobalFilterBar } from "@/components/filters/GlobalFilterBar";
+import { UserSelectorBar } from "@/components/filters/UserSelectorBar";
 import { StatTile } from "./StatTile";
 import { BarChart } from "./BarChart";
-import type { BarChartDatum } from "./BarChart";
+import { ChartCard } from "./ChartCard";
+import { PerformanceTable } from "./PerformanceTable";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { isOverdue } from "@/lib/date";
-import { AlertTriangleIcon, CheckIcon, ListChecksIcon, UserPlusIcon } from "@/components/ui/icons";
+import { applyGlobalFilters } from "@/lib/globalFilters";
+import {
+  computeOnTimeRate,
+  countByAssignee,
+  countByPriority,
+  countByProject,
+  countByStatus,
+  countByTeam,
+  countCompletedByWeek,
+  performanceByProject,
+  performanceByTeam,
+  performanceByUser,
+} from "@/lib/taskStats";
+import { AlertTriangleIcon, CheckIcon, ClockIcon, ListChecksIcon, UserPlusIcon } from "@/components/ui/icons";
 
 export function StatisticsView() {
-  const { tasks, assignees, loadState } = useTasks("task");
+  const { tasks: allTasks, assignees, loadState } = useTasks("task");
   const { statuses, priorities, loadState: metaLoadState } = useTaskMeta();
   const { projects } = useProjects();
+  const { teams } = useTeams();
+  const { users } = useUsers();
+  const { filters, setTeamIds, setUserIds, setProjectIds, setPriorities, setStatuses, setDateRange, selectUser, clearAll } = useGlobalFilters();
+
+  const tasks = useMemo(() => applyGlobalFilters(allTasks, filters), [allTasks, filters]);
 
   const doneStatusId = statuses[statuses.length - 1]?.id;
 
-  const byStatus: BarChartDatum[] = useMemo(
-    () => statuses.map((status) => ({ key: status.id, label: status.label, value: tasks.filter((t) => t.status === status.id).length, color: status.color })),
-    [tasks, statuses]
-  );
+  const byStatus = useMemo(() => countByStatus(tasks, statuses), [tasks, statuses]);
+  const byPriority = useMemo(() => countByPriority(tasks, priorities), [tasks, priorities]);
+  const byAssignee = useMemo(() => countByAssignee(tasks, assignees), [tasks, assignees]);
+  const byProject = useMemo(() => countByProject(tasks, projects), [tasks, projects]);
+  const byTeam = useMemo(() => countByTeam(tasks, teams), [tasks, teams]);
+  const weeklyTrend = useMemo(() => countCompletedByWeek(tasks, doneStatusId), [tasks, doneStatusId]);
 
-  const byPriority: BarChartDatum[] = useMemo(
-    () => priorities.map((priority) => ({ key: priority.id, label: priority.label, value: tasks.filter((t) => t.priority === priority.id).length, color: priority.color })),
-    [tasks, priorities]
-  );
-
-  const byAssignee: BarChartDatum[] = useMemo(() => {
-    const rows = assignees.map((assignee) => ({
-      key: assignee.id,
-      label: assignee.name,
-      value: tasks.filter((t) => t.assigneeIds.includes(assignee.id)).length,
-      color: assignee.color,
-    }));
-    const unassigned = tasks.filter((t) => t.assigneeIds.length === 0).length;
-    if (unassigned > 0) rows.push({ key: "unassigned", label: "Unassigned", value: unassigned, color: "#94a3b8" });
-    return rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
-  }, [tasks, assignees]);
-
-  const byProject: BarChartDatum[] = useMemo(() => {
-    const rows = projects.map((project) => ({
-      key: project.id,
-      label: project.name,
-      value: tasks.filter((t) => t.projectId === project.id).length,
-      color: project.color,
-    }));
-    return rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
-  }, [tasks, projects]);
+  const userPerformance = useMemo(() => performanceByUser(tasks, assignees, doneStatusId), [tasks, assignees, doneStatusId]);
+  const teamPerformance = useMemo(() => performanceByTeam(tasks, teams, doneStatusId), [tasks, teams, doneStatusId]);
+  const projectPerformance = useMemo(() => performanceByProject(tasks, projects, doneStatusId), [tasks, projects, doneStatusId]);
 
   const completedCount = tasks.filter((t) => t.status === doneStatusId).length;
   const overdueCount = tasks.filter((t) => t.status !== doneStatusId && isOverdue(t.dueDate)).length;
   const unassignedCount = tasks.filter((t) => t.assigneeIds.length === 0).length;
   const completionRate = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+  const onTimeRate = useMemo(() => computeOnTimeRate(tasks, doneStatusId), [tasks, doneStatusId]);
 
   const isLoading = loadState === "loading" || metaLoadState === "loading";
 
@@ -61,16 +65,35 @@ export function StatisticsView() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Statistics</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">A breakdown of your tasks by status, priority, assignee, and project.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Analysis, trends, and performance across your work.</p>
       </header>
+
+      <UserSelectorBar users={users} selectedUserId={filters.userIds[0] ?? null} onSelectUser={selectUser} />
+
+      <GlobalFilterBar
+        filters={filters}
+        onTeamIdsChange={setTeamIds}
+        onUserIdsChange={setUserIds}
+        onProjectIdsChange={setProjectIds}
+        onPrioritiesChange={setPriorities}
+        onStatusesChange={setStatuses}
+        onDateRangeChange={setDateRange}
+        onClearAll={clearAll}
+        teams={teams}
+        users={users}
+        projects={projects}
+        statuses={statuses}
+        priorities={priorities}
+      />
 
       {isLoading ? (
         <TaskListSkeleton />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <StatTile label="Total tasks" value={tasks.length} icon={<ListChecksIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Completion rate" value={`${completionRate}%`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="On-time rate" value={`${onTimeRate}%`} icon={<ClockIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Overdue" value={overdueCount} tone={overdueCount > 0 ? "critical" : "default"} icon={<AlertTriangleIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Unassigned" value={unassignedCount} icon={<UserPlusIcon className="h-4.5 w-4.5" />} />
           </div>
@@ -90,18 +113,26 @@ export function StatisticsView() {
                 <BarChart data={byProject} />
               </ChartCard>
             )}
+            {byTeam.length > 0 && (
+              <ChartCard title="Tasks by team">
+                <BarChart data={byTeam} />
+              </ChartCard>
+            )}
+            <ChartCard title="Completed per week (last 6 weeks)">
+              <BarChart data={weeklyTrend} />
+            </ChartCard>
           </div>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Performance</h2>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <PerformanceTable title="By user" rows={userPerformance} />
+              {teamPerformance.length > 0 && <PerformanceTable title="By team" rows={teamPerformance} />}
+              {projectPerformance.length > 0 && <PerformanceTable title="By project" rows={projectPerformance} />}
+            </div>
+          </section>
         </>
       )}
-    </div>
-  );
-}
-
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
-      {children}
     </div>
   );
 }

@@ -9,5 +9,6 @@ export interface AppUser {
   role: Role;
   color: string;
   status: UserStatus;
+  managerIds: string[];
   createdAt: string;
 }

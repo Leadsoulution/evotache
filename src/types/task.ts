@@ -18,6 +18,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   assigneeIds: string[];
+  teamIds: string[];
   dueDate: string | null;
   order: number;
   parentId: string | null;
@@ -41,4 +42,5 @@ export interface TaskFilters {
   priorities: TaskPriority[];
   assigneeIds: string[];
   projectIds: string[];
+  teamIds: string[];
 }

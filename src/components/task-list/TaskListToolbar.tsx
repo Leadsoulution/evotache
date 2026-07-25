@@ -1,15 +1,19 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { Menu } from "@/components/ui/Menu";
+import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Avatar } from "@/components/ui/Avatar";
+import { ProjectAvatar } from "@/components/projects/ProjectAvatar";
 import { ColumnsMenu } from "./ColumnsMenu";
-import { ChevronDownIcon, SearchIcon, SortIcon, TrashIcon, XIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, KanbanIcon, ListIcon, SearchIcon, SortIcon, TrashIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { Assignee, GroupField, SortDirection, SortField } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { CustomFieldDef } from "@/types/customField";
 import type { Project } from "@/types/project";
+import type { Team } from "@/types/team";
+
+export type TaskViewMode = "list" | "board";
 
 const GROUP_OPTIONS: { value: GroupField; label: string }[] = [
   { value: "none", label: "No grouping" },
@@ -38,8 +42,11 @@ interface TaskListToolbarProps {
   onAssigneeFilterChange: (value: string[]) => void;
   projectFilter: string[];
   onProjectFilterChange: (value: string[]) => void;
+  teamFilter: string[];
+  onTeamFilterChange: (value: string[]) => void;
   assignees: Assignee[];
   projects: Project[];
+  teams: Team[];
   statuses: StatusDef[];
   priorities: PriorityDef[];
   customFields: CustomFieldDef[];
@@ -56,6 +63,8 @@ interface TaskListToolbarProps {
   onClearSelection: () => void;
   visibleCount: number;
   totalCount: number;
+  viewMode: TaskViewMode;
+  onViewModeChange: (mode: TaskViewMode) => void;
 }
 
 export function TaskListToolbar({
@@ -69,8 +78,11 @@ export function TaskListToolbar({
   onAssigneeFilterChange,
   projectFilter,
   onProjectFilterChange,
+  teamFilter,
+  onTeamFilterChange,
   assignees,
   projects,
+  teams,
   statuses,
   priorities,
   customFields,
@@ -87,6 +99,8 @@ export function TaskListToolbar({
   onClearSelection,
   visibleCount,
   totalCount,
+  viewMode,
+  onViewModeChange,
 }: TaskListToolbarProps) {
   const statusOptions = statuses.map((status) => ({
     value: status.id,
@@ -102,7 +116,12 @@ export function TaskListToolbar({
   const projectOptions = projects.map((project) => ({
     value: project.id,
     label: project.name,
-    icon: <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />,
+    icon: <ProjectAvatar project={project} size="xs" />,
+  }));
+  const teamOptions = teams.map((team) => ({
+    value: team.id,
+    label: team.name,
+    icon: <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />,
   }));
 
   return (
@@ -125,42 +144,75 @@ export function TaskListToolbar({
         {projects.length > 0 && (
           <FilterMenu label="Project" count={projectFilter.length} options={projectOptions} value={projectFilter} onChange={onProjectFilterChange} />
         )}
+        {teams.length > 0 && (
+          <FilterMenu label="Team" count={teamFilter.length} options={teamOptions} value={teamFilter} onChange={onTeamFilterChange} />
+        )}
 
         <div className="mx-1 hidden h-5 w-px bg-slate-200 sm:block dark:bg-slate-700" />
 
-        <Menu
-          options={GROUP_OPTIONS}
-          value={[groupField]}
-          onChange={(next) => onGroupFieldChange(next[0] as GroupField)}
-          ariaLabel="Group by"
-          renderTrigger={() => <ToolbarButton label={`Group: ${GROUP_OPTIONS.find((o) => o.value === groupField)?.label}`} />}
-        />
+        {viewMode === "list" && (
+          <>
+            <Menu
+              options={GROUP_OPTIONS}
+              value={[groupField]}
+              onChange={(next) => onGroupFieldChange(next[0] as GroupField)}
+              ariaLabel="Group by"
+              renderTrigger={() => <ToolbarButton label={`Group: ${GROUP_OPTIONS.find((o) => o.value === groupField)?.label}`} />}
+            />
 
-        <div className="flex items-center gap-1">
-          <Menu
-            options={SORT_OPTIONS}
-            value={[sortField]}
-            onChange={(next) => onSortFieldChange(next[0] as SortField)}
-            ariaLabel="Sort by"
-            renderTrigger={() => <ToolbarButton label={`Sort: ${SORT_OPTIONS.find((o) => o.value === sortField)?.label}`} />}
-          />
-          <button
-            type="button"
-            onClick={onToggleSortDirection}
-            title={sortDirection === "asc" ? "Ascending" : "Descending"}
-            aria-label="Toggle sort direction"
-            className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-          >
-            <SortIcon className={cn("h-4 w-4 transition-transform", sortDirection === "desc" && "rotate-180")} />
-          </button>
-        </div>
+            <div className="flex items-center gap-1">
+              <Menu
+                options={SORT_OPTIONS}
+                value={[sortField]}
+                onChange={(next) => onSortFieldChange(next[0] as SortField)}
+                ariaLabel="Sort by"
+                renderTrigger={() => <ToolbarButton label={`Sort: ${SORT_OPTIONS.find((o) => o.value === sortField)?.label}`} />}
+              />
+              <button
+                type="button"
+                onClick={onToggleSortDirection}
+                title={sortDirection === "asc" ? "Ascending" : "Descending"}
+                aria-label="Toggle sort direction"
+                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                <SortIcon className={cn("h-4 w-4 transition-transform", sortDirection === "desc" && "rotate-180")} />
+              </button>
+            </div>
 
-        <ColumnsMenu customFields={customFields} hiddenColumnIds={hiddenColumnIds} onToggle={onToggleColumn} />
+            <ColumnsMenu customFields={customFields} hiddenColumnIds={hiddenColumnIds} onToggle={onToggleColumn} />
+          </>
+        )}
 
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-slate-400">
             {visibleCount} of {totalCount}
           </span>
+          <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => onViewModeChange("list")}
+              aria-label="List view"
+              aria-pressed={viewMode === "list"}
+              className={cn(
+                "rounded-md p-1.5",
+                viewMode === "list" ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+              )}
+            >
+              <ListIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("board")}
+              aria-label="Board view"
+              aria-pressed={viewMode === "board"}
+              className={cn(
+                "rounded-md p-1.5",
+                viewMode === "board" ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+              )}
+            >
+              <KanbanIcon className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -193,39 +245,5 @@ function ToolbarButton({ label }: { label: string }) {
       {label}
       <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
     </span>
-  );
-}
-
-interface FilterMenuProps {
-  label: string;
-  count: number;
-  options: { value: string; label: string; dotColor?: string; icon?: ReactNode }[];
-  value: string[];
-  onChange: (value: string[]) => void;
-}
-
-function FilterMenu({ label, count, options, value, onChange }: FilterMenuProps) {
-  return (
-    <Menu
-      options={options}
-      value={value}
-      multiple
-      onChange={onChange}
-      ariaLabel={`Filter by ${label}`}
-      renderTrigger={() => (
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium",
-            count > 0
-              ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
-              : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          )}
-        >
-          {label}
-          {count > 0 && <span className="rounded-full bg-indigo-600 px-1.5 text-[10px] font-semibold text-white">{count}</span>}
-          <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
-        </span>
-      )}
-    />
   );
 }

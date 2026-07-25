@@ -5,18 +5,21 @@ import { createPortal } from "react-dom";
 import { StatusMenu } from "./StatusMenu";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
+import { TeamMenu } from "./TeamMenu";
 import { DueDateField } from "./DueDateField";
 import { CustomFieldCell } from "./CustomFieldCell";
 import { AttachmentList } from "./AttachmentList";
 import { AttachmentUploader } from "./AttachmentUploader";
 import { useAttachments } from "@/hooks/useAttachments";
 import { Menu } from "@/components/ui/Menu";
+import { ProjectAvatar } from "@/components/projects/ProjectAvatar";
 import { ChevronDownIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { Assignee, Task } from "@/types/task";
 import type { StatusDef, PriorityDef } from "@/types/taskMeta";
 import type { CustomFieldDef } from "@/types/customField";
 import type { Project } from "@/types/project";
+import type { Team } from "@/types/team";
 import type { TaskPermissions } from "@/lib/taskPermissions";
 
 interface TaskDetailDrawerProps {
@@ -26,6 +29,7 @@ interface TaskDetailDrawerProps {
   priorities: PriorityDef[];
   customFields: CustomFieldDef[];
   projects: Project[];
+  teams: Team[];
   subtaskCount: number;
   currentUserId: string;
   permissions: TaskPermissions;
@@ -33,7 +37,7 @@ interface TaskDetailDrawerProps {
   onUpdate: (id: string, patch: Partial<Task>) => void;
 }
 
-export function TaskDetailDrawer({ task, assignees, statuses, priorities, customFields, projects, subtaskCount, currentUserId, permissions, onClose, onUpdate }: TaskDetailDrawerProps) {
+export function TaskDetailDrawer({ task, assignees, statuses, priorities, customFields, projects, teams, subtaskCount, currentUserId, permissions, onClose, onUpdate }: TaskDetailDrawerProps) {
   useEffect(() => {
     if (!task) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -69,6 +73,7 @@ export function TaskDetailDrawer({ task, assignees, statuses, priorities, custom
           priorities={priorities}
           customFields={customFields}
           projects={projects}
+          teams={teams}
           subtaskCount={subtaskCount}
           currentUserId={currentUserId}
           permissions={permissions}
@@ -87,13 +92,14 @@ interface TaskDetailContentProps {
   priorities: PriorityDef[];
   customFields: CustomFieldDef[];
   projects: Project[];
+  teams: Team[];
   subtaskCount: number;
   currentUserId: string;
   permissions: TaskPermissions;
   onUpdate: (id: string, patch: Partial<Task>) => void;
 }
 
-function TaskDetailContent({ task, assignees, statuses, priorities, customFields, projects, subtaskCount, currentUserId, permissions, onUpdate }: TaskDetailContentProps) {
+function TaskDetailContent({ task, assignees, statuses, priorities, customFields, projects, teams, subtaskCount, currentUserId, permissions, onUpdate }: TaskDetailContentProps) {
   const { attachments, uploadFile, addLink, removeAttachment } = useAttachments(task.id);
   const [description, setDescription] = useState(task.description);
 
@@ -140,6 +146,13 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
         <div>
           <p className="mb-1 text-xs font-medium text-slate-400">Project</p>
           <ProjectMenu projects={projects} value={task.projectId} onChange={(projectId) => onUpdate(task.id, { projectId })} readOnly={!permissions.canEditFull} />
+        </div>
+      )}
+
+      {teams.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-medium text-slate-400">Teams</p>
+          <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
         </div>
       )}
 
@@ -211,13 +224,13 @@ function ProjectMenu({ projects, value, onChange, readOnly }: ProjectMenuProps) 
     ...projects.map((project) => ({
       value: project.id,
       label: project.name,
-      icon: <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />,
+      icon: <ProjectAvatar project={project} size="xs" />,
     })),
   ];
 
   const badge = current ? (
     <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: current.color }} />
+      <ProjectAvatar project={current} size="xs" />
       {current.name}
     </span>
   ) : (

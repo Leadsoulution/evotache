@@ -13,6 +13,8 @@ interface CreateUserInput {
   password: string;
   role: Role;
   color: string;
+  managerIds?: string[];
+  teamIds?: string[];
 }
 
 interface UpdateUserPatch {
@@ -20,6 +22,9 @@ interface UpdateUserPatch {
   email?: string;
   role?: Role;
   status?: UserStatus;
+  password?: string;
+  managerIds?: string[];
+  teamIds?: string[];
 }
 
 interface UseUsersResult {
@@ -93,7 +98,14 @@ export function useUsers(): UseUsersResult {
   const updateUser = useCallback(
     async (id: string, patch: UpdateUserPatch) => {
       const previous = usersRef.current;
-      setUsers(previous.map((u) => (u.id === id ? { ...u, ...patch } : u)));
+      const userPatch: Partial<AppUser> = {
+        ...(patch.name !== undefined && { name: patch.name }),
+        ...(patch.email !== undefined && { email: patch.email }),
+        ...(patch.role !== undefined && { role: patch.role }),
+        ...(patch.status !== undefined && { status: patch.status }),
+        ...(patch.managerIds !== undefined && { managerIds: patch.managerIds }),
+      };
+      setUsers(previous.map((u) => (u.id === id ? { ...u, ...userPatch } : u)));
       try {
         const updated = await updateUserRequest(id, patch);
         setUsers((current) => current.map((u) => (u.id === id ? updated : u)));

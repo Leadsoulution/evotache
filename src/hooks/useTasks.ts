@@ -3,17 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createTaskRequest, deleteTasksRequest, fetchAssignees, fetchTasks, updateTaskRequest } from "@/services/taskApi";
 import { fetchDefaultPriorityId, fetchDefaultStatusId } from "@/services/taskMetaApi";
+import { fetchUsers } from "@/services/userApi";
 import { generateId } from "@/lib/id";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/hooks/useAuth";
 import { canManageUsers } from "@/config/roleMeta";
 import { getDescendantIds } from "@/lib/taskTree";
+import { getVisibleUserIds } from "@/lib/orgChart";
 import type { Assignee, Task, TaskDraft, TaskModule } from "@/types/task";
 
 type LoadState = "loading" | "success" | "error";
 
 export interface CreateTaskOptions {
   parentId?: string | null;
+  status?: string;
   priority?: string;
   description?: string;
   dueDate?: string | null;
@@ -51,12 +54,15 @@ export function useTasks(module: TaskModule): UseTasksResult {
     if (!user) return;
     setLoadState("loading");
     setErrorMessage(null);
-    Promise.all([fetchTasks({ userId: user.id, isAdmin, module }), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId()])
-      .then(([taskList, assigneeList, statusId, priorityId]) => {
-        defaultsRef.current = { statusId, priorityId };
-        setTasks(taskList);
-        setAssignees(assigneeList);
-        setLoadState("success");
+    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId()])
+      .then(([allUsers, assigneeList, statusId, priorityId]) => {
+        const visibleUserIds = getVisibleUserIds(allUsers, user.id);
+        return fetchTasks({ userId: user.id, isAdmin, module, visibleUserIds }).then((taskList) => {
+          defaultsRef.current = { statusId, priorityId };
+          setTasks(taskList);
+          setAssignees(assigneeList);
+          setLoadState("success");
+        });
       })
       .catch((err: unknown) => {
         setLoadState("error");
@@ -67,13 +73,16 @@ export function useTasks(module: TaskModule): UseTasksResult {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    Promise.all([fetchTasks({ userId: user.id, isAdmin, module }), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId()])
-      .then(([taskList, assigneeList, statusId, priorityId]) => {
-        if (cancelled) return;
-        defaultsRef.current = { statusId, priorityId };
-        setTasks(taskList);
-        setAssignees(assigneeList);
-        setLoadState("success");
+    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId()])
+      .then(([allUsers, assigneeList, statusId, priorityId]) => {
+        const visibleUserIds = getVisibleUserIds(allUsers, user.id);
+        return fetchTasks({ userId: user.id, isAdmin, module, visibleUserIds }).then((taskList) => {
+          if (cancelled) return;
+          defaultsRef.current = { statusId, priorityId };
+          setTasks(taskList);
+          setAssignees(assigneeList);
+          setLoadState("success");
+        });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -101,9 +110,10 @@ export function useTasks(module: TaskModule): UseTasksResult {
         module,
         title: trimmed,
         description: options.description ?? "",
-        status: statusId,
+        status: options.status ?? statusId,
         priority: options.priority ?? priorityId,
         assigneeIds: isAdmin ? [] : [user.id],
+        teamIds: [],
         dueDate: options.dueDate ?? null,
         parentId,
         projectId: null,

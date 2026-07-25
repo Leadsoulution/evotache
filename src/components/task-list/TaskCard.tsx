@@ -5,7 +5,7 @@ import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
 import { DueDateField } from "./DueDateField";
 import type { VisibleColumns } from "./TaskRow";
-import { ChevronDownIcon, ExpandIcon, PaperclipIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, EyeIcon, PaperclipIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { Assignee, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
@@ -93,7 +93,7 @@ export function TaskCard({
           </span>
         )}
         <button type="button" onClick={() => onOpenDetail(task)} className="shrink-0 rounded-md p-1 text-slate-400" aria-label={`Open details for ${task.title}`}>
-          <ExpandIcon className="h-3.5 w-3.5" />
+          <EyeIcon className="h-3.5 w-3.5" />
         </button>
       </div>
 

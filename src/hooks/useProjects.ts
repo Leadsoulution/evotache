@@ -30,7 +30,7 @@ export function useProjects() {
   }, []);
 
   const addProject = useCallback(
-    async (input: { name: string; description: string; color: string }) => {
+    async (input: { name: string; description: string; color: string; logoDataUrl?: string | null; teamIds?: string[] }) => {
       try {
         const created = await createProject(input);
         setProjects((current) => [...current, created]);
@@ -44,7 +44,7 @@ export function useProjects() {
   );
 
   const editProject = useCallback(
-    async (id: string, patch: Partial<Pick<Project, "name" | "description" | "color">>) => {
+    async (id: string, patch: Partial<Pick<Project, "name" | "description" | "color" | "logoDataUrl" | "teamIds">>) => {
       const previous = projects;
       setProjects((current) => current.map((p) => (p.id === id ? { ...p, ...patch } : p)));
       try {

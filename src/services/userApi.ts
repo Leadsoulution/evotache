@@ -1,4 +1,5 @@
 import { generateId } from "@/lib/id";
+import { fetchTeams, updateTeam } from "@/services/teamApi";
 import type { AppUser, Role, UserStatus } from "@/types/user";
 import type { Assignee } from "@/types/task";
 
@@ -25,11 +26,11 @@ function maybeFail(action: string): void {
 function createSeedUsers(): StoredUser[] {
   const now = new Date().toISOString();
   const rows: Omit<StoredUser, "createdAt">[] = [
-    { id: "u1", name: "Amine Bahazzaz", email: "amine@evotasks.com", password: "admin123", role: "admin", color: "#6366f1", status: "active" },
-    { id: "u2", name: "Sarah Chen", email: "sarah@evotasks.com", password: "member123", role: "member", color: "#ec4899", status: "active" },
-    { id: "u3", name: "Marcus Lee", email: "marcus@evotasks.com", password: "member123", role: "member", color: "#22c55e", status: "active" },
-    { id: "u4", name: "Priya Patel", email: "priya@evotasks.com", password: "limited123", role: "member_limited", color: "#f59e0b", status: "active" },
-    { id: "u5", name: "Diego Alvarez", email: "diego@evotasks.com", password: "viewer123", role: "viewer", color: "#06b6d4", status: "active" },
+    { id: "u1", name: "Amine Bahazzaz", email: "amine@evotasks.com", password: "admin123", role: "admin", color: "#6366f1", status: "active", managerIds: [] },
+    { id: "u2", name: "Sarah Chen", email: "sarah@evotasks.com", password: "member123", role: "member", color: "#ec4899", status: "active", managerIds: ["u1"] },
+    { id: "u3", name: "Marcus Lee", email: "marcus@evotasks.com", password: "member123", role: "member", color: "#22c55e", status: "active", managerIds: ["u1"] },
+    { id: "u4", name: "Priya Patel", email: "priya@evotasks.com", password: "limited123", role: "member_limited", color: "#f59e0b", status: "active", managerIds: ["u2", "u3"] },
+    { id: "u5", name: "Diego Alvarez", email: "diego@evotasks.com", password: "viewer123", role: "viewer", color: "#06b6d4", status: "active", managerIds: ["u3"] },
   ];
   return rows.map((row) => ({ ...row, createdAt: now }));
 }
@@ -66,6 +67,7 @@ function toPublicUser(user: StoredUser): AppUser {
     role: user.role,
     color: user.color,
     status: user.status,
+    managerIds: user.managerIds,
     createdAt: user.createdAt,
   };
 }
@@ -102,6 +104,21 @@ interface CreateUserInput {
   password: string;
   role: Role;
   color: string;
+  managerIds?: string[];
+  teamIds?: string[];
+}
+
+async function syncTeamMembership(userId: string, teamIds: string[]): Promise<void> {
+  const allTeams = await fetchTeams();
+  await Promise.all(
+    allTeams.map((team) => {
+      const shouldBeMember = teamIds.includes(team.id);
+      const isMember = team.memberIds.includes(userId);
+      if (shouldBeMember === isMember) return Promise.resolve();
+      const memberIds = shouldBeMember ? [...team.memberIds, userId] : team.memberIds.filter((id) => id !== userId);
+      return updateTeam(team.id, { memberIds });
+    })
+  );
 }
 
 export async function createUserRequest(input: CreateUserInput): Promise<AppUser> {
@@ -121,9 +138,11 @@ export async function createUserRequest(input: CreateUserInput): Promise<AppUser
     role: input.role,
     color: input.color,
     status: "active",
+    managerIds: input.managerIds ?? [],
     createdAt: new Date().toISOString(),
   };
   writeStore([...users, user]);
+  if (input.teamIds?.length) await syncTeamMembership(user.id, input.teamIds);
   return toPublicUser(user);
 }
 
@@ -133,6 +152,8 @@ interface UpdateUserInput {
   role?: Role;
   status?: UserStatus;
   password?: string;
+  managerIds?: string[];
+  teamIds?: string[];
 }
 
 export async function updateUserRequest(id: string, patch: UpdateUserInput): Promise<AppUser> {
@@ -141,10 +162,12 @@ export async function updateUserRequest(id: string, patch: UpdateUserInput): Pro
   const users = readStore();
   const index = users.findIndex((u) => u.id === id);
   if (index === -1) throw new ApiError("User not found.");
-  const updated: StoredUser = { ...users[index], ...patch };
+  const { teamIds, ...userPatch } = patch;
+  const updated: StoredUser = { ...users[index], ...userPatch };
   const next = [...users];
   next[index] = updated;
   writeStore(next);
+  if (teamIds) await syncTeamMembership(id, teamIds);
   return toPublicUser(updated);
 }
 

@@ -33,7 +33,8 @@ export function MobileNavDrawer() {
             <div className="absolute inset-0 animate-fade-in bg-black/30" onClick={() => setOpen(false)} />
             <aside className="relative flex h-full w-64 max-w-[80vw] animate-slide-up flex-col overflow-y-auto border-r border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">EVOTASKS</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-horizontal.png" alt="EvoTask" className="h-11 w-auto rounded-md" />
                 <button
                   type="button"
                   onClick={() => setOpen(false)}

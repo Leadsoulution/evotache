@@ -8,7 +8,7 @@ import { AssigneeMenu } from "./AssigneeMenu";
 import { DueDateField } from "./DueDateField";
 import { InlineEditableText } from "./InlineEditableText";
 import { CustomFieldCell } from "./CustomFieldCell";
-import { ChevronDownIcon, ExpandIcon, GripVerticalIcon, PaperclipIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, EyeIcon, GripVerticalIcon, PaperclipIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { Assignee, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
@@ -175,7 +175,7 @@ export function TaskRow({
               className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
               aria-label={`Open details for ${task.title}`}
             >
-              <ExpandIcon className="h-3.5 w-3.5" />
+              <EyeIcon className="h-3.5 w-3.5" />
             </button>
             {permissions.canCreate && (
               <button

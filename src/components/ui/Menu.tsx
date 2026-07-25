@@ -179,7 +179,7 @@ export function Menu({ options, value, multiple = false, onChange, ariaLabel, al
               right: position.right ?? undefined,
               minWidth: Math.max(position.width, 180),
             }}
-            className="z-50 max-h-72 animate-scale-in overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+            className="z-[95] max-h-72 animate-scale-in overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl focus:outline-none dark:border-slate-700 dark:bg-slate-900"
           >
             {options.length === 0 && <div className="px-2.5 py-1.5 text-sm text-slate-400">No options</div>}
             {options.map((option, index) => {

@@ -21,6 +21,8 @@ function createSeedProjects(): Project[] {
       name: "Site Web LPR Maroc",
       description: "Refonte du site vitrine et catalogue produits LPR Maroc.",
       color: "#6366f1",
+      logoDataUrl: null,
+      teamIds: ["team-web"],
       createdAt: now,
     },
     {
@@ -28,6 +30,8 @@ function createSeedProjects(): Project[] {
       name: "Internal Tools",
       description: "Internal dashboards and tooling for the ops team.",
       color: "#22c55e",
+      logoDataUrl: null,
+      teamIds: ["team-ops"],
       createdAt: now,
     },
     {
@@ -35,6 +39,8 @@ function createSeedProjects(): Project[] {
       name: "Marketing Q3 Campaign",
       description: "Q3 marketing launch across web and social.",
       color: "#f59e0b",
+      logoDataUrl: null,
+      teamIds: [],
       createdAt: now,
     },
   ];
@@ -69,7 +75,13 @@ export async function fetchProjects(): Promise<Project[]> {
   return readAll();
 }
 
-export async function createProject(input: { name: string; description: string; color: string }): Promise<Project> {
+export async function createProject(input: {
+  name: string;
+  description: string;
+  color: string;
+  logoDataUrl?: string | null;
+  teamIds?: string[];
+}): Promise<Project> {
   await delay(NETWORK_DELAY_MS);
   const name = input.name.trim();
   if (!name) throw new ApiError("Project name is required.");
@@ -78,13 +90,15 @@ export async function createProject(input: { name: string; description: string; 
     name,
     description: input.description.trim(),
     color: input.color,
+    logoDataUrl: input.logoDataUrl ?? null,
+    teamIds: input.teamIds ?? [],
     createdAt: new Date().toISOString(),
   };
   writeAll([...readAll(), project]);
   return project;
 }
 
-export async function updateProject(id: string, patch: Partial<Pick<Project, "name" | "description" | "color">>): Promise<Project> {
+export async function updateProject(id: string, patch: Partial<Pick<Project, "name" | "description" | "color" | "logoDataUrl" | "teamIds">>): Promise<Project> {
   await delay(NETWORK_DELAY_MS);
   const items = readAll();
   const index = items.findIndex((p) => p.id === id);

@@ -22,7 +22,8 @@ export function AppSidebar() {
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex dark:border-slate-800 dark:bg-slate-950">
       <div className="px-4 py-4">
-        <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-50">EVOTASKS</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-horizontal.png" alt="EvoTask" className="h-14 w-auto rounded-md" />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 px-2">
         {navItems.map((item) => {

@@ -55,7 +55,12 @@ function subtreeMatches(task: Task, childrenMap: Map<string, Task[]>, filters: T
  */
 export function filterTopLevelTasks(topLevelTasks: Task[], allTasks: Task[], filters: TaskFilters, assigneeNameById: Record<string, string>): Task[] {
   const hasActiveFilter = Boolean(
-    filters.search || filters.statuses.length || filters.priorities.length || filters.assigneeIds.length || filters.projectIds.length
+    filters.search ||
+      filters.statuses.length ||
+      filters.priorities.length ||
+      filters.assigneeIds.length ||
+      filters.projectIds.length ||
+      filters.teamIds.length
   );
   if (!hasActiveFilter) return topLevelTasks;
   const childrenMap = buildChildrenMap(allTasks);

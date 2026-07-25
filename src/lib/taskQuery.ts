@@ -6,6 +6,7 @@ export function taskMatchesFilters(task: Task, filters: TaskFilters, assigneeNam
   if (filters.priorities.length && !filters.priorities.includes(task.priority)) return false;
   if (filters.assigneeIds.length && !task.assigneeIds.some((id) => filters.assigneeIds.includes(id))) return false;
   if (filters.projectIds.length && !(task.projectId && filters.projectIds.includes(task.projectId))) return false;
+  if (filters.teamIds.length && !(task.teamIds ?? []).some((id) => filters.teamIds.includes(id))) return false;
   const search = filters.search.trim().toLowerCase();
   if (search) {
     const haystack = [task.title, task.description, ...task.assigneeIds.map((id) => assigneeNameById[id] ?? "")].join(" ").toLowerCase();

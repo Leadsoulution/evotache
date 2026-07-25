@@ -18,12 +18,14 @@ interface SeedRow {
   assigneeIds: string[];
   dueDate: string | null;
   projectId?: string | null;
+  teamIds?: string[];
   description?: string;
 }
 
 const PROJECT_INTERNAL_TOOLS = "proj-internal-tools";
 const PROJECT_MARKETING_Q3 = "proj-marketing-q3";
 const PROJECT_LPR = "proj-lpr-maroc";
+const TEAM_WEB = "team-web";
 
 // Website-creation example project: "Site Web LPR Maroc". The Quads category
 // below uses the 4 real models provided so far (Trooper 110, Hawk 200R,
@@ -32,13 +34,13 @@ const PROJECT_LPR = "proj-lpr-maroc";
 // content, not real LPR data, until the full list is provided.
 const LPR_ROWS: SeedRow[] = [
   // Phase 1 — Design & UX
-  { id: "lpr-design", parentId: null, title: "Design & UX", status: "in_progress", priority: "high", assigneeIds: ["u2"], dueDate: daysFromToday(6), projectId: PROJECT_LPR },
+  { id: "lpr-design", parentId: null, title: "Design & UX", status: "in_progress", priority: "high", assigneeIds: ["u2"], dueDate: daysFromToday(6), projectId: PROJECT_LPR, teamIds: [TEAM_WEB] },
   { id: "lpr-design-1", parentId: "lpr-design", title: "Wireframes desktop & mobile", status: "done", priority: "normal", assigneeIds: ["u2"], dueDate: daysFromToday(-3) },
   { id: "lpr-design-2", parentId: "lpr-design", title: "Charte graphique / design system", status: "in_progress", priority: "normal", assigneeIds: ["u2"], dueDate: daysFromToday(2) },
   { id: "lpr-design-3", parentId: "lpr-design", title: "Maquettes des pages catalogue", status: "todo", priority: "normal", assigneeIds: ["u2"], dueDate: daysFromToday(5) },
 
   // Phase 2 — Création du catalogue LPR Maroc
-  { id: "lpr-catalog", parentId: null, title: "Création du catalogue LPR Maroc", status: "in_progress", priority: "high", assigneeIds: ["u1"], dueDate: daysFromToday(10), projectId: PROJECT_LPR },
+  { id: "lpr-catalog", parentId: null, title: "Création du catalogue LPR Maroc", status: "in_progress", priority: "high", assigneeIds: ["u1"], dueDate: daysFromToday(10), projectId: PROJECT_LPR, teamIds: [TEAM_WEB] },
   { id: "lpr-catalog-quads", parentId: "lpr-catalog", title: "Quads", status: "in_progress", priority: "high", assigneeIds: ["u1"], dueDate: daysFromToday(8) },
   { id: "lpr-quad-trooper110", parentId: "lpr-catalog-quads", title: "Trooper 110", status: "in_progress", priority: "normal", assigneeIds: ["u1"], dueDate: daysFromToday(4) },
   { id: "lpr-quad-trooper110-1", parentId: "lpr-quad-trooper110", title: "Fichier Excel des composants de véhicule", status: "done", priority: "normal", assigneeIds: ["u1"], dueDate: daysFromToday(-2) },
@@ -52,6 +54,9 @@ const LPR_ROWS: SeedRow[] = [
   { id: "lpr-quad-hawk250r", parentId: "lpr-catalog-quads", title: "Hawk 250R", status: "todo", priority: "normal", assigneeIds: ["u1"], dueDate: daysFromToday(7) },
   { id: "lpr-quad-hawk250r-1", parentId: "lpr-quad-hawk250r", title: "Fichier Excel des composants de véhicule", status: "todo", priority: "normal", assigneeIds: ["u1"], dueDate: daysFromToday(7) },
   { id: "lpr-quad-hawk250r-2", parentId: "lpr-quad-hawk250r", title: "Fichier Excel des pièces moteur", status: "todo", priority: "normal", assigneeIds: ["u1"], dueDate: daysFromToday(7) },
+  { id: "lpr-quad-xtank200r", parentId: "lpr-catalog-quads", title: "XTANK 200R", status: "todo", priority: "normal", assigneeIds: ["u3"], dueDate: daysFromToday(8) },
+  { id: "lpr-quad-xtank200r-1", parentId: "lpr-quad-xtank200r", title: "Fichier Excel des composants de véhicule", status: "todo", priority: "normal", assigneeIds: ["u3"], dueDate: daysFromToday(8) },
+  { id: "lpr-quad-xtank200r-2", parentId: "lpr-quad-xtank200r", title: "Fichier Excel des pièces moteur", status: "todo", priority: "normal", assigneeIds: ["u3"], dueDate: daysFromToday(8) },
 
   // Phase 3 — Développement
   { id: "lpr-dev", parentId: null, title: "Développement", status: "todo", priority: "high", assigneeIds: ["u5"], dueDate: daysFromToday(15), projectId: PROJECT_LPR },
@@ -170,6 +175,7 @@ export function createSeedTasks(): Task[] {
     status: row.status,
     priority: row.priority,
     assigneeIds: row.assigneeIds,
+    teamIds: row.teamIds ?? [],
     dueDate: row.dueDate,
     projectId: row.projectId ?? null,
     order: index,
@@ -199,6 +205,7 @@ export function createSeedDisputes(): Task[] {
     status: row.status,
     priority: row.priority,
     assigneeIds: row.assigneeIds,
+    teamIds: row.teamIds ?? [],
     dueDate: row.dueDate,
     projectId: row.projectId ?? null,
     order: index,

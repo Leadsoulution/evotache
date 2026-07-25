@@ -27,6 +27,17 @@ export function isOverdue(iso: string | null): boolean {
   return due.getTime() < today.getTime();
 }
 
+export function isDueToday(iso: string | null): boolean {
+  if (!iso) return false;
+  const due = startOfDay(new Date(iso));
+  const today = startOfDay(new Date());
+  return due.getTime() === today.getTime();
+}
+
+export function isToday(iso: string): boolean {
+  return startOfDay(new Date(iso)).getTime() === startOfDay(new Date()).getTime();
+}
+
 export function isDueSoon(iso: string | null): boolean {
   if (!iso) return false;
   const due = startOfDay(new Date(iso));
@@ -43,4 +54,16 @@ export function toDateInputValue(iso: string | null): string {
 export function fromDateInputValue(value: string): string | null {
   if (!value) return null;
   return new Date(`${value}T00:00:00`).toISOString();
+}
+
+export function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return formatDueDate(iso);
 }
