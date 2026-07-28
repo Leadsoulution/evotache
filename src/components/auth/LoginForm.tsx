@@ -52,9 +52,9 @@ export function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-dark.png" alt="EvoTask" className="mx-auto h-28 w-auto dark:hidden" />
+          <img src="/logo-dark.png" alt="EvoTask" className="mx-auto h-auto w-64 dark:hidden" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-light.png" alt="EvoTask" className="mx-auto hidden h-28 w-auto dark:block" />
+          <img src="/logo-light.png" alt="EvoTask" className="mx-auto hidden h-auto w-64 dark:block" />
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sign in to manage your tasks.</p>
         </div>
 
