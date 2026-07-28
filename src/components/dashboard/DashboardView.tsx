@@ -9,6 +9,8 @@ import { useProjects } from "@/hooks/useProjects";
 import { useTeams } from "@/hooks/useTeams";
 import { useUsers } from "@/hooks/useUsers";
 import { useGlobalFilters } from "@/hooks/useGlobalFilters";
+import { canManageUsers } from "@/config/roleMeta";
+import { getVisibleUserIds } from "@/lib/orgChart";
 import { GlobalFilterBar } from "@/components/filters/GlobalFilterBar";
 import { UserSelectorBar } from "@/components/filters/UserSelectorBar";
 import { StatTile } from "@/components/stats/StatTile";
@@ -45,8 +47,15 @@ export function DashboardView() {
   const { statuses, priorities } = useTaskMeta();
   const { projects } = useProjects();
   const { teams } = useTeams();
-  const { users } = useUsers();
+  const { users: allUsers } = useUsers();
   const { filters, setTeamIds, setUserIds, setProjectIds, setPriorities, setStatuses, setDateRange, selectUser, clearAll } = useGlobalFilters();
+
+  const isAdmin = user ? canManageUsers(user.role) : false;
+  const users = useMemo(() => {
+    if (!user || isAdmin) return allUsers;
+    const visibleUserIds = new Set(getVisibleUserIds(allUsers, user.id));
+    return allUsers.filter((u) => visibleUserIds.has(u.id));
+  }, [allUsers, user, isAdmin]);
 
   const tasks = useMemo(() => applyGlobalFilters(allTasks, filters), [allTasks, filters]);
   const disputes = useMemo(() => applyGlobalFilters(allDisputes, filters), [allDisputes, filters]);
@@ -68,7 +77,7 @@ export function DashboardView() {
   const isLoading = tasksLoadState === "loading" || disputesLoadState === "loading";
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[95%] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
           {user ? `Welcome back, ${user.name.split(" ")[0]}` : "Dashboard"}

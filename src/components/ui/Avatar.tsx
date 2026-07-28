@@ -3,7 +3,8 @@ import { cn } from "@/lib/cn";
 interface AvatarProps {
   name: string;
   color: string;
-  size?: "xs" | "sm" | "md";
+  photoDataUrl?: string | null;
+  size?: "xs" | "sm" | "md" | "lg";
   className?: string;
 }
 
@@ -11,6 +12,7 @@ const SIZE_CLASSES: Record<NonNullable<AvatarProps["size"]>, string> = {
   xs: "h-5 w-5 text-[10px]",
   sm: "h-6 w-6 text-[11px]",
   md: "h-8 w-8 text-sm",
+  lg: "h-12 w-12 text-base",
 };
 
 export function getInitials(name: string): string {
@@ -22,7 +24,19 @@ export function getInitials(name: string): string {
   return initials || "?";
 }
 
-export function Avatar({ name, color, size = "sm", className }: AvatarProps) {
+export function Avatar({ name, color, photoDataUrl, size = "sm", className }: AvatarProps) {
+  if (photoDataUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={photoDataUrl}
+        alt={name}
+        title={name}
+        className={cn("shrink-0 rounded-full object-cover ring-2 ring-white dark:ring-slate-900", SIZE_CLASSES[size], className)}
+      />
+    );
+  }
+
   return (
     <span
       title={name}

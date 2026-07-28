@@ -1,6 +1,17 @@
 import type { AppUser } from "@/types/user";
 
 /**
+ * Shared visibility scope for the mock services (tasks, projects, teams):
+ * an admin sees everything; everyone else sees only what's tied to
+ * themselves or a subordinate (recursively, via the manager chain).
+ */
+export interface VisibilityScope {
+  userId: string;
+  isAdmin: boolean;
+  visibleUserIds: string[];
+}
+
+/**
  * A user can see their own tasks plus every direct/indirect subordinate's
  * tasks (walking the manager -> report chain), so a manager doesn't need
  * to be assigned a task themselves to see their team's work.

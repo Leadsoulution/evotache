@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
+import type { ColumnMapping, GoogleSheetStatus } from "@/types/googleSheet";
 
 // Server-only. Lets an admin configure the OpenAI key from the app UI instead
 // of only through a process env var, by persisting it to a local, gitignored
@@ -9,7 +10,14 @@ const STORE_PATH = path.join(process.cwd(), ".data", "settings.json");
 
 interface StoredSettings {
   openaiApiKey?: string;
+  googleSheetWebAppUrl?: string;
+  googleSheetToken?: string;
+  googleSheetColumnMapping?: ColumnMapping;
+  googleSheetProductsPerDay?: number;
 }
+
+const DEFAULT_COLUMN_MAPPING: ColumnMapping = { name: null, reference: null, lastSaleDate: null, purchaseDate: null };
+const DEFAULT_PRODUCTS_PER_DAY = 20;
 
 async function readSettings(): Promise<StoredSettings> {
   try {
@@ -57,5 +65,47 @@ export async function setOpenAIKey(key: string | null): Promise<void> {
   const settings = await readSettings();
   if (key) settings.openaiApiKey = key;
   else delete settings.openaiApiKey;
+  await writeSettings(settings);
+}
+
+export async function getGoogleSheetStatus(): Promise<GoogleSheetStatus> {
+  const settings = await readSettings();
+  return {
+    configured: Boolean(settings.googleSheetWebAppUrl),
+    webAppUrl: settings.googleSheetWebAppUrl ?? null,
+    maskedToken: settings.googleSheetToken ? maskKey(settings.googleSheetToken) : null,
+    columnMapping: settings.googleSheetColumnMapping ?? DEFAULT_COLUMN_MAPPING,
+    productsPerDay: settings.googleSheetProductsPerDay ?? DEFAULT_PRODUCTS_PER_DAY,
+  };
+}
+
+/** Server-only: includes the raw URL/token, never sent to the client — only `/api/social/sheet-data` reads this to proxy the actual fetch. */
+export async function getGoogleSheetConnection(): Promise<{ webAppUrl: string; token: string | null } | null> {
+  const settings = await readSettings();
+  if (!settings.googleSheetWebAppUrl) return null;
+  return { webAppUrl: settings.googleSheetWebAppUrl, token: settings.googleSheetToken ?? null };
+}
+
+export async function setGoogleSheetConnection(webAppUrl: string, token: string | null): Promise<void> {
+  const settings = await readSettings();
+  settings.googleSheetWebAppUrl = webAppUrl;
+  if (token) settings.googleSheetToken = token;
+  else delete settings.googleSheetToken;
+  await writeSettings(settings);
+}
+
+export async function setGoogleSheetMapping(columnMapping: ColumnMapping, productsPerDay: number): Promise<void> {
+  const settings = await readSettings();
+  settings.googleSheetColumnMapping = columnMapping;
+  settings.googleSheetProductsPerDay = productsPerDay;
+  await writeSettings(settings);
+}
+
+export async function clearGoogleSheetConnection(): Promise<void> {
+  const settings = await readSettings();
+  delete settings.googleSheetWebAppUrl;
+  delete settings.googleSheetToken;
+  delete settings.googleSheetColumnMapping;
+  delete settings.googleSheetProductsPerDay;
   await writeSettings(settings);
 }

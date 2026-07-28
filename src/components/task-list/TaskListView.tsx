@@ -8,9 +8,12 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useTaskMeta } from "@/hooks/useTaskMeta";
 import { useCustomFields } from "@/hooks/useCustomFields";
 import { useViewPrefs } from "@/hooks/useViewPrefs";
+import { usePagination } from "@/hooks/usePagination";
 import { useProjects } from "@/hooks/useProjects";
 import { useTeams } from "@/hooks/useTeams";
+import { Pagination } from "@/components/ui/Pagination";
 import { getTaskPermissions } from "@/lib/taskPermissions";
+import { canManageWorkflow } from "@/config/roleMeta";
 import { TaskListToolbar } from "./TaskListToolbar";
 import type { TaskViewMode } from "./TaskListToolbar";
 import { TaskTable } from "./TaskTable";
@@ -25,7 +28,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { groupTasks, sortTasks } from "@/lib/taskQuery";
 import { countDescendants, filterTopLevelTasks, flattenVisibleTree, getChildren } from "@/lib/taskTree";
 import { fetchAttachmentCountsByTask } from "@/services/attachmentApi";
-import type { GroupField, SortDirection, SortField, Task, TaskFilters, TaskModule } from "@/types/task";
+import type { GroupField, SortDirection, SortField, Task, TaskFilters, TaskModule, TaskTypeFilter } from "@/types/task";
 
 interface TaskListViewProps {
   module: TaskModule;
@@ -38,8 +41,9 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   const permissions = getTaskPermissions(user?.role);
   const { tasks, assignees, loadState, errorMessage, refetch, createTask, updateTask, deleteTasks, reorderTask } = useTasks(module);
   const { statuses, priorities, loadState: metaLoadState } = useTaskMeta();
-  const { fields: customFields } = useCustomFields();
-  const { hiddenColumnIds, toggleColumn } = useViewPrefs();
+  const { fields: customFields, addField, editField, removeField } = useCustomFields();
+  const canManageFields = user ? canManageWorkflow(user.role) : false;
+  const { hiddenColumnIds, toggleColumn, columnWidths, setColumnWidth, columnOrder, reorderColumns, pageSize, setPageSize } = useViewPrefs();
   const { projects } = useProjects();
   const { teams } = useTeams();
   const searchParams = useSearchParams();
@@ -57,6 +61,8 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     const teamParam = searchParams.get("team");
     return teamParam ? [teamParam] : [];
   });
+  const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter[]>([]);
+  const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [viewMode, setViewMode] = useState<TaskViewMode>("list");
   const [groupField, setGroupField] = useState<GroupField>("status");
   const [sortField, setSortField] = useState<SortField>("manual");
@@ -82,7 +88,14 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   }, [tasks, attachmentRefreshKey]);
 
   const hasActiveFilters = Boolean(
-    debouncedSearch || statusFilter.length || priorityFilter.length || assigneeFilter.length || projectFilter.length || teamFilter.length
+    debouncedSearch ||
+      statusFilter.length ||
+      priorityFilter.length ||
+      assigneeFilter.length ||
+      projectFilter.length ||
+      teamFilter.length ||
+      taskTypeFilter.length ||
+      myTasksOnly
   );
 
   const groups: TaskTableGroup[] = useMemo(() => {
@@ -93,6 +106,9 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
       assigneeIds: assigneeFilter,
       projectIds: projectFilter,
       teamIds: teamFilter,
+      taskTypes: taskTypeFilter,
+      myTasksOnly,
+      currentUserId: user?.id ?? "",
     };
     const topLevel = tasks.filter((t) => t.parentId === null);
     const filteredTopLevel = filterTopLevelTasks(topLevel, tasks, filters, assigneeNameById);
@@ -113,6 +129,9 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     assigneeFilter,
     projectFilter,
     teamFilter,
+    taskTypeFilter,
+    myTasksOnly,
+    user,
     assigneeNameById,
     sortField,
     sortDirection,
@@ -131,25 +150,72 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
       assigneeIds: assigneeFilter,
       projectIds: projectFilter,
       teamIds: teamFilter,
+      taskTypes: taskTypeFilter,
+      myTasksOnly,
+      currentUserId: user?.id ?? "",
     };
     const topLevel = tasks.filter((t) => t.parentId === null);
     const filteredTopLevel = filterTopLevelTasks(topLevel, tasks, filters, assigneeNameById);
     return flattenVisibleTree(filteredTopLevel, tasks, new Set()).map((row) => row.task);
-  }, [tasks, debouncedSearch, statusFilter, priorityFilter, assigneeFilter, projectFilter, teamFilter, assigneeNameById]);
+  }, [tasks, debouncedSearch, statusFilter, priorityFilter, assigneeFilter, projectFilter, teamFilter, taskTypeFilter, myTasksOnly, user, assigneeNameById]);
 
   const allRowIds = useMemo(() => groups.flatMap((g) => g.rows.map((r) => r.task.id)), [groups]);
   const totalRows = allRowIds.length;
 
+  const flatRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
+  const { page: rawPage, setPage, pageCount } = usePagination(flatRows.length, pageSize);
+  // Render-time reset (no effect): jump back to page 1 whenever the result
+  // set itself changes shape, so pagination never strands the user on a
+  // page number that no longer corresponds to their filters/sort/grouping.
+  const filterSignature = JSON.stringify([
+    debouncedSearch,
+    statusFilter,
+    priorityFilter,
+    assigneeFilter,
+    projectFilter,
+    teamFilter,
+    taskTypeFilter,
+    myTasksOnly,
+    sortField,
+    sortDirection,
+    groupField,
+  ]);
+  const [lastFilterSignature, setLastFilterSignature] = useState(filterSignature);
+  const filtersChanged = filterSignature !== lastFilterSignature;
+  if (filtersChanged) {
+    setLastFilterSignature(filterSignature);
+    setPage(1);
+  }
+  const page = filtersChanged ? 1 : rawPage;
+  const pageStart = pageSize === "all" ? 0 : (page - 1) * pageSize;
+  const pageEnd = pageSize === "all" ? flatRows.length : Math.min(pageStart + pageSize, flatRows.length);
+
+  const pagedGroups: TaskTableGroup[] = useMemo(() => {
+    const pageIds = new Set(flatRows.slice(pageStart, pageEnd).map((r) => r.task.id));
+    return groups.map((g) => ({ ...g, rows: g.rows.filter((r) => pageIds.has(r.task.id)) })).filter((g) => g.rows.length > 0);
+  }, [groups, flatRows, pageStart, pageEnd]);
+
+  // Union of the user's own "Columns" toggle and any columns an admin has
+  // hidden for them — the admin restriction can never be re-enabled by the
+  // user's own self-service preference.
+  const effectiveHiddenColumnIds = useMemo(
+    () => Array.from(new Set([...hiddenColumnIds, ...(user?.hiddenColumnIds ?? [])])),
+    [hiddenColumnIds, user]
+  );
   const visibleColumns = useMemo(
     () => ({
-      assignees: !hiddenColumnIds.includes("assignees"),
-      dueDate: !hiddenColumnIds.includes("dueDate"),
-      priority: !hiddenColumnIds.includes("priority"),
-      status: !hiddenColumnIds.includes("status"),
+      assignees: !effectiveHiddenColumnIds.includes("assignees"),
+      team: !effectiveHiddenColumnIds.includes("team"),
+      dueDate: !effectiveHiddenColumnIds.includes("dueDate"),
+      priority: !effectiveHiddenColumnIds.includes("priority"),
+      status: !effectiveHiddenColumnIds.includes("status"),
     }),
-    [hiddenColumnIds]
+    [effectiveHiddenColumnIds]
   );
-  const visibleCustomFields = useMemo(() => customFields.filter((f) => !hiddenColumnIds.includes(f.id)), [customFields, hiddenColumnIds]);
+  const visibleCustomFields = useMemo(
+    () => customFields.filter((f) => !effectiveHiddenColumnIds.includes(f.id)),
+    [customFields, effectiveHiddenColumnIds]
+  );
 
   function toggleSelect(id: string, checked: boolean) {
     setSelectedIds((current) => {
@@ -180,6 +246,8 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     setAssigneeFilter([]);
     setProjectFilter([]);
     setTeamFilter([]);
+    setTaskTypeFilter([]);
+    setMyTasksOnly(false);
   }
 
   function handleAddSubtask(parentId: string) {
@@ -216,7 +284,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   const isReady = loadState === "success" && metaLoadState === "success";
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[95%] flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">{title}</h1>
@@ -242,6 +310,10 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         onProjectFilterChange={setProjectFilter}
         teamFilter={teamFilter}
         onTeamFilterChange={setTeamFilter}
+        taskTypeFilter={taskTypeFilter}
+        onTaskTypeFilterChange={setTaskTypeFilter}
+        myTasksOnly={myTasksOnly}
+        onMyTasksOnlyChange={setMyTasksOnly}
         assignees={assignees}
         projects={projects}
         teams={teams}
@@ -274,13 +346,23 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
       {isReady && (totalRows > 0 || !hasActiveFilters) && viewMode === "list" && (
         <>
           <TaskTable
-            groups={groups}
+            groups={pagedGroups}
             allTasksById={allTasksById}
             assignees={assignees}
+            teams={teams}
+            columnWidths={columnWidths}
+            onResizeColumn={setColumnWidth}
+            columnOrder={columnOrder}
+            onReorderColumns={reorderColumns}
             statuses={statuses}
             priorities={priorities}
             visibleColumns={visibleColumns}
             visibleCustomFields={visibleCustomFields}
+            canManageFields={canManageFields}
+            onAddCustomField={addField}
+            onRenameCustomField={(id, name) => editField(id, { name })}
+            onSetCustomFieldOptions={(id, options) => editField(id, { options })}
+            onDeleteCustomField={removeField}
             attachmentCounts={attachmentCounts}
             groupField={groupField}
             dragEnabled={sortField === "manual" && permissions.canEditFull}
@@ -298,8 +380,9 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
             onCreate={createTask}
           />
           <TaskCardList
-            groups={groups}
+            groups={pagedGroups}
             assignees={assignees}
+            teams={teams}
             statuses={statuses}
             priorities={priorities}
             visibleColumns={visibleColumns}
@@ -316,6 +399,21 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
             onOpenDetail={setDetailTask}
             onCreate={createTask}
           />
+          {totalRows > 0 && (
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              total={totalRows}
+              rangeStart={pageStart + 1}
+              rangeEnd={pageEnd}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          )}
         </>
       )}
 

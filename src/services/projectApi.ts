@@ -1,4 +1,6 @@
 import { generateId } from "@/lib/id";
+import { fetchTeams } from "@/services/teamApi";
+import type { VisibilityScope } from "@/lib/orgChart";
 import type { Project } from "@/types/project";
 
 const STORAGE_KEY = "evotasks.projects.v1";
@@ -23,6 +25,7 @@ function createSeedProjects(): Project[] {
       color: "#6366f1",
       logoDataUrl: null,
       teamIds: ["team-web"],
+      excludedUserIds: [],
       createdAt: now,
     },
     {
@@ -32,6 +35,7 @@ function createSeedProjects(): Project[] {
       color: "#22c55e",
       logoDataUrl: null,
       teamIds: ["team-ops"],
+      excludedUserIds: [],
       createdAt: now,
     },
     {
@@ -41,6 +45,7 @@ function createSeedProjects(): Project[] {
       color: "#f59e0b",
       logoDataUrl: null,
       teamIds: [],
+      excludedUserIds: [],
       createdAt: now,
     },
   ];
@@ -70,9 +75,19 @@ function writeAll(items: Project[]): void {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-export async function fetchProjects(): Promise<Project[]> {
+/**
+ * Visibility-scoped list for the UI: admins see all projects; everyone else
+ * sees a project if it's unscoped (no team) or owned by a team they can see
+ * (their own or a subordinate's), minus any project that excluded them.
+ */
+export async function fetchProjects(scope: VisibilityScope): Promise<Project[]> {
   await delay(NETWORK_DELAY_MS);
-  return readAll();
+  const all = readAll();
+  if (scope.isAdmin) return all;
+  const visibleTeamIds = new Set((await fetchTeams(scope)).map((t) => t.id));
+  return all.filter(
+    (p) => (p.teamIds.length === 0 || p.teamIds.some((id) => visibleTeamIds.has(id))) && !(p.excludedUserIds ?? []).includes(scope.userId)
+  );
 }
 
 export async function createProject(input: {
@@ -81,6 +96,7 @@ export async function createProject(input: {
   color: string;
   logoDataUrl?: string | null;
   teamIds?: string[];
+  excludedUserIds?: string[];
 }): Promise<Project> {
   await delay(NETWORK_DELAY_MS);
   const name = input.name.trim();
@@ -92,13 +108,17 @@ export async function createProject(input: {
     color: input.color,
     logoDataUrl: input.logoDataUrl ?? null,
     teamIds: input.teamIds ?? [],
+    excludedUserIds: input.excludedUserIds ?? [],
     createdAt: new Date().toISOString(),
   };
   writeAll([...readAll(), project]);
   return project;
 }
 
-export async function updateProject(id: string, patch: Partial<Pick<Project, "name" | "description" | "color" | "logoDataUrl" | "teamIds">>): Promise<Project> {
+export async function updateProject(
+  id: string,
+  patch: Partial<Pick<Project, "name" | "description" | "color" | "logoDataUrl" | "teamIds" | "excludedUserIds">>
+): Promise<Project> {
   await delay(NETWORK_DELAY_MS);
   const items = readAll();
   const index = items.findIndex((p) => p.id === id);

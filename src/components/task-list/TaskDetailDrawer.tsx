@@ -7,11 +7,13 @@ import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
 import { TeamMenu } from "./TeamMenu";
 import { DueDateField } from "./DueDateField";
+import { RecurrenceMenu } from "./RecurrenceMenu";
 import { CustomFieldCell } from "./CustomFieldCell";
 import { AttachmentList } from "./AttachmentList";
 import { AttachmentUploader } from "./AttachmentUploader";
 import { useAttachments } from "@/hooks/useAttachments";
 import { Menu } from "@/components/ui/Menu";
+import { UserExcludeMenu } from "@/components/ui/UserExcludeMenu";
 import { ProjectAvatar } from "@/components/projects/ProjectAvatar";
 import { ChevronDownIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -140,6 +142,10 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
           <p className="mb-1 text-xs font-medium text-slate-400">Due date</p>
           <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
         </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-slate-400">Repeat</p>
+          <RecurrenceMenu value={task.recurrence} dueDate={task.dueDate} onChange={(recurrence) => onUpdate(task.id, { recurrence })} readOnly={!permissions.canEditFull} />
+        </div>
       </div>
 
       {projects.length > 0 && (
@@ -151,10 +157,21 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
 
       {teams.length > 0 && (
         <div>
-          <p className="mb-1 text-xs font-medium text-slate-400">Teams</p>
+          <p className="mb-1 text-xs font-medium text-slate-400">Departments</p>
           <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
         </div>
       )}
+
+      <div>
+        <p className="mb-1 text-xs font-medium text-slate-400">Exclude a user</p>
+        <UserExcludeMenu
+          users={assignees}
+          value={task.excludedUserIds ?? []}
+          onChange={(excludedUserIds) => onUpdate(task.id, { excludedUserIds })}
+          readOnly={!permissions.canEditFull}
+        />
+        <p className="mt-1 text-xs text-slate-400">Hides this task from that person even if they&apos;d normally see it as a manager.</p>
+      </div>
 
       {subtaskCount > 0 && (
         <p className="text-xs text-slate-400">

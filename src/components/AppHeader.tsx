@@ -3,21 +3,28 @@
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Avatar } from "@/components/ui/Avatar";
 import { Menu } from "@/components/ui/Menu";
 import { ACCOUNT_MENU_OPTIONS, handleAccountMenuChange } from "@/config/accountMenu";
+import type { NavBadgeCounts } from "@/hooks/useNavBadgeCounts";
 
-export function AppHeader() {
+interface AppHeaderProps {
+  navBadgeCounts: NavBadgeCounts;
+}
+
+export function AppHeader({ navBadgeCounts }: AppHeaderProps) {
   const { user, logout } = useAuth();
 
   if (!user) return null;
 
   return (
     <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-slate-200 bg-white/80 px-3 py-2.5 backdrop-blur md:hidden dark:border-slate-800 dark:bg-slate-950/80">
-      <MobileNavDrawer />
+      <MobileNavDrawer navBadgeCounts={navBadgeCounts} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-horizontal.png" alt="EvoTask" className="h-11 w-auto rounded-md" />
       <div className="ml-auto flex items-center gap-2">
+        <NotificationBell align="end" />
         <ThemeToggle />
         <Menu
           options={ACCOUNT_MENU_OPTIONS}
@@ -27,7 +34,7 @@ export function AppHeader() {
           align="end"
           renderTrigger={() => (
             <span className="flex items-center gap-1.5 rounded-lg border border-slate-200 p-1 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-              <Avatar name={user.name} color={user.color} size="sm" />
+              <Avatar name={user.name} color={user.color} photoDataUrl={user.photoDataUrl} size="sm" />
             </span>
           )}
         />

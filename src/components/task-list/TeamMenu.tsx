@@ -36,7 +36,7 @@ export function TeamMenu({ teams, value, onChange, readOnly }: TeamMenuProps) {
       {selected.map((team) => (
         <TeamChip key={team.id} team={team} />
       ))}
-      {selected.length === 0 && <span className="text-xs text-slate-400">No team</span>}
+      {selected.length === 0 && <span className="text-xs text-slate-400">No department</span>}
     </span>
   );
 
@@ -48,7 +48,7 @@ export function TeamMenu({ teams, value, onChange, readOnly }: TeamMenuProps) {
       value={value}
       multiple
       onChange={onChange}
-      ariaLabel="Assign teams"
+      ariaLabel="Assign departments"
       renderTrigger={({ open }) => (
         <span
           className={cn(
@@ -62,7 +62,7 @@ export function TeamMenu({ teams, value, onChange, readOnly }: TeamMenuProps) {
           {selected.length === 0 && (
             <span className="flex items-center gap-1 text-xs text-slate-400">
               <UsersIcon className="h-3.5 w-3.5" />
-              Assign team
+              Assign department
             </span>
           )}
         </span>

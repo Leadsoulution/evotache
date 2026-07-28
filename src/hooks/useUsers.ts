@@ -13,8 +13,11 @@ interface CreateUserInput {
   password: string;
   role: Role;
   color: string;
+  photoDataUrl?: string | null;
   managerIds?: string[];
   teamIds?: string[];
+  visibleSectionHrefs?: string[] | null;
+  hiddenColumnIds?: string[];
 }
 
 interface UpdateUserPatch {
@@ -23,8 +26,12 @@ interface UpdateUserPatch {
   role?: Role;
   status?: UserStatus;
   password?: string;
+  color?: string;
+  photoDataUrl?: string | null;
   managerIds?: string[];
   teamIds?: string[];
+  visibleSectionHrefs?: string[] | null;
+  hiddenColumnIds?: string[];
 }
 
 interface UseUsersResult {
@@ -103,7 +110,11 @@ export function useUsers(): UseUsersResult {
         ...(patch.email !== undefined && { email: patch.email }),
         ...(patch.role !== undefined && { role: patch.role }),
         ...(patch.status !== undefined && { status: patch.status }),
+        ...(patch.color !== undefined && { color: patch.color }),
+        ...(patch.photoDataUrl !== undefined && { photoDataUrl: patch.photoDataUrl }),
         ...(patch.managerIds !== undefined && { managerIds: patch.managerIds }),
+        ...(patch.visibleSectionHrefs !== undefined && { visibleSectionHrefs: patch.visibleSectionHrefs }),
+        ...(patch.hiddenColumnIds !== undefined && { hiddenColumnIds: patch.hiddenColumnIds }),
       };
       setUsers(previous.map((u) => (u.id === id ? { ...u, ...userPatch } : u)));
       try {

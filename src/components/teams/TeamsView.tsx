@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTeams } from "@/hooks/useTeams";
 import { useUsers } from "@/hooks/useUsers";
 import { useTasks } from "@/hooks/useTasks";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canManageWorkflow } from "@/config/roleMeta";
 import { Avatar } from "@/components/ui/Avatar";
 import { TeamDialog } from "@/components/admin/TeamDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -16,19 +16,14 @@ import type { Team } from "@/types/team";
 
 export function TeamsView() {
   const { user } = useAuth();
-  const isAdmin = user ? canManageUsers(user.role) : false;
   const canManage = user ? canManageWorkflow(user.role) : false;
-  const { teams: allTeams, loadState, addTeam, editTeam, removeTeam } = useTeams();
+  const { teams, loadState, addTeam, editTeam, removeTeam } = useTeams();
   const { users } = useUsers();
   const { tasks } = useTasks("task");
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-
-  // Only admins get full org oversight here — everyone else sees just the
-  // teams they're actually a member of.
-  const teams = isAdmin || !user ? allTeams : allTeams.filter((team) => team.memberIds.includes(user.id));
 
   const usersById = new Map(users.map((u) => [u.id, u]));
   const taskCountByTeam = tasks.reduce<Record<string, number>>((acc, task) => {
@@ -39,11 +34,11 @@ export function TeamsView() {
   const pendingTeam = teams.find((t) => t.id === pendingDeleteId) ?? null;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[95%] flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Teams</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Open a team to see its tasks, or assign a team to tasks and projects.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Departments</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Open a department to see its tasks, or assign a department to tasks and projects.</p>
         </div>
         {canManage && (
           <button
@@ -55,7 +50,7 @@ export function TeamsView() {
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
           >
             <PlusIcon className="h-4 w-4" />
-            New team
+            New department
           </button>
         )}
       </header>
@@ -65,7 +60,7 @@ export function TeamsView() {
       {loadState === "success" && teams.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center dark:border-slate-800 dark:bg-slate-900">
           <UsersIcon className="h-10 w-10 text-slate-300 dark:text-slate-700" />
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">No teams yet</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">No departments yet</p>
         </div>
       )}
 
@@ -86,7 +81,7 @@ export function TeamsView() {
                   {team.memberIds.slice(0, 6).map((id) => {
                     const member = usersById.get(id);
                     if (!member) return null;
-                    return <Avatar key={id} name={member.name} color={member.color} size="sm" />;
+                    return <Avatar key={id} name={member.name} color={member.color} photoDataUrl={member.photoDataUrl} size="sm" />;
                   })}
                   {team.memberIds.length === 0 && <span className="text-xs text-slate-400">No members yet</span>}
                   {team.memberIds.length > 6 && (
@@ -137,8 +132,8 @@ export function TeamsView() {
 
       <ConfirmDialog
         open={pendingDeleteId !== null}
-        title="Delete this team?"
-        description={pendingTeam ? `"${pendingTeam.name}" will be removed. Tasks and projects already linked to it keep their history but lose the team link.` : ""}
+        title="Delete this department?"
+        description={pendingTeam ? `"${pendingTeam.name}" will be removed. Tasks and projects already linked to it keep their history but lose the department link.` : ""}
         confirmLabel="Delete"
         destructive
         onConfirm={async () => {

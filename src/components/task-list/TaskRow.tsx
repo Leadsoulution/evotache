@@ -5,18 +5,22 @@ import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent }
 import { StatusMenu } from "./StatusMenu";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
+import { TeamMenu } from "./TeamMenu";
 import { DueDateField } from "./DueDateField";
 import { InlineEditableText } from "./InlineEditableText";
 import { CustomFieldCell } from "./CustomFieldCell";
-import { ChevronDownIcon, EyeIcon, GripVerticalIcon, PaperclipIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, EyeIcon, GripVerticalIcon, PaperclipIcon, PlusIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
+import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/cn";
 import type { Assignee, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { CustomFieldDef } from "@/types/customField";
 import type { TaskPermissions } from "@/lib/taskPermissions";
+import type { Team } from "@/types/team";
 
 export interface VisibleColumns {
   assignees: boolean;
+  team: boolean;
   dueDate: boolean;
   priority: boolean;
   status: boolean;
@@ -29,9 +33,11 @@ interface TaskRowProps {
   collapsed: boolean;
   onToggleCollapse: (id: string) => void;
   assignees: Assignee[];
+  teams: Team[];
   statuses: StatusDef[];
   priorities: PriorityDef[];
-  visibleColumns: VisibleColumns;
+  /** Data column ids (fixed field names + custom field ids) in display order — drives both the header and this row's cells so they always stay aligned. */
+  columnOrder: string[];
   visibleCustomFields: CustomFieldDef[];
   attachmentCount: number;
   selected: boolean;
@@ -55,9 +61,10 @@ export function TaskRow({
   collapsed,
   onToggleCollapse,
   assignees,
+  teams,
   statuses,
   priorities,
-  visibleColumns,
+  columnOrder,
   visibleCustomFields,
   attachmentCount,
   selected,
@@ -113,7 +120,7 @@ export function TaskRow({
       onDrop={handleDrop}
       onDragLeave={() => setDragHover(null)}
     >
-      <td className="w-14 px-2 py-1.5">
+      <td className="overflow-hidden px-2 py-1.5">
         <div className="flex items-center gap-1">
           <span
             draggable={dragEnabled}
@@ -138,7 +145,7 @@ export function TaskRow({
           />
         </div>
       </td>
-      <td className="px-1 py-1.5">
+      <td className="overflow-hidden px-1 py-1.5">
         <div className="flex items-center gap-1" style={{ paddingLeft: depth * 20 }}>
           {hasChildren ? (
             <button
@@ -162,6 +169,11 @@ export function TaskRow({
               className={cn(task.status === "done" && "text-slate-400 line-through dark:text-slate-500")}
             />
           </div>
+          {task.recurrence && (
+            <span className="shrink-0 text-indigo-400 dark:text-indigo-300" title={describeRecurrence(task.recurrence)}>
+              <RepeatIcon className="h-3.5 w-3.5" />
+            </span>
+          )}
           {attachmentCount > 0 && (
             <span className="flex shrink-0 items-center gap-0.5 text-slate-400" title={`${attachmentCount} attachment(s)`}>
               <PaperclipIcon className="h-3.5 w-3.5" />
@@ -190,47 +202,65 @@ export function TaskRow({
           </div>
         </div>
       </td>
-      {visibleColumns.assignees && (
-        <td className="w-24 px-2 py-1.5">
-          <AssigneeMenu
-            assignees={assignees}
-            value={task.assigneeIds}
-            onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })}
-            readOnly={!permissions.canEditFull}
-          />
-        </td>
-      )}
-      {visibleColumns.dueDate && (
-        <td className="w-36 px-2 py-1.5">
-          <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
-        </td>
-      )}
-      {visibleColumns.priority && (
-        <td className="w-32 px-2 py-1.5">
-          <PriorityMenu
-            value={task.priority}
-            priorities={priorities}
-            onChange={(priority) => onUpdate(task.id, { priority })}
-            readOnly={!permissions.canEditFull}
-          />
-        </td>
-      )}
-      {visibleColumns.status && (
-        <td className="w-40 px-2 py-1.5">
-          <StatusMenu value={task.status} statuses={statuses} onChange={(status) => onUpdate(task.id, { status })} readOnly={!permissions.canEditStatus} />
-        </td>
-      )}
-      {visibleCustomFields.map((field) => (
-        <td key={field.id} className="w-32 px-2 py-1.5">
-          <CustomFieldCell
-            field={field}
-            value={task.customValues[field.id] ?? ""}
-            onChange={(value) => onUpdate(task.id, { customValues: { ...task.customValues, [field.id]: value } })}
-            readOnly={!permissions.canEditFull}
-          />
-        </td>
-      ))}
-      <td className="w-10 px-2 py-1.5 text-right">
+      {columnOrder.map((columnId) => {
+        switch (columnId) {
+          case "assignees":
+            return (
+              <td key="assignees" className="overflow-hidden px-2 py-1.5">
+                <AssigneeMenu
+                  assignees={assignees}
+                  value={task.assigneeIds}
+                  onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })}
+                  readOnly={!permissions.canEditFull}
+                />
+              </td>
+            );
+          case "team":
+            return (
+              <td key="team" className="overflow-hidden px-2 py-1.5">
+                <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
+              </td>
+            );
+          case "dueDate":
+            return (
+              <td key="dueDate" className="overflow-hidden px-2 py-1.5">
+                <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+              </td>
+            );
+          case "priority":
+            return (
+              <td key="priority" className="overflow-hidden px-2 py-1.5">
+                <PriorityMenu
+                  value={task.priority}
+                  priorities={priorities}
+                  onChange={(priority) => onUpdate(task.id, { priority })}
+                  readOnly={!permissions.canEditFull}
+                />
+              </td>
+            );
+          case "status":
+            return (
+              <td key="status" className="overflow-hidden px-2 py-1.5">
+                <StatusMenu value={task.status} statuses={statuses} onChange={(status) => onUpdate(task.id, { status })} readOnly={!permissions.canEditStatus} />
+              </td>
+            );
+          default: {
+            const field = visibleCustomFields.find((f) => f.id === columnId);
+            if (!field) return null;
+            return (
+              <td key={field.id} className="overflow-hidden px-2 py-1.5">
+                <CustomFieldCell
+                  field={field}
+                  value={task.customValues[field.id] ?? ""}
+                  onChange={(value) => onUpdate(task.id, { customValues: { ...task.customValues, [field.id]: value } })}
+                  readOnly={!permissions.canEditFull}
+                />
+              </td>
+            );
+          }
+        }
+      })}
+      <td className="overflow-hidden px-2 py-1.5 text-right">
         {permissions.canDelete && (
           <button
             type="button"

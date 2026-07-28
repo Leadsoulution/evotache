@@ -6,16 +6,22 @@ import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { getNavItems } from "@/config/navigation";
+import { NavBadge } from "@/components/NavBadge";
 import { MenuIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import type { NavBadgeCounts } from "@/hooks/useNavBadgeCounts";
 
-export function MobileNavDrawer() {
+interface MobileNavDrawerProps {
+  navBadgeCounts: NavBadgeCounts;
+}
+
+export function MobileNavDrawer({ navBadgeCounts }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const pathname = usePathname();
 
   if (!user) return null;
-  const navItems = getNavItems(user.role);
+  const navItems = getNavItems(user);
 
   return (
     <>
@@ -48,6 +54,7 @@ export function MobileNavDrawer() {
                 {navItems.map((item) => {
                   const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
                   const Icon = item.icon;
+                  const badgeCount = navBadgeCounts[item.href as keyof NavBadgeCounts] ?? 0;
                   return (
                     <Link
                       key={item.href}
@@ -60,7 +67,10 @@ export function MobileNavDrawer() {
                           : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="relative inline-flex shrink-0">
+                        <Icon className="h-4 w-4" />
+                        <NavBadge count={badgeCount} />
+                      </span>
                       {item.label}
                     </Link>
                   );

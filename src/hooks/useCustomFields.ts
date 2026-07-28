@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { createCustomField, deleteCustomField, fetchCustomFields, updateCustomField } from "@/services/customFieldApi";
 import { useToast } from "@/components/ui/Toast";
-import type { CustomFieldDef, CustomFieldType } from "@/types/customField";
+import type { CustomFieldDef, CustomFieldOption, CustomFieldType } from "@/types/customField";
 
 type LoadState = "loading" | "success" | "error";
 
 interface UseCustomFieldsResult {
   fields: CustomFieldDef[];
   loadState: LoadState;
-  addField: (input: { name: string; type: CustomFieldType; options: string[] }) => Promise<boolean>;
+  addField: (input: { name: string; type: CustomFieldType; options: CustomFieldOption[] }) => Promise<boolean>;
   editField: (id: string, patch: Partial<Pick<CustomFieldDef, "name" | "options">>) => Promise<void>;
   removeField: (id: string) => Promise<void>;
 }
@@ -38,7 +38,7 @@ export function useCustomFields(): UseCustomFieldsResult {
   }, []);
 
   const addField = useCallback(
-    async (input: { name: string; type: CustomFieldType; options: string[] }) => {
+    async (input: { name: string; type: CustomFieldType; options: CustomFieldOption[] }) => {
       try {
         const created = await createCustomField(input);
         setFields((current) => [...current, created]);

@@ -59,7 +59,7 @@ export function UserSelectorBar({ users, selectedUserId, onSelectUser }: UserSel
               selected ? "bg-indigo-50 ring-1 ring-indigo-300 dark:bg-indigo-950 dark:ring-indigo-800" : "hover:bg-slate-100 dark:hover:bg-slate-800"
             )}
           >
-            <Avatar name={user.name} color={user.color} size="md" className={cn(selected && "ring-2 ring-indigo-500")} />
+            <Avatar name={user.name} color={user.color} photoDataUrl={user.photoDataUrl} size="md" className={cn(selected && "ring-2 ring-indigo-500")} />
             <span
               className={cn("max-w-[72px] truncate text-xs font-medium", selected ? "text-indigo-700 dark:text-indigo-300" : "text-slate-500 dark:text-slate-400")}
               title={user.name}

@@ -6,6 +6,7 @@ import type { CustomFieldDef } from "@/types/customField";
 
 export const BUILT_IN_COLUMNS = [
   { id: "assignees", label: "Assignees" },
+  { id: "team", label: "Department" },
   { id: "dueDate", label: "Due date" },
   { id: "priority", label: "Priority" },
   { id: "status", label: "Status" },

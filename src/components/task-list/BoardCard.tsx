@@ -4,7 +4,8 @@ import type { DragEvent } from "react";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
 import { DueDateField } from "./DueDateField";
-import { PaperclipIcon, TrashIcon } from "@/components/ui/icons";
+import { PaperclipIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
+import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/cn";
 import type { Assignee, Task } from "@/types/task";
 import type { PriorityDef } from "@/types/taskMeta";
@@ -57,16 +58,23 @@ export function BoardCard({
     >
       {parentTitle && <span className="truncate text-[11px] font-medium text-slate-400">{parentTitle}</span>}
 
-      <button
-        type="button"
-        onClick={() => onOpenDetail(task)}
-        className={cn(
-          "text-left text-sm font-medium text-slate-800 dark:text-slate-100",
-          task.status === "done" && "text-slate-400 line-through dark:text-slate-500"
+      <div className="flex items-start gap-1.5">
+        <button
+          type="button"
+          onClick={() => onOpenDetail(task)}
+          className={cn(
+            "min-w-0 flex-1 text-left text-sm font-medium text-slate-800 dark:text-slate-100",
+            task.status === "done" && "text-slate-400 line-through dark:text-slate-500"
+          )}
+        >
+          {task.title}
+        </button>
+        {task.recurrence && (
+          <span className="mt-0.5 shrink-0 text-indigo-400 dark:text-indigo-300" title={describeRecurrence(task.recurrence)}>
+            <RepeatIcon className="h-3.5 w-3.5" />
+          </span>
         )}
-      >
-        {task.title}
-      </button>
+      </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <PriorityMenu value={task.priority} priorities={priorities} onChange={(priority) => onUpdate(task.id, { priority })} readOnly={!permissions.canEditFull} />

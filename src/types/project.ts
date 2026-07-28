@@ -5,5 +5,6 @@ export interface Project {
   color: string;
   logoDataUrl: string | null;
   teamIds: string[];
+  excludedUserIds: string[];
   createdAt: string;
 }

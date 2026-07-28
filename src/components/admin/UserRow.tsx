@@ -23,7 +23,7 @@ export function UserRow({ targetUser, isSelf, allUsers, onChangeRole, onChangeSt
     <tr className="group border-b border-slate-100 text-sm last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2.5">
-          <Avatar name={targetUser.name} color={targetUser.color} size="sm" />
+          <Avatar name={targetUser.name} color={targetUser.color} photoDataUrl={targetUser.photoDataUrl} size="sm" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
               {targetUser.name}

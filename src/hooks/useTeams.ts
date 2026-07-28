@@ -2,19 +2,30 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createTeam, deleteTeam, fetchTeams, updateTeam } from "@/services/teamApi";
+import { fetchUsers } from "@/services/userApi";
+import { useAuth } from "@/hooks/useAuth";
+import { canManageUsers } from "@/config/roleMeta";
+import { getVisibleUserIds } from "@/lib/orgChart";
 import { useToast } from "@/components/ui/Toast";
 import type { Team } from "@/types/team";
 
 type LoadState = "loading" | "success" | "error";
 
 export function useTeams() {
+  const { user } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const toast = useToast();
+  const isAdmin = user ? canManageUsers(user.role) : false;
 
   useEffect(() => {
+    if (!user) return;
     let cancelled = false;
-    fetchTeams()
+    fetchUsers()
+      .then((allUsers) => {
+        const visibleUserIds = getVisibleUserIds(allUsers, user.id);
+        return fetchTeams({ userId: user.id, isAdmin, visibleUserIds });
+      })
       .then((list) => {
         if (cancelled) return;
         setTeams(list);
@@ -27,10 +38,11 @@ export function useTeams() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isAdmin]);
 
   const addTeam = useCallback(
-    async (input: { name: string; color: string; memberIds: string[] }) => {
+    async (input: { name: string; color: string; memberIds: string[]; excludedUserIds?: string[] }) => {
       try {
         const created = await createTeam(input);
         setTeams((current) => [...current, created]);
@@ -44,7 +56,7 @@ export function useTeams() {
   );
 
   const editTeam = useCallback(
-    async (id: string, patch: Partial<Pick<Team, "name" | "color" | "memberIds">>) => {
+    async (id: string, patch: Partial<Pick<Team, "name" | "color" | "memberIds" | "excludedUserIds">>) => {
       const previous = teams;
       setTeams((current) => current.map((t) => (t.id === id ? { ...t, ...patch } : t)));
       try {

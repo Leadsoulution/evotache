@@ -4,16 +4,22 @@ import { useState } from "react";
 import { useCustomFields } from "@/hooks/useCustomFields";
 import { Menu } from "@/components/ui/Menu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownOptionsEditor } from "@/components/ui/DropdownOptionsEditor";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { ChevronDownIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { randomPaletteColor } from "@/config/colorPalette";
+import { generateId } from "@/lib/id";
 import { cn } from "@/lib/cn";
-import type { CustomFieldType } from "@/types/customField";
+import type { CustomFieldOption, CustomFieldType } from "@/types/customField";
 
 const TYPE_OPTIONS: { value: CustomFieldType; label: string }[] = [
   { value: "text", label: "Text" },
   { value: "number", label: "Number" },
   { value: "date", label: "Date" },
   { value: "select", label: "Dropdown" },
+  { value: "image", label: "Image" },
+  { value: "video", label: "Video" },
+  { value: "link", label: "Link" },
 ];
 
 const TYPE_LABEL: Record<CustomFieldType, string> = {
@@ -21,6 +27,9 @@ const TYPE_LABEL: Record<CustomFieldType, string> = {
   number: "Number",
   date: "Date",
   select: "Dropdown",
+  image: "Image",
+  video: "Video",
+  link: "Link",
 };
 
 export function CustomFieldsManager() {
@@ -35,10 +44,11 @@ export function CustomFieldsManager() {
   async function handleAdd() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const options = optionsDraft
+    const options: CustomFieldOption[] = optionsDraft
       .split(",")
       .map((o) => o.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((label) => ({ id: generateId("option"), label, color: randomPaletteColor() }));
     const success = await addField({ name: trimmed, type, options });
     if (success) {
       setName("");
@@ -71,7 +81,7 @@ export function CustomFieldsManager() {
                 </button>
               </div>
               {field.type === "select" && (
-                <OptionsInput options={field.options} onCommit={(next) => editField(field.id, { options: next })} />
+                <DropdownOptionsEditor options={field.options} onChange={(next) => editField(field.id, { options: next })} />
               )}
             </li>
           ))}
@@ -165,25 +175,6 @@ function FieldNameInput({ name, onCommit }: { name: string; onCommit: (next: str
       className={cn(
         "flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:ring-indigo-950"
       )}
-    />
-  );
-}
-
-function OptionsInput({ options, onCommit }: { options: string[]; onCommit: (next: string[]) => void }) {
-  const [value, setValue] = useState(options.join(", "));
-  return (
-    <input
-      value={value}
-      onChange={(event) => setValue(event.target.value)}
-      onBlur={() => {
-        const next = value
-          .split(",")
-          .map((o) => o.trim())
-          .filter(Boolean);
-        onCommit(next);
-      }}
-      aria-label="Dropdown options, comma-separated"
-      className="ml-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
     />
   );
 }

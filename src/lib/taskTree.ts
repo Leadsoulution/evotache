@@ -60,7 +60,9 @@ export function filterTopLevelTasks(topLevelTasks: Task[], allTasks: Task[], fil
       filters.priorities.length ||
       filters.assigneeIds.length ||
       filters.projectIds.length ||
-      filters.teamIds.length
+      filters.teamIds.length ||
+      filters.taskTypes.length ||
+      filters.myTasksOnly
   );
   if (!hasActiveFilter) return topLevelTasks;
   const childrenMap = buildChildrenMap(allTasks);

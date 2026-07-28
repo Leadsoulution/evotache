@@ -33,7 +33,7 @@ export function ColorSwatchPicker({ value, onChange }: ColorSwatchPickerProps) {
         aria-expanded={open}
       />
       {open && (
-        <div className="absolute left-0 top-7 z-20 grid grid-cols-5 gap-1.5 rounded-lg border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="absolute left-0 top-7 z-20 grid w-36 grid-cols-5 gap-1.5 rounded-lg border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
           {COLOR_PALETTE.map((color) => (
             <button
               key={color}

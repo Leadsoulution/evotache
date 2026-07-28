@@ -3,5 +3,6 @@ export interface Team {
   name: string;
   color: string;
   memberIds: string[];
+  excludedUserIds: string[];
   createdAt: string;
 }

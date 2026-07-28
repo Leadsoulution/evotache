@@ -5,9 +5,10 @@ import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProjectAvatar } from "@/components/projects/ProjectAvatar";
 import { ColumnsMenu } from "./ColumnsMenu";
-import { ChevronDownIcon, KanbanIcon, ListIcon, SearchIcon, SortIcon, TrashIcon, XIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, KanbanIcon, ListIcon, RepeatIcon, SearchIcon, SortIcon, TrashIcon, UserIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import type { Assignee, GroupField, SortDirection, SortField } from "@/types/task";
+import type { Assignee, GroupField, SortDirection, SortField, TaskTypeFilter } from "@/types/task";
+import type { MenuOption } from "@/components/ui/Menu";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { CustomFieldDef } from "@/types/customField";
 import type { Project } from "@/types/project";
@@ -20,6 +21,11 @@ const GROUP_OPTIONS: { value: GroupField; label: string }[] = [
   { value: "status", label: "Status" },
   { value: "priority", label: "Priority" },
   { value: "assignee", label: "Assignee" },
+];
+
+const TASK_TYPE_OPTIONS: MenuOption[] = [
+  { value: "mission", label: "Mission" },
+  { value: "recurring", label: "Recurring", icon: <RepeatIcon className="h-3.5 w-3.5" /> },
 ];
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -44,6 +50,10 @@ interface TaskListToolbarProps {
   onProjectFilterChange: (value: string[]) => void;
   teamFilter: string[];
   onTeamFilterChange: (value: string[]) => void;
+  taskTypeFilter: TaskTypeFilter[];
+  onTaskTypeFilterChange: (value: TaskTypeFilter[]) => void;
+  myTasksOnly: boolean;
+  onMyTasksOnlyChange: (value: boolean) => void;
   assignees: Assignee[];
   projects: Project[];
   teams: Team[];
@@ -80,6 +90,10 @@ export function TaskListToolbar({
   onProjectFilterChange,
   teamFilter,
   onTeamFilterChange,
+  taskTypeFilter,
+  onTaskTypeFilterChange,
+  myTasksOnly,
+  onMyTasksOnlyChange,
   assignees,
   projects,
   teams,
@@ -112,7 +126,11 @@ export function TaskListToolbar({
     label: priority.label,
     icon: <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: priority.color }} />,
   }));
-  const assigneeOptions = assignees.map((assignee) => ({ value: assignee.id, label: assignee.name, icon: <Avatar name={assignee.name} color={assignee.color} size="xs" /> }));
+  const assigneeOptions = assignees.map((assignee) => ({
+    value: assignee.id,
+    label: assignee.name,
+    icon: <Avatar name={assignee.name} color={assignee.color} photoDataUrl={assignee.photoDataUrl} size="xs" />,
+  }));
   const projectOptions = projects.map((project) => ({
     value: project.id,
     label: project.name,
@@ -145,8 +163,24 @@ export function TaskListToolbar({
           <FilterMenu label="Project" count={projectFilter.length} options={projectOptions} value={projectFilter} onChange={onProjectFilterChange} />
         )}
         {teams.length > 0 && (
-          <FilterMenu label="Team" count={teamFilter.length} options={teamOptions} value={teamFilter} onChange={onTeamFilterChange} />
+          <FilterMenu label="Department" count={teamFilter.length} options={teamOptions} value={teamFilter} onChange={onTeamFilterChange} />
         )}
+        <FilterMenu label="Type" count={taskTypeFilter.length} options={TASK_TYPE_OPTIONS} value={taskTypeFilter} onChange={(next) => onTaskTypeFilterChange(next as TaskTypeFilter[])} />
+
+        <button
+          type="button"
+          onClick={() => onMyTasksOnlyChange(!myTasksOnly)}
+          aria-pressed={myTasksOnly}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium",
+            myTasksOnly
+              ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+              : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          )}
+        >
+          <UserIcon className="h-3.5 w-3.5" />
+          My Tasks
+        </button>
 
         <div className="mx-1 hidden h-5 w-px bg-slate-200 sm:block dark:bg-slate-700" />
 

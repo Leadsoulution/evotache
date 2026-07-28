@@ -83,7 +83,10 @@ export async function fetchTasks(scope: TaskScope): Promise<Task[]> {
   // Visible to the assignee themselves and to their manager(s) (recursively,
   // via visibleUserIds). Team membership alone no longer grants visibility —
   // being on the same team as an assignee isn't enough to see their tasks.
-  return tasks.filter((t) => t.assigneeIds.some((id) => scope.visibleUserIds.includes(id)));
+  // An explicit exclusion always wins, even for a manager who'd otherwise see it.
+  return tasks.filter(
+    (t) => t.assigneeIds.some((id) => scope.visibleUserIds.includes(id)) && !(t.excludedUserIds ?? []).includes(scope.userId)
+  );
 }
 
 export async function fetchAssignees(): Promise<Assignee[]> {
@@ -104,7 +107,9 @@ export async function createTaskRequest(draft: TaskDraft): Promise<Task> {
     priority: draft.priority ?? "none",
     assigneeIds: draft.assigneeIds ?? [],
     teamIds: draft.teamIds ?? [],
+    excludedUserIds: draft.excludedUserIds ?? [],
     dueDate: draft.dueDate ?? null,
+    recurrence: draft.recurrence ?? null,
     parentId: draft.parentId ?? null,
     projectId: draft.projectId ?? null,
     customValues: draft.customValues ?? {},

@@ -7,10 +7,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { AlertTriangleIcon } from "@/components/ui/icons";
 
 const DEMO_ACCOUNTS = [
+  { email: "elmahdi@evotasks.com", password: "admin123", role: "Admin" },
   { email: "amine@evotasks.com", password: "admin123", role: "Admin" },
-  { email: "sarah@evotasks.com", password: "member123", role: "Member" },
-  { email: "priya@evotasks.com", password: "limited123", role: "Limited member" },
-  { email: "diego@evotasks.com", password: "viewer123", role: "Viewer" },
+  { email: "mouad@evotasks.com", password: "member123", role: "Member" },
+  { email: "yassine@evotasks.com", password: "member123", role: "Member" },
+  { email: "rabie@evotasks.com", password: "limited123", role: "Limited member" },
+  { email: "moha@evotasks.com", password: "limited123", role: "Limited member" },
+  { email: "reda@evotasks.com", password: "viewer123", role: "Viewer" },
 ];
 
 const inputClass =

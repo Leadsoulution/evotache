@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskMeta } from "@/hooks/useTaskMeta";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { useAuth } from "@/hooks/useAuth";
+import { canManageUsers } from "@/config/roleMeta";
 import { useToast } from "@/components/ui/Toast";
 import { countByPriority, countByStatus } from "@/lib/taskStats";
 import { isOverdue } from "@/lib/date";
+import { IntegrationsSettings } from "@/components/admin/IntegrationsSettings";
 import { AlertTriangleIcon, FlagIcon, MicIcon, SparklesIcon, StopCircleIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { TaskModule } from "@/types/task";
@@ -29,7 +32,9 @@ const MODULE_OPTIONS: { value: TaskModule; label: string }[] = [
   { value: "dispute", label: "Litiges" },
 ];
 
-const TAB_OPTIONS: { value: "generate" | "analyze"; label: string }[] = [
+type AssistantTab = "generate" | "analyze" | "settings";
+
+const TAB_OPTIONS: { value: AssistantTab; label: string }[] = [
   { value: "generate", label: "Generate" },
   { value: "analyze", label: "Analyze" },
 ];
@@ -86,11 +91,15 @@ function VoiceTextarea({ value, onChange, placeholder, rows = 4 }: VoiceTextarea
 }
 
 export function AssistantView() {
-  const [tab, setTab] = useState<"generate" | "analyze">("generate");
+  const { user } = useAuth();
+  const isAdmin = user ? canManageUsers(user.role) : false;
+  const [tab, setTab] = useState<AssistantTab>("generate");
   const [module, setModule] = useState<TaskModule>("task");
   const { priorities, statuses } = useTaskMeta();
   const { tasks, createTask } = useTasks(module);
   const toast = useToast();
+
+  const tabOptions = isAdmin ? [...TAB_OPTIONS, { value: "settings" as const, label: "Settings" }] : TAB_OPTIONS;
 
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -219,7 +228,7 @@ export function AssistantView() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
-          {TAB_OPTIONS.map((option) => (
+          {tabOptions.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -235,23 +244,27 @@ export function AssistantView() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
-          {MODULE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setModule(option.value)}
-              aria-pressed={module === option.value}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium",
-                module === option.value ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        {tab !== "settings" && (
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
+            {MODULE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setModule(option.value)}
+                aria-pressed={module === option.value}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  module === option.value ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {tab === "settings" && <IntegrationsSettings />}
 
       {tab === "generate" && (
         <>

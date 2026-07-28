@@ -9,7 +9,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
 
   if (!user || (!canManageUsers(user.role) && !canManageWorkflow(user.role))) {
     return (
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 px-4 py-24 text-center sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[95%] flex-col items-center gap-3 px-4 py-24 text-center sm:px-6 lg:px-8">
         <AlertTriangleIcon className="h-10 w-10 text-amber-400" />
         <div>
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Access denied</p>

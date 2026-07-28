@@ -2,9 +2,14 @@ const STORAGE_KEY = "evotasks.viewprefs.v1";
 
 export interface ViewPrefs {
   hiddenColumnIds: string[];
+  columnWidths: Record<string, number>;
+  /** Column ids in the user's preferred left-to-right order. Ids not listed keep their natural/default order, appended after the listed ones. */
+  columnOrder: string[];
+  /** Rows per page across every paginated table; "all" disables pagination. */
+  pageSize: number | "all";
 }
 
-const DEFAULT_PREFS: ViewPrefs = { hiddenColumnIds: [] };
+const DEFAULT_PREFS: ViewPrefs = { hiddenColumnIds: [], columnWidths: {}, columnOrder: [], pageSize: 25 };
 
 function readMap(): Record<string, ViewPrefs> {
   if (typeof window === "undefined") return {};
@@ -25,7 +30,9 @@ function writeMap(map: Record<string, ViewPrefs>): void {
 
 export async function getViewPrefs(userId: string): Promise<ViewPrefs> {
   const map = readMap();
-  return map[userId] ?? DEFAULT_PREFS;
+  // Spread over the defaults so prefs saved before a field existed (e.g.
+  // columnWidths) don't come back `undefined` and break consumers.
+  return { ...DEFAULT_PREFS, ...map[userId] };
 }
 
 export async function saveViewPrefs(userId: string, prefs: ViewPrefs): Promise<void> {

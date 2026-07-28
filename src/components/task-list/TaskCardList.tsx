@@ -10,10 +10,12 @@ import { cn } from "@/lib/cn";
 import type { Assignee, GroupField, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { TaskPermissions } from "@/lib/taskPermissions";
+import type { Team } from "@/types/team";
 
 interface TaskCardListProps {
   groups: TaskTableGroup[];
   assignees: Assignee[];
+  teams: Team[];
   statuses: StatusDef[];
   priorities: PriorityDef[];
   visibleColumns: VisibleColumns;
@@ -34,6 +36,7 @@ interface TaskCardListProps {
 export function TaskCardList({
   groups,
   assignees,
+  teams,
   statuses,
   priorities,
   visibleColumns,
@@ -58,6 +61,7 @@ export function TaskCardList({
           group={group}
           showHeader={groupField !== "none"}
           assignees={assignees}
+          teams={teams}
           statuses={statuses}
           priorities={priorities}
           visibleColumns={visibleColumns}
@@ -86,6 +90,7 @@ interface TaskCardGroupProps {
   group: TaskTableGroup;
   showHeader: boolean;
   assignees: Assignee[];
+  teams: Team[];
   statuses: StatusDef[];
   priorities: PriorityDef[];
   visibleColumns: VisibleColumns;
@@ -105,6 +110,7 @@ function TaskCardGroup({
   group,
   showHeader,
   assignees,
+  teams,
   statuses,
   priorities,
   visibleColumns,
@@ -144,6 +150,7 @@ function TaskCardGroup({
             collapsed={collapsedIds.has(task.id)}
             onToggleCollapse={onToggleCollapse}
             assignees={assignees}
+            teams={teams}
             statuses={statuses}
             priorities={priorities}
             visibleColumns={visibleColumns}

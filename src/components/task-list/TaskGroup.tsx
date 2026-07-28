@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { TaskRow } from "./TaskRow";
-import type { VisibleColumns } from "./TaskRow";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { FlatTreeRow } from "@/lib/taskTree";
@@ -10,14 +9,17 @@ import type { Assignee, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { CustomFieldDef } from "@/types/customField";
 import type { TaskPermissions } from "@/lib/taskPermissions";
+import type { Team } from "@/types/team";
 
 interface TaskGroupProps {
   label: string;
   rows: FlatTreeRow[];
   assignees: Assignee[];
+  teams: Team[];
   statuses: StatusDef[];
   priorities: PriorityDef[];
-  visibleColumns: VisibleColumns;
+  columnOrder: string[];
+  columnCount: number;
   visibleCustomFields: CustomFieldDef[];
   attachmentCounts: Record<string, number>;
   selectedIds: Set<string>;
@@ -41,9 +43,11 @@ export function TaskGroup({
   label,
   rows,
   assignees,
+  teams,
   statuses,
   priorities,
-  visibleColumns,
+  columnOrder,
+  columnCount,
   visibleCustomFields,
   attachmentCounts,
   selectedIds,
@@ -63,7 +67,6 @@ export function TaskGroup({
   onDropOn,
 }: TaskGroupProps) {
   const [sectionCollapsed, setSectionCollapsed] = useState(false);
-  const columnCount = 3 + Object.values(visibleColumns).filter(Boolean).length + visibleCustomFields.length;
 
   return (
     <tbody>
@@ -93,9 +96,10 @@ export function TaskGroup({
             collapsed={collapsedIds.has(task.id)}
             onToggleCollapse={onToggleCollapse}
             assignees={assignees}
+            teams={teams}
             statuses={statuses}
             priorities={priorities}
-            visibleColumns={visibleColumns}
+            columnOrder={columnOrder}
             visibleCustomFields={visibleCustomFields}
             attachmentCount={attachmentCounts[task.id] ?? 0}
             selected={selectedIds.has(task.id)}

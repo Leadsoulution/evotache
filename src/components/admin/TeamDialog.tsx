@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { ColorSwatchPicker } from "./ColorSwatchPicker";
 import { Avatar } from "@/components/ui/Avatar";
+import { UserExcludeMenu } from "@/components/ui/UserExcludeMenu";
 import { randomPaletteColor } from "@/config/colorPalette";
 import type { Team } from "@/types/team";
 import type { AppUser } from "@/types/user";
@@ -14,7 +15,7 @@ interface TeamDialogProps {
   team: Team | null;
   users: AppUser[];
   onClose: () => void;
-  onSubmit: (input: { name: string; color: string; memberIds: string[] }) => Promise<boolean>;
+  onSubmit: (input: { name: string; color: string; memberIds: string[]; excludedUserIds?: string[] }) => Promise<boolean>;
 }
 
 const inputClass =
@@ -24,6 +25,7 @@ export function TeamDialog({ open, team, users, onClose, onSubmit }: TeamDialogP
   const [name, setName] = useState("");
   const [color, setColor] = useState(randomPaletteColor());
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [excludedUserIds, setExcludedUserIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -36,6 +38,7 @@ export function TeamDialog({ open, team, users, onClose, onSubmit }: TeamDialogP
       setName(team?.name ?? "");
       setColor(team?.color ?? randomPaletteColor());
       setMemberIds(team?.memberIds ?? []);
+      setExcludedUserIds(team?.excludedUserIds ?? []);
     }
   }
 
@@ -48,7 +51,7 @@ export function TeamDialog({ open, team, users, onClose, onSubmit }: TeamDialogP
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
-    const success = await onSubmit({ name: name.trim(), color, memberIds });
+    const success = await onSubmit({ name: name.trim(), color, memberIds, excludedUserIds });
     setSubmitting(false);
     if (success) onClose();
   }
@@ -67,13 +70,13 @@ export function TeamDialog({ open, team, users, onClose, onSubmit }: TeamDialogP
         className="w-full max-w-sm animate-scale-in rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
       >
         <h2 id="team-dialog-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">
-          {team ? "Edit team" : "New team"}
+          {team ? "Edit department" : "New department"}
         </h2>
 
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <ColorSwatchPicker value={color} onChange={setColor} />
-            <input ref={nameRef} value={name} onChange={(event) => setName(event.target.value)} required placeholder="Team name" className={inputClass} />
+            <input ref={nameRef} value={name} onChange={(event) => setName(event.target.value)} required placeholder="Department name" className={inputClass} />
           </div>
 
           <fieldset className="block text-sm">
@@ -91,12 +94,18 @@ export function TeamDialog({ open, team, users, onClose, onSubmit }: TeamDialogP
                     onChange={() => toggleMember(candidate.id)}
                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
                   />
-                  <Avatar name={candidate.name} color={candidate.color} size="xs" />
+                  <Avatar name={candidate.name} color={candidate.color} photoDataUrl={candidate.photoDataUrl} size="xs" />
                   <span className="text-sm text-slate-700 dark:text-slate-200">{candidate.name}</span>
                 </label>
               ))}
             </div>
           </fieldset>
+
+          <div className="block text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Exclude a user</span>
+            <UserExcludeMenu users={users} value={excludedUserIds} onChange={setExcludedUserIds} />
+            <p className="mt-1 text-xs text-slate-400">Hides this department from that person even if they&apos;d normally see it as a manager.</p>
+          </div>
 
           <div className="mt-2 flex justify-end gap-2">
             <button
@@ -111,7 +120,7 @@ export function TeamDialog({ open, team, users, onClose, onSubmit }: TeamDialogP
               disabled={submitting || !name.trim()}
               className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? "Saving…" : team ? "Save changes" : "Create team"}
+              {submitting ? "Saving…" : team ? "Save changes" : "Create department"}
             </button>
           </div>
         </form>

@@ -7,6 +7,11 @@ export function taskMatchesFilters(task: Task, filters: TaskFilters, assigneeNam
   if (filters.assigneeIds.length && !task.assigneeIds.some((id) => filters.assigneeIds.includes(id))) return false;
   if (filters.projectIds.length && !(task.projectId && filters.projectIds.includes(task.projectId))) return false;
   if (filters.teamIds.length && !(task.teamIds ?? []).some((id) => filters.teamIds.includes(id))) return false;
+  if (filters.taskTypes.length) {
+    const type = task.recurrence ? "recurring" : "mission";
+    if (!filters.taskTypes.includes(type)) return false;
+  }
+  if (filters.myTasksOnly && !task.assigneeIds.includes(filters.currentUserId)) return false;
   const search = filters.search.trim().toLowerCase();
   if (search) {
     const haystack = [task.title, task.description, ...task.assigneeIds.map((id) => assigneeNameById[id] ?? "")].join(" ").toLowerCase();

@@ -45,7 +45,7 @@ export function GlobalFilterBar({
 }: GlobalFilterBarProps) {
   const userOptions = users
     .filter((u) => u.status === "active")
-    .map((u) => ({ value: u.id, label: u.name, icon: <Avatar name={u.name} color={u.color} size="xs" /> }));
+    .map((u) => ({ value: u.id, label: u.name, icon: <Avatar name={u.name} color={u.color} photoDataUrl={u.photoDataUrl} size="xs" /> }));
   const teamOptions = teams.map((team) => ({ value: team.id, label: team.name, icon: <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: team.color }} /> }));
   const projectOptions = projects.map((project) => ({ value: project.id, label: project.name, icon: <ProjectAvatar project={project} size="xs" /> }));
   const priorityOptions = priorities.map((p) => ({ value: p.id, label: p.label, icon: <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} /> }));
@@ -55,7 +55,7 @@ export function GlobalFilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {teams.length > 0 && <FilterMenu label="Team" count={filters.teamIds.length} options={teamOptions} value={filters.teamIds} onChange={onTeamIdsChange} />}
+      {teams.length > 0 && <FilterMenu label="Department" count={filters.teamIds.length} options={teamOptions} value={filters.teamIds} onChange={onTeamIdsChange} />}
       <FilterMenu label="User" count={filters.userIds.length} options={userOptions} value={filters.userIds} onChange={onUserIdsChange} />
       {projects.length > 0 && (
         <FilterMenu label="Project" count={filters.projectIds.length} options={projectOptions} value={filters.projectIds} onChange={onProjectIdsChange} />

@@ -1,5 +1,5 @@
 import { generateId } from "@/lib/id";
-import { fetchTeams, updateTeam } from "@/services/teamApi";
+import { fetchAllTeamsUnscoped, updateTeam } from "@/services/teamApi";
 import type { AppUser, Role, UserStatus } from "@/types/user";
 import type { Assignee } from "@/types/task";
 
@@ -25,14 +25,16 @@ function maybeFail(action: string): void {
 
 function createSeedUsers(): StoredUser[] {
   const now = new Date().toISOString();
-  const rows: Omit<StoredUser, "createdAt">[] = [
-    { id: "u1", name: "Amine Bahazzaz", email: "amine@evotasks.com", password: "admin123", role: "admin", color: "#6366f1", status: "active", managerIds: [] },
-    { id: "u2", name: "Sarah Chen", email: "sarah@evotasks.com", password: "member123", role: "member", color: "#ec4899", status: "active", managerIds: ["u1"] },
-    { id: "u3", name: "Marcus Lee", email: "marcus@evotasks.com", password: "member123", role: "member", color: "#22c55e", status: "active", managerIds: ["u1"] },
-    { id: "u4", name: "Priya Patel", email: "priya@evotasks.com", password: "limited123", role: "member_limited", color: "#f59e0b", status: "active", managerIds: ["u2", "u3"] },
-    { id: "u5", name: "Diego Alvarez", email: "diego@evotasks.com", password: "viewer123", role: "viewer", color: "#06b6d4", status: "active", managerIds: ["u3"] },
+  const rows: Omit<StoredUser, "createdAt" | "visibleSectionHrefs" | "hiddenColumnIds">[] = [
+    { id: "u1", name: "Elmahdi Bouzida", email: "elmahdi@evotasks.com", password: "admin123", role: "admin", color: "#a855f7", photoDataUrl: null, status: "active", managerIds: [] },
+    { id: "u2", name: "Amine Bahazzaz", email: "amine@evotasks.com", password: "admin123", role: "admin", color: "#6366f1", photoDataUrl: null, status: "active", managerIds: [] },
+    { id: "u3", name: "Mouad", email: "mouad@evotasks.com", password: "member123", role: "member", color: "#ec4899", photoDataUrl: null, status: "active", managerIds: ["u2"] },
+    { id: "u4", name: "Yassine", email: "yassine@evotasks.com", password: "member123", role: "member", color: "#22c55e", photoDataUrl: null, status: "active", managerIds: ["u1"] },
+    { id: "u5", name: "Rabie", email: "rabie@evotasks.com", password: "limited123", role: "member_limited", color: "#f59e0b", photoDataUrl: null, status: "active", managerIds: ["u3", "u4"] },
+    { id: "u6", name: "Moha", email: "moha@evotasks.com", password: "limited123", role: "member_limited", color: "#ef4444", photoDataUrl: null, status: "active", managerIds: ["u3", "u4"] },
+    { id: "u7", name: "Reda", email: "reda@evotasks.com", password: "viewer123", role: "viewer", color: "#06b6d4", photoDataUrl: null, status: "active", managerIds: ["u4"] },
   ];
-  return rows.map((row) => ({ ...row, createdAt: now }));
+  return rows.map((row) => ({ ...row, createdAt: now, visibleSectionHrefs: null, hiddenColumnIds: [] }));
 }
 
 function readStore(): StoredUser[] {
@@ -66,9 +68,12 @@ function toPublicUser(user: StoredUser): AppUser {
     email: user.email,
     role: user.role,
     color: user.color,
+    photoDataUrl: user.photoDataUrl,
     status: user.status,
     managerIds: user.managerIds,
     createdAt: user.createdAt,
+    visibleSectionHrefs: user.visibleSectionHrefs,
+    hiddenColumnIds: user.hiddenColumnIds,
   };
 }
 
@@ -87,7 +92,7 @@ export async function fetchAssignees(): Promise<Assignee[]> {
   await delay(120);
   return readStore()
     .filter((u) => u.status === "active")
-    .map((u) => ({ id: u.id, name: u.name, color: u.color }));
+    .map((u) => ({ id: u.id, name: u.name, color: u.color, photoDataUrl: u.photoDataUrl }));
 }
 
 export async function verifyCredentials(email: string, password: string): Promise<AppUser | null> {
@@ -104,12 +109,15 @@ interface CreateUserInput {
   password: string;
   role: Role;
   color: string;
+  photoDataUrl?: string | null;
   managerIds?: string[];
   teamIds?: string[];
+  visibleSectionHrefs?: string[] | null;
+  hiddenColumnIds?: string[];
 }
 
 async function syncTeamMembership(userId: string, teamIds: string[]): Promise<void> {
-  const allTeams = await fetchTeams();
+  const allTeams = await fetchAllTeamsUnscoped();
   await Promise.all(
     allTeams.map((team) => {
       const shouldBeMember = teamIds.includes(team.id);
@@ -137,9 +145,12 @@ export async function createUserRequest(input: CreateUserInput): Promise<AppUser
     password: input.password,
     role: input.role,
     color: input.color,
+    photoDataUrl: input.photoDataUrl ?? null,
     status: "active",
     managerIds: input.managerIds ?? [],
     createdAt: new Date().toISOString(),
+    visibleSectionHrefs: input.visibleSectionHrefs ?? null,
+    hiddenColumnIds: input.hiddenColumnIds ?? [],
   };
   writeStore([...users, user]);
   if (input.teamIds?.length) await syncTeamMembership(user.id, input.teamIds);
@@ -152,8 +163,12 @@ interface UpdateUserInput {
   role?: Role;
   status?: UserStatus;
   password?: string;
+  color?: string;
+  photoDataUrl?: string | null;
   managerIds?: string[];
   teamIds?: string[];
+  visibleSectionHrefs?: string[] | null;
+  hiddenColumnIds?: string[];
 }
 
 export async function updateUserRequest(id: string, patch: UpdateUserInput): Promise<AppUser> {

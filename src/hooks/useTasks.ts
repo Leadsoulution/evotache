@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createTaskRequest, deleteTasksRequest, fetchAssignees, fetchTasks, updateTaskRequest } from "@/services/taskApi";
-import { fetchDefaultPriorityId, fetchDefaultStatusId } from "@/services/taskMetaApi";
+import { fetchDefaultPriorityId, fetchDefaultStatusId, fetchStatuses } from "@/services/taskMetaApi";
 import { fetchUsers } from "@/services/userApi";
 import { generateId } from "@/lib/id";
 import { useToast } from "@/components/ui/Toast";
@@ -10,7 +10,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { canManageUsers } from "@/config/roleMeta";
 import { getDescendantIds } from "@/lib/taskTree";
 import { getVisibleUserIds } from "@/lib/orgChart";
+import { computeNextOccurrence } from "@/lib/recurrence";
+import { fromDateInputValue } from "@/lib/date";
 import type { Assignee, Task, TaskDraft, TaskModule } from "@/types/task";
+import type { StatusDef } from "@/types/taskMeta";
 
 type LoadState = "loading" | "success" | "error";
 
@@ -43,6 +46,7 @@ export function useTasks(module: TaskModule): UseTasksResult {
   const toast = useToast();
   const tasksRef = useRef<Task[]>([]);
   const defaultsRef = useRef<{ statusId: string; priorityId: string }>({ statusId: "todo", priorityId: "none" });
+  const statusesRef = useRef<StatusDef[]>([]);
 
   useEffect(() => {
     tasksRef.current = tasks;
@@ -54,11 +58,12 @@ export function useTasks(module: TaskModule): UseTasksResult {
     if (!user) return;
     setLoadState("loading");
     setErrorMessage(null);
-    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId()])
-      .then(([allUsers, assigneeList, statusId, priorityId]) => {
+    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId(), fetchStatuses()])
+      .then(([allUsers, assigneeList, statusId, priorityId, statusList]) => {
         const visibleUserIds = getVisibleUserIds(allUsers, user.id);
         return fetchTasks({ userId: user.id, isAdmin, module, visibleUserIds }).then((taskList) => {
           defaultsRef.current = { statusId, priorityId };
+          statusesRef.current = statusList;
           setTasks(taskList);
           setAssignees(assigneeList);
           setLoadState("success");
@@ -73,12 +78,13 @@ export function useTasks(module: TaskModule): UseTasksResult {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId()])
-      .then(([allUsers, assigneeList, statusId, priorityId]) => {
+    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId(), fetchStatuses()])
+      .then(([allUsers, assigneeList, statusId, priorityId, statusList]) => {
         const visibleUserIds = getVisibleUserIds(allUsers, user.id);
         return fetchTasks({ userId: user.id, isAdmin, module, visibleUserIds }).then((taskList) => {
           if (cancelled) return;
           defaultsRef.current = { statusId, priorityId };
+          statusesRef.current = statusList;
           setTasks(taskList);
           setAssignees(assigneeList);
           setLoadState("success");
@@ -114,7 +120,9 @@ export function useTasks(module: TaskModule): UseTasksResult {
         priority: options.priority ?? priorityId,
         assigneeIds: isAdmin ? [] : [user.id],
         teamIds: [],
+        excludedUserIds: [],
         dueDate: options.dueDate ?? null,
+        recurrence: null,
         parentId,
         projectId: null,
         customValues: {},
@@ -138,9 +146,30 @@ export function useTasks(module: TaskModule): UseTasksResult {
   const updateTask = useCallback(
     async (id: string, patch: Partial<Task>) => {
       const previous = tasksRef.current;
-      setTasks(previous.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t)));
+      const existingTask = previous.find((t) => t.id === id);
+      let finalPatch = patch;
+
+      // Recurring tasks don't stay "done" — moving one to the workflow's last
+      // status recycles it: jump the due date to the next occurrence and reset
+      // status back to the first column, instead of leaving it completed.
+      if (existingTask?.recurrence && patch.status && patch.status !== existingTask.status) {
+        const statuses = statusesRef.current;
+        const doneId = statuses[statuses.length - 1]?.id;
+        const firstId = statuses[0]?.id;
+        if (doneId && firstId && patch.status === doneId) {
+          const base = existingTask.dueDate ? new Date(existingTask.dueDate) : new Date();
+          const next = computeNextOccurrence(existingTask.recurrence, base);
+          const y = next.getFullYear();
+          const m = String(next.getMonth() + 1).padStart(2, "0");
+          const d = String(next.getDate()).padStart(2, "0");
+          finalPatch = { ...patch, status: firstId, dueDate: fromDateInputValue(`${y}-${m}-${d}`) };
+          toast.success(`Recurring task rescheduled — next due ${next.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
+        }
+      }
+
+      setTasks(previous.map((t) => (t.id === id ? { ...t, ...finalPatch, updatedAt: new Date().toISOString() } : t)));
       try {
-        const updated = await updateTaskRequest(id, patch);
+        const updated = await updateTaskRequest(id, finalPatch);
         setTasks((current) => current.map((t) => (t.id === id ? updated : t)));
       } catch (err) {
         setTasks(previous);

@@ -8,7 +8,22 @@ export interface Assignee {
   id: string;
   name: string;
   color: string;
+  photoDataUrl: string | null;
 }
+
+export type RecurrenceFrequency = "daily" | "weekly" | "monthly";
+
+export interface RecurrenceRule {
+  frequency: RecurrenceFrequency;
+  /** Repeat every N days/weeks/months, depending on frequency. Always >= 1. */
+  interval: number;
+  /** Weekly only — 0=Sunday..6=Saturday. Falls back to the due date's weekday when empty. */
+  daysOfWeek: number[];
+  /** Monthly only — 1-31, clamped to the shorter month. Falls back to the due date's day when null. */
+  dayOfMonth: number | null;
+}
+
+export type TaskTypeFilter = "mission" | "recurring";
 
 export interface Task {
   id: string;
@@ -19,7 +34,9 @@ export interface Task {
   priority: TaskPriority;
   assigneeIds: string[];
   teamIds: string[];
+  excludedUserIds: string[];
   dueDate: string | null;
+  recurrence: RecurrenceRule | null;
   order: number;
   parentId: string | null;
   projectId: string | null;
@@ -43,4 +60,7 @@ export interface TaskFilters {
   assigneeIds: string[];
   projectIds: string[];
   teamIds: string[];
+  taskTypes: TaskTypeFilter[];
+  myTasksOnly: boolean;
+  currentUserId: string;
 }

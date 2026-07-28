@@ -8,7 +8,12 @@ export interface AppUser {
   email: string;
   role: Role;
   color: string;
+  photoDataUrl: string | null;
   status: UserStatus;
   managerIds: string[];
   createdAt: string;
+  /** Nav hrefs this user is allowed to see; null means no admin-imposed restriction (all role-appropriate sections). */
+  visibleSectionHrefs: string[] | null;
+  /** Column ids hidden for this user by an admin, across Tasks/Litiges/Achats — on top of their own self-service hidden columns. */
+  hiddenColumnIds: string[];
 }

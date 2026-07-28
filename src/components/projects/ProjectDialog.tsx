@@ -6,17 +6,27 @@ import { createPortal } from "react-dom";
 import { ColorSwatchPicker } from "@/components/admin/ColorSwatchPicker";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { TeamMenu } from "@/components/task-list/TeamMenu";
+import { UserExcludeMenu } from "@/components/ui/UserExcludeMenu";
 import { randomPaletteColor } from "@/config/colorPalette";
 import { ImageIcon, XIcon } from "@/components/ui/icons";
 import type { Project } from "@/types/project";
 import type { Team } from "@/types/team";
+import type { AppUser } from "@/types/user";
 
 interface ProjectDialogProps {
   open: boolean;
   project: Project | null;
   teams: Team[];
+  users: AppUser[];
   onClose: () => void;
-  onSubmit: (input: { name: string; description: string; color: string; logoDataUrl?: string | null; teamIds?: string[] }) => Promise<boolean>;
+  onSubmit: (input: {
+    name: string;
+    description: string;
+    color: string;
+    logoDataUrl?: string | null;
+    teamIds?: string[];
+    excludedUserIds?: string[];
+  }) => Promise<boolean>;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -31,12 +41,13 @@ function readFileAsDataUrl(file: File): Promise<string> {
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
 
-export function ProjectDialog({ open, project, teams, onClose, onSubmit }: ProjectDialogProps) {
+export function ProjectDialog({ open, project, teams, users, onClose, onSubmit }: ProjectDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState(randomPaletteColor());
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [excludedUserIds, setExcludedUserIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [wasOpen, setWasOpen] = useState(false);
@@ -53,6 +64,7 @@ export function ProjectDialog({ open, project, teams, onClose, onSubmit }: Proje
       setColor(project?.color ?? randomPaletteColor());
       setLogoDataUrl(project?.logoDataUrl ?? null);
       setTeamIds(project?.teamIds ?? []);
+      setExcludedUserIds(project?.excludedUserIds ?? []);
       setLogoError(null);
     }
   }
@@ -91,7 +103,7 @@ export function ProjectDialog({ open, project, teams, onClose, onSubmit }: Proje
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
-    const success = await onSubmit({ name: name.trim(), description: description.trim(), color, logoDataUrl, teamIds });
+    const success = await onSubmit({ name: name.trim(), description: description.trim(), color, logoDataUrl, teamIds, excludedUserIds });
     setSubmitting(false);
     if (success) onClose();
   }
@@ -157,10 +169,16 @@ export function ProjectDialog({ open, project, teams, onClose, onSubmit }: Proje
 
           {teams.length > 0 && (
             <div className="block text-sm">
-              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Teams</span>
+              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Departments</span>
               <TeamMenu teams={teams} value={teamIds} onChange={setTeamIds} />
             </div>
           )}
+
+          <div className="block text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Exclude a user</span>
+            <UserExcludeMenu users={users} value={excludedUserIds} onChange={setExcludedUserIds} />
+            <p className="mt-1 text-xs text-slate-400">Hides this project from that person even if they&apos;d normally see it as a manager.</p>
+          </div>
 
           <div className="mt-2 flex justify-end gap-2">
             <button

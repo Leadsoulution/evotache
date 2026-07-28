@@ -1,8 +1,11 @@
 import { generateId } from "@/lib/id";
-import type { CustomFieldDef, CustomFieldType } from "@/types/customField";
+import type { CustomFieldDef, CustomFieldOption, CustomFieldType } from "@/types/customField";
 
 const STORAGE_KEY = "evotasks.customfields.v1";
 const NETWORK_DELAY_MS = 250;
+
+/** Image/video custom-field values are stored as base64 data URLs directly on the task record, so this stays conservative to avoid hitting the origin's storage quota. */
+export const MAX_CUSTOM_FIELD_FILE_BYTES = 2 * 1024 * 1024;
 
 export class ApiError extends Error {}
 
@@ -33,7 +36,7 @@ export async function fetchCustomFields(): Promise<CustomFieldDef[]> {
   return readList();
 }
 
-export async function createCustomField(input: { name: string; type: CustomFieldType; options: string[] }): Promise<CustomFieldDef> {
+export async function createCustomField(input: { name: string; type: CustomFieldType; options: CustomFieldOption[] }): Promise<CustomFieldDef> {
   await delay(NETWORK_DELAY_MS);
   const name = input.name.trim();
   if (!name) throw new ApiError("Field name is required.");
@@ -42,7 +45,7 @@ export async function createCustomField(input: { name: string; type: CustomField
     id: generateId("field"),
     name,
     type: input.type,
-    options: input.type === "select" ? input.options.map((o) => o.trim()).filter(Boolean) : [],
+    options: input.type === "select" ? input.options.filter((o) => o.label.trim()) : [],
     order: items.length,
     createdAt: new Date().toISOString(),
   };

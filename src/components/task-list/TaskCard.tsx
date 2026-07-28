@@ -3,13 +3,16 @@
 import { StatusMenu } from "./StatusMenu";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
+import { TeamMenu } from "./TeamMenu";
 import { DueDateField } from "./DueDateField";
 import type { VisibleColumns } from "./TaskRow";
-import { ChevronDownIcon, EyeIcon, PaperclipIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, EyeIcon, PaperclipIcon, PlusIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
+import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/cn";
 import type { Assignee, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { TaskPermissions } from "@/lib/taskPermissions";
+import type { Team } from "@/types/team";
 
 interface TaskCardProps {
   task: Task;
@@ -18,6 +21,7 @@ interface TaskCardProps {
   collapsed: boolean;
   onToggleCollapse: (id: string) => void;
   assignees: Assignee[];
+  teams: Team[];
   statuses: StatusDef[];
   priorities: PriorityDef[];
   visibleColumns: VisibleColumns;
@@ -38,6 +42,7 @@ export function TaskCard({
   collapsed,
   onToggleCollapse,
   assignees,
+  teams,
   statuses,
   priorities,
   visibleColumns,
@@ -86,6 +91,11 @@ export function TaskCard({
         >
           {task.title}
         </button>
+        {task.recurrence && (
+          <span className="shrink-0 text-indigo-400 dark:text-indigo-300" title={describeRecurrence(task.recurrence)}>
+            <RepeatIcon className="h-3.5 w-3.5" />
+          </span>
+        )}
         {attachmentCount > 0 && (
           <span className="flex shrink-0 items-center gap-0.5 text-slate-400">
             <PaperclipIcon className="h-3.5 w-3.5" />
@@ -119,6 +129,9 @@ export function TaskCard({
             onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })}
             readOnly={!permissions.canEditFull}
           />
+        )}
+        {visibleColumns.team && (
+          <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
         )}
         {(permissions.canCreate || permissions.canDelete) && (
           <div className="ml-auto flex items-center gap-1">

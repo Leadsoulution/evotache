@@ -6,7 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjects } from "@/hooks/useProjects";
 import { useTeams } from "@/hooks/useTeams";
 import { useTasks } from "@/hooks/useTasks";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { useUsers } from "@/hooks/useUsers";
+import { canManageWorkflow } from "@/config/roleMeta";
 import { ProjectDialog } from "./ProjectDialog";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -16,22 +17,15 @@ import type { Project } from "@/types/project";
 
 export function ProjectsView() {
   const { user } = useAuth();
-  const isAdmin = user ? canManageUsers(user.role) : false;
   const canManage = user ? canManageWorkflow(user.role) : false;
-  const { projects: allProjects, loadState, addProject, editProject, removeProject } = useProjects();
+  const { projects, loadState, addProject, editProject, removeProject } = useProjects();
   const { teams } = useTeams();
   const { tasks } = useTasks("task");
+  const { users } = useUsers();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-
-  // Only admins get full org oversight — everyone else only sees projects
-  // owned by a team they belong to (a project with no team is unscoped and
-  // stays visible to everyone).
-  const myTeamIds = user ? teams.filter((team) => team.memberIds.includes(user.id)).map((team) => team.id) : [];
-  const projects =
-    isAdmin || !user ? allProjects : allProjects.filter((project) => project.teamIds.length === 0 || project.teamIds.some((id) => myTeamIds.includes(id)));
 
   const taskCountByProject = tasks.reduce<Record<string, number>>((acc, task) => {
     if (task.projectId) acc[task.projectId] = (acc[task.projectId] ?? 0) + 1;
@@ -41,7 +35,7 @@ export function ProjectsView() {
   const pendingProject = projects.find((p) => p.id === pendingDeleteId) ?? null;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[95%] flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Projects</h1>
@@ -118,6 +112,7 @@ export function ProjectsView() {
         open={dialogOpen}
         project={editingProject}
         teams={teams}
+        users={users}
         onClose={() => setDialogOpen(false)}
         onSubmit={(input) => (editingProject ? editProject(editingProject.id, input).then(() => true) : addProject(input))}
       />

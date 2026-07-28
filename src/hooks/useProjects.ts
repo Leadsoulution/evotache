@@ -2,19 +2,30 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createProject, deleteProject, fetchProjects, updateProject } from "@/services/projectApi";
+import { fetchUsers } from "@/services/userApi";
+import { useAuth } from "@/hooks/useAuth";
+import { canManageUsers } from "@/config/roleMeta";
+import { getVisibleUserIds } from "@/lib/orgChart";
 import { useToast } from "@/components/ui/Toast";
 import type { Project } from "@/types/project";
 
 type LoadState = "loading" | "success" | "error";
 
 export function useProjects() {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const toast = useToast();
+  const isAdmin = user ? canManageUsers(user.role) : false;
 
   useEffect(() => {
+    if (!user) return;
     let cancelled = false;
-    fetchProjects()
+    fetchUsers()
+      .then((allUsers) => {
+        const visibleUserIds = getVisibleUserIds(allUsers, user.id);
+        return fetchProjects({ userId: user.id, isAdmin, visibleUserIds });
+      })
       .then((list) => {
         if (cancelled) return;
         setProjects(list);
@@ -27,10 +38,11 @@ export function useProjects() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isAdmin]);
 
   const addProject = useCallback(
-    async (input: { name: string; description: string; color: string; logoDataUrl?: string | null; teamIds?: string[] }) => {
+    async (input: { name: string; description: string; color: string; logoDataUrl?: string | null; teamIds?: string[]; excludedUserIds?: string[] }) => {
       try {
         const created = await createProject(input);
         setProjects((current) => [...current, created]);
@@ -44,7 +56,7 @@ export function useProjects() {
   );
 
   const editProject = useCallback(
-    async (id: string, patch: Partial<Pick<Project, "name" | "description" | "color" | "logoDataUrl" | "teamIds">>) => {
+    async (id: string, patch: Partial<Pick<Project, "name" | "description" | "color" | "logoDataUrl" | "teamIds" | "excludedUserIds">>) => {
       const previous = projects;
       setProjects((current) => current.map((p) => (p.id === id ? { ...p, ...patch } : p)));
       try {

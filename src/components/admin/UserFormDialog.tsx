@@ -1,18 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { ROLE_CONFIG, ROLE_ORDER } from "@/config/roleMeta";
 import { wouldCreateManagerCycle } from "@/lib/orgChart";
+import { randomPaletteColor } from "@/config/colorPalette";
 import { cn } from "@/lib/cn";
+import { Avatar } from "@/components/ui/Avatar";
+import { ColorSwatchPicker } from "./ColorSwatchPicker";
+import { ImageIcon, XIcon } from "@/components/ui/icons";
+import { BASE_NAV_ITEMS } from "@/config/navigation";
+import { BUILT_IN_COLUMNS } from "@/components/task-list/ColumnsMenu";
+import { ASSIGNED_TO_COLUMN_ID, EXCLUDED_COLUMN_ID } from "@/components/purchases/PurchaseTable";
+import { useCustomFields } from "@/hooks/useCustomFields";
+import { usePurchaseColumns } from "@/hooks/usePurchaseColumns";
 import type { AppUser, Role } from "@/types/user";
 import type { Team } from "@/types/team";
 
-const AVATAR_COLORS = ["#6366f1", "#ec4899", "#22c55e", "#f59e0b", "#06b6d4", "#a855f7", "#ef4444"];
-
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 export interface UserFormValues {
   name: string;
@@ -20,8 +36,11 @@ export interface UserFormValues {
   password: string;
   role: Role;
   color: string;
+  photoDataUrl: string | null;
   managerIds: string[];
   teamIds: string[];
+  visibleSectionHrefs: string[] | null;
+  hiddenColumnIds: string[];
 }
 
 interface UserFormDialogProps {
@@ -42,12 +61,19 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("member");
+  const [color, setColor] = useState(randomPaletteColor());
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [managerIds, setManagerIds] = useState<string[]>([]);
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [visibleSectionHrefs, setVisibleSectionHrefs] = useState<string[]>(BASE_NAV_ITEMS.map((item) => item.href));
+  const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wasOpen, setWasOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const { fields: customFields } = useCustomFields();
+  const { columns: purchaseColumns } = usePurchaseColumns();
 
   // Reset/prefill the draft whenever the dialog transitions from closed to
   // open, per React's guidance for resetting state when a prop changes.
@@ -58,8 +84,13 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
       setEmail(editingUser?.email ?? "");
       setPassword("");
       setRole(editingUser?.role ?? "member");
+      setColor(editingUser?.color ?? randomPaletteColor());
+      setPhotoDataUrl(editingUser?.photoDataUrl ?? null);
+      setPhotoError(null);
       setManagerIds(editingUser?.managerIds ?? []);
       setTeamIds(editingUser ? teamIdsForUser(teams, editingUser.id) : []);
+      setVisibleSectionHrefs(editingUser?.visibleSectionHrefs ?? BASE_NAV_ITEMS.map((item) => item.href));
+      setHiddenColumnIds(editingUser?.hiddenColumnIds ?? []);
       setError(null);
     }
   }
@@ -79,6 +110,22 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
 
   if (!open) return null;
 
+  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Please choose an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setPhotoError("Image must be smaller than 2 MB.");
+      return;
+    }
+    setPhotoError(null);
+    setPhotoDataUrl(await readFileAsDataUrl(file));
+  }
+
   function toggleTeam(teamId: string) {
     setTeamIds((current) => (current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId]));
   }
@@ -86,6 +133,21 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
   function toggleManager(managerId: string) {
     setManagerIds((current) => (current.includes(managerId) ? current.filter((id) => id !== managerId) : [...current, managerId]));
   }
+
+  function toggleSection(href: string) {
+    setVisibleSectionHrefs((current) => (current.includes(href) ? current.filter((h) => h !== href) : [...current, href]));
+  }
+
+  function toggleHiddenColumn(columnId: string) {
+    setHiddenColumnIds((current) => (current.includes(columnId) ? current.filter((id) => id !== columnId) : [...current, columnId]));
+  }
+
+  const taskColumns = [...BUILT_IN_COLUMNS, ...customFields.map((f) => ({ id: f.id, label: f.name }))];
+  const achatsColumns = [
+    { id: ASSIGNED_TO_COLUMN_ID, label: "Assigned to" },
+    { id: EXCLUDED_COLUMN_ID, label: "Excluded" },
+    ...purchaseColumns.map((c) => ({ id: c.id, label: c.name })),
+  ];
 
   const managerCandidates = users.filter((candidate) => {
     if (editingUser && candidate.id === editingUser.id) return false;
@@ -97,8 +159,19 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
     event.preventDefault();
     setSubmitting(true);
     setError(null);
-    const color = editingUser?.color ?? AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
-    const success = await onSubmit({ name: name.trim(), email: email.trim(), password, role, color, managerIds, teamIds });
+    const normalizedVisibleSectionHrefs = visibleSectionHrefs.length >= BASE_NAV_ITEMS.length ? null : visibleSectionHrefs;
+    const success = await onSubmit({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      role,
+      color,
+      photoDataUrl,
+      managerIds,
+      teamIds,
+      visibleSectionHrefs: normalizedVisibleSectionHrefs,
+      hiddenColumnIds,
+    });
     setSubmitting(false);
     if (success) onClose();
     else setError(editingUser ? "Couldn't save changes. Check the email isn't used by another account." : "Couldn't add this user. Check the email isn't already in use.");
@@ -137,6 +210,35 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Email</span>
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className={inputClass} />
           </label>
+
+          <div className="flex items-center gap-3">
+            <Avatar name={name || "?"} color={color} photoDataUrl={photoDataUrl} size="lg" />
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  {photoDataUrl ? "Change photo" : "Upload photo"}
+                  <input type="file" accept="image/*" onChange={handlePhotoChange} className="sr-only" />
+                </label>
+                {photoDataUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setPhotoDataUrl(null)}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                    Remove
+                  </button>
+                )}
+                <ColorSwatchPicker value={color} onChange={setColor} />
+              </div>
+              {photoError ? (
+                <p className="text-xs text-red-600 dark:text-red-400">{photoError}</p>
+              ) : (
+                <p className="text-xs text-slate-400">Optional. Falls back to the initial and color.</p>
+              )}
+            </div>
+          </div>
 
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">
@@ -194,7 +296,7 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
 
           {teams.length > 0 && (
             <fieldset className="block text-sm">
-              <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Teams (optional)</legend>
+              <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Departments (optional)</legend>
               <div className="flex flex-col gap-1 rounded-lg border border-slate-200 p-1.5 dark:border-slate-700">
                 {teams.map((team) => (
                   <label key={team.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">
@@ -211,6 +313,63 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
               </div>
             </fieldset>
           )}
+
+          <fieldset className="block text-sm">
+            <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Visible sections</legend>
+            <p className="mb-1.5 text-xs text-slate-400">Uncheck a section to hide it from this user&apos;s navigation menu.</p>
+            <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-slate-200 p-1.5 dark:border-slate-700">
+              {BASE_NAV_ITEMS.map((item) => (
+                <label key={item.href} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={visibleSectionHrefs.includes(item.href)}
+                    onChange={() => toggleSection(item.href)}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
+                  />
+                  <span className="text-sm text-slate-700 dark:text-slate-200">{item.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset className="block text-sm">
+            <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Hidden columns</legend>
+            <p className="mb-1.5 text-xs text-slate-400">Check a column to hide it from this user in Tasks/Litiges and Achats tables.</p>
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Tasks &amp; Litiges</p>
+                <div className="flex max-h-32 flex-col gap-1 overflow-y-auto rounded-lg border border-slate-200 p-1.5 dark:border-slate-700">
+                  {taskColumns.map((column) => (
+                    <label key={column.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={hiddenColumnIds.includes(column.id)}
+                        onChange={() => toggleHiddenColumn(column.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-200">{column.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Achats</p>
+                <div className="flex max-h-32 flex-col gap-1 overflow-y-auto rounded-lg border border-slate-200 p-1.5 dark:border-slate-700">
+                  {achatsColumns.map((column) => (
+                    <label key={column.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={hiddenColumnIds.includes(column.id)}
+                        onChange={() => toggleHiddenColumn(column.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-200">{column.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </fieldset>
 
           <div className="mt-2 flex justify-end gap-2">
             <button

@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskMeta } from "@/hooks/useTaskMeta";
 import { useProjects } from "@/hooks/useProjects";
 import { useTeams } from "@/hooks/useTeams";
 import { useUsers } from "@/hooks/useUsers";
 import { useGlobalFilters } from "@/hooks/useGlobalFilters";
+import { canManageUsers } from "@/config/roleMeta";
+import { getVisibleUserIds } from "@/lib/orgChart";
 import { GlobalFilterBar } from "@/components/filters/GlobalFilterBar";
 import { UserSelectorBar } from "@/components/filters/UserSelectorBar";
 import { StatTile } from "./StatTile";
@@ -31,12 +34,20 @@ import {
 import { AlertTriangleIcon, CheckIcon, ClockIcon, ListChecksIcon, UserPlusIcon } from "@/components/ui/icons";
 
 export function StatisticsView() {
+  const { user } = useAuth();
   const { tasks: allTasks, assignees, loadState } = useTasks("task");
   const { statuses, priorities, loadState: metaLoadState } = useTaskMeta();
   const { projects } = useProjects();
   const { teams } = useTeams();
-  const { users } = useUsers();
+  const { users: allUsers } = useUsers();
   const { filters, setTeamIds, setUserIds, setProjectIds, setPriorities, setStatuses, setDateRange, selectUser, clearAll } = useGlobalFilters();
+
+  const isAdmin = user ? canManageUsers(user.role) : false;
+  const users = useMemo(() => {
+    if (!user || isAdmin) return allUsers;
+    const visibleUserIds = new Set(getVisibleUserIds(allUsers, user.id));
+    return allUsers.filter((u) => visibleUserIds.has(u.id));
+  }, [allUsers, user, isAdmin]);
 
   const tasks = useMemo(() => applyGlobalFilters(allTasks, filters), [allTasks, filters]);
 
@@ -62,7 +73,7 @@ export function StatisticsView() {
   const isLoading = loadState === "loading" || metaLoadState === "loading";
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[95%] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Statistics</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">Analysis, trends, and performance across your work.</p>
@@ -114,7 +125,7 @@ export function StatisticsView() {
               </ChartCard>
             )}
             {byTeam.length > 0 && (
-              <ChartCard title="Tasks by team">
+              <ChartCard title="Tasks by department">
                 <BarChart data={byTeam} />
               </ChartCard>
             )}
@@ -127,7 +138,7 @@ export function StatisticsView() {
             <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Performance</h2>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <PerformanceTable title="By user" rows={userPerformance} />
-              {teamPerformance.length > 0 && <PerformanceTable title="By team" rows={teamPerformance} />}
+              {teamPerformance.length > 0 && <PerformanceTable title="By department" rows={teamPerformance} />}
               {projectPerformance.length > 0 && <PerformanceTable title="By project" rows={projectPerformance} />}
             </div>
           </section>
