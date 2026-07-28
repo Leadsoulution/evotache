@@ -22,7 +22,7 @@ function createSeedPosts(): Post[] {
     {
       id: "post-1",
       title: "Carrousel — Gamme Hawk complète",
-      client: "LPR Maroc",
+      client: "LPR MAROC",
       assigneeId: "u3",
       status: "design",
       priority: "high",
@@ -34,7 +34,7 @@ function createSeedPosts(): Post[] {
     {
       id: "post-2",
       title: "Post témoignage client",
-      client: "Atlas Distribution",
+      client: "MXSHOP",
       assigneeId: "u5",
       status: "published",
       priority: "normal",
@@ -46,7 +46,7 @@ function createSeedPosts(): Post[] {
     {
       id: "post-3",
       title: "Annonce partenariat concessionnaire",
-      client: "LPR Maroc",
+      client: "LPR MAROC",
       assigneeId: "u3",
       status: "scheduled",
       priority: "normal",
@@ -58,7 +58,7 @@ function createSeedPosts(): Post[] {
     {
       id: "post-4",
       title: "Récap mensuel des livraisons",
-      client: "EvoTasks Interne",
+      client: "EVOBIKE",
       assigneeId: "u6",
       status: "draft",
       priority: "low",

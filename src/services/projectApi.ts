@@ -19,8 +19,18 @@ function createSeedProjects(): Project[] {
   const now = new Date().toISOString();
   return [
     {
+      id: "proj-evobike",
+      name: "EVOBIKE",
+      description: "Boutique et opérations EVOBIKE.",
+      color: "#ef4444",
+      logoDataUrl: null,
+      teamIds: [],
+      excludedUserIds: [],
+      createdAt: now,
+    },
+    {
       id: SEED_PROJECT_LPR,
-      name: "Site Web LPR Maroc",
+      name: "LPR MAROC",
       description: "Refonte du site vitrine et catalogue produits LPR Maroc.",
       color: "#6366f1",
       logoDataUrl: null,
@@ -30,8 +40,8 @@ function createSeedProjects(): Project[] {
     },
     {
       id: "proj-internal-tools",
-      name: "Internal Tools",
-      description: "Internal dashboards and tooling for the ops team.",
+      name: "EVOTRACEUR",
+      description: "Outils et tableaux de bord internes EVOTRACEUR.",
       color: "#22c55e",
       logoDataUrl: null,
       teamIds: ["team-ops"],
@@ -40,8 +50,8 @@ function createSeedProjects(): Project[] {
     },
     {
       id: "proj-marketing-q3",
-      name: "Marketing Q3 Campaign",
-      description: "Q3 marketing launch across web and social.",
+      name: "BAYSONE",
+      description: "Projet BAYSONE.",
       color: "#f59e0b",
       logoDataUrl: null,
       teamIds: [],

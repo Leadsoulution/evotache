@@ -17,9 +17,10 @@ export const SEED_TEAM_WEB = "team-web";
 function createSeedTeams(): Team[] {
   const now = new Date().toISOString();
   return [
-    { id: SEED_TEAM_WEB, name: "Web Development", color: "#6366f1", memberIds: ["u2", "u4", "u7"], excludedUserIds: [], createdAt: now },
-    { id: "team-design", name: "Design", color: "#ec4899", memberIds: ["u3", "u6"], excludedUserIds: [], createdAt: now },
-    { id: "team-ops", name: "Operations", color: "#22c55e", memberIds: ["u1", "u2", "u5"], excludedUserIds: [], createdAt: now },
+    { id: SEED_TEAM_WEB, name: "MARKETING DIGITAL", color: "#6366f1", memberIds: ["u2", "u4", "u7"], excludedUserIds: [], createdAt: now },
+    { id: "team-design", name: "COMMERCIAL", color: "#ec4899", memberIds: ["u3", "u6"], excludedUserIds: [], createdAt: now },
+    { id: "team-ops", name: "ADMINISTRATIF", color: "#22c55e", memberIds: ["u1", "u2", "u5"], excludedUserIds: [], createdAt: now },
+    { id: "team-atelier", name: "ATELIER", color: "#f97316", memberIds: [], excludedUserIds: [], createdAt: now },
   ];
 }
 

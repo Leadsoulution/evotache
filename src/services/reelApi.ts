@@ -22,7 +22,7 @@ function createSeedReels(): Reel[] {
     {
       id: "reel-1",
       title: "Hawk 200R — Essai en conditions réelles",
-      client: "LPR Maroc",
+      client: "LPR MAROC",
       assigneeId: "u4",
       script: "Ouverture sur le désert, plan large du Hawk 200R, cut rapide sur les caractéristiques techniques, CTA fin de vidéo.",
       shootingDate: daysFromToday(-3),
@@ -37,7 +37,7 @@ function createSeedReels(): Reel[] {
     {
       id: "reel-2",
       title: "Unboxing XTANK 200R",
-      client: "LPR Maroc",
+      client: "LPR MAROC",
       assigneeId: "u3",
       script: "",
       shootingDate: daysFromToday(6),
@@ -52,7 +52,7 @@ function createSeedReels(): Reel[] {
     {
       id: "reel-3",
       title: "Behind the scenes atelier",
-      client: "EvoTasks Interne",
+      client: "EVOBIKE",
       assigneeId: "u7",
       script: "Interviews courtes de l'équipe technique.",
       shootingDate: daysFromToday(-10),

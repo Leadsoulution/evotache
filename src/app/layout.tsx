@@ -28,7 +28,7 @@ const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem("evotasks.
 // service reads localStorage, so a stale cache never causes mismatched ids,
 // missing users, or "changes don't show up" confusion — it just quietly
 // reseeds. Keeps session/theme so this never signs anyone out.
-const SEED_VERSION = "9";
+const SEED_VERSION = "10";
 const SEED_RESET_SCRIPT = `(function(){try{var v="${SEED_VERSION}";var k="evotasks.seedVersion";if(localStorage.getItem(k)!==v){var keys=Object.keys(localStorage);for(var i=0;i<keys.length;i++){var key=keys[i];if(key.indexOf("evotasks.")===0&&key!=="evotasks.session.v1"&&key!=="evotasks.theme"){localStorage.removeItem(key);}}localStorage.setItem(k,v);}}catch(e){}})();`;
 
 export default function RootLayout({

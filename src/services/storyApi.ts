@@ -22,7 +22,7 @@ function createSeedStories(): Story[] {
     {
       id: "story-1",
       title: "Coulisses tournage Hawk 200R",
-      client: "LPR Maroc",
+      client: "LPR MAROC",
       platform: "instagram",
       dueDate: daysFromToday(1),
       status: "scheduled",
@@ -34,7 +34,7 @@ function createSeedStories(): Story[] {
     {
       id: "story-2",
       title: "Sondage : quel modèle préférez-vous ?",
-      client: "LPR Maroc",
+      client: "LPR MAROC",
       platform: "instagram",
       dueDate: daysFromToday(-1),
       status: "published",
@@ -46,7 +46,7 @@ function createSeedStories(): Story[] {
     {
       id: "story-3",
       title: "Compte à rebours promo",
-      client: "Atlas Distribution",
+      client: "MXSHOP",
       platform: "facebook",
       dueDate: daysFromToday(4),
       status: "draft",

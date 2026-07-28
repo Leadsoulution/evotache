@@ -21,8 +21,8 @@ function createSeedProjects(): AdProject[] {
   const rows: Omit<AdProject, "createdAt">[] = [
     {
       id: "adproj-lpr",
-      name: "LPR Maroc — Lancement Quads",
-      client: "LPR Maroc",
+      name: "LPR MAROC",
+      client: "LPR MAROC",
       platform: "facebook",
       status: "active",
       archived: false,
@@ -32,8 +32,8 @@ function createSeedProjects(): AdProject[] {
     },
     {
       id: "adproj-atlas",
-      name: "Atlas Distribution — Génération de leads",
-      client: "Atlas Distribution",
+      name: "MXSHOP",
+      client: "MXSHOP",
       platform: "google",
       status: "active",
       archived: false,
@@ -43,8 +43,8 @@ function createSeedProjects(): AdProject[] {
     },
     {
       id: "adproj-brand",
-      name: "Notoriété de marque Q2",
-      client: "EvoTasks Interne",
+      name: "EVOBIKE",
+      client: "EVOBIKE",
       platform: "instagram",
       status: "paused",
       archived: false,
