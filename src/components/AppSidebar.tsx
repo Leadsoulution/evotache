@@ -29,9 +29,9 @@ export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
     <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex dark:border-slate-800 dark:bg-slate-950">
       <div className="px-4 py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-dark.png" alt="EvoTask" className="h-14 w-auto rounded-md dark:hidden" />
+        <img src="/app-logo-light.png" alt="EvoTask" className="h-14 w-auto rounded-md dark:hidden" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-light.png" alt="EvoTask" className="hidden h-14 w-auto rounded-md dark:block" />
+        <img src="/app-logo-dark.png" alt="EvoTask" className="hidden h-14 w-auto rounded-md dark:block" />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 px-2">
         {navItems.map((item) => {
