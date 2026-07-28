@@ -25,11 +25,15 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
   const updatePosition = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    if (align === "end") {
-      setPosition({ top: rect.bottom + 6, left: 0, right: window.innerWidth - rect.right });
-    } else {
-      setPosition({ top: rect.bottom + 6, left: rect.left, right: 0 });
-    }
+    const top = rect.bottom + 6;
+    // Panel is w-80 (320px) capped by max-w-[calc(100vw-1.5rem)]; clamp the
+    // left edge so it can't be pushed off-screen on narrow viewports.
+    const panelWidth = Math.min(320, window.innerWidth - 24);
+    const margin = 8;
+    const maxLeft = Math.max(margin, window.innerWidth - panelWidth - margin);
+    const idealLeft = align === "end" ? rect.right - panelWidth : rect.left;
+    const clampedLeft = Math.min(Math.max(idealLeft, margin), maxLeft);
+    setPosition({ top, left: clampedLeft, right: 0 });
   }, [align]);
 
   useLayoutEffect(() => {
@@ -85,7 +89,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
             ref={panelRef}
             role="dialog"
             aria-label="Overdue task notifications"
-            style={{ position: "fixed", top: position.top, left: align === "start" ? position.left : undefined, right: align === "end" ? position.right : undefined }}
+            style={{ position: "fixed", top: position.top, left: position.left }}
             className="z-[95] w-80 max-w-[calc(100vw-1.5rem)] animate-scale-in overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
           >
             <div className="border-b border-slate-100 px-3.5 py-2.5 dark:border-slate-800">

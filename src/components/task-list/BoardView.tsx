@@ -74,7 +74,7 @@ export function BoardView({ tasks, statuses, priorities, assignees, attachmentCo
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <div className="flex min-w-0 gap-3 overflow-x-auto pb-2">
       {statuses.map((status) => {
         const columnTasks = tasksByStatus.get(status.id) ?? [];
         return (

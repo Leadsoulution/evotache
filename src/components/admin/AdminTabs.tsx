@@ -17,7 +17,7 @@ export function AdminTabs() {
   ];
 
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
+    <nav className="flex min-w-0 gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
       {tabs.map((tab) => {
         const active = pathname === tab.href;
         return (

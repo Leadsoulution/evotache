@@ -55,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="hidden justify-end border-b border-slate-200 px-4 py-2 md:flex dark:border-slate-800">
           <NotificationBell align="end" />
         </div>
-        <main className="flex-1">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );

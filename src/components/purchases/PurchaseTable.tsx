@@ -128,7 +128,7 @@ export function PurchaseTable({
   const tableWidth = Math.max(720, orderedColumnIds.reduce((sum, id) => sum + widthOf(id, defaultSizeFor(id).width), 0) + 80);
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <table className="border-collapse" style={{ tableLayout: "fixed", width: tableWidth }}>
         <colgroup>
           {orderedColumnIds.map((id) => (

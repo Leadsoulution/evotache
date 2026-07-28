@@ -74,7 +74,7 @@ export function ContentKanbanBoard<T extends { id: string; order: number }>({
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <div className="flex min-w-0 gap-3 overflow-x-auto pb-2">
       {columns.map((column) => {
         const columnItems = itemsByColumn.get(column.id) ?? [];
         return (

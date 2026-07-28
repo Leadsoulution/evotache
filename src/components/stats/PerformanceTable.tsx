@@ -8,12 +8,12 @@ interface PerformanceTableProps {
 
 export function PerformanceTable({ title, rows }: PerformanceTableProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
       {rows.length === 0 ? (
         <p className="text-sm text-slate-400">No data yet.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <table className="w-full min-w-[420px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800">

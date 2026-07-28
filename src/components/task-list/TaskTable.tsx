@@ -220,7 +220,7 @@ export function TaskTable({
   const tableWidth = Math.max(880, 56 + 40 + (canManageFields ? 36 : 0) + resizableColumns.reduce((sum, col) => sum + widthOf(col), 0));
 
   return (
-    <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-800 dark:bg-slate-900">
+    <div className="hidden min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-800 dark:bg-slate-900">
       <table className="border-collapse" style={{ tableLayout: "fixed", width: tableWidth }}>
         <colgroup>
           <col style={{ width: 56 }} />

@@ -51,10 +51,18 @@ export function Menu({ options, value, multiple = false, onChange, ariaLabel, al
     const spaceBelow = window.innerHeight - rect.bottom;
     const shouldFlip = panelHeight > 0 && spaceBelow < panelHeight + 12 && rect.top > panelHeight + 12;
     const top = Math.max(4, shouldFlip ? rect.top - panelHeight - 6 : rect.bottom + 6);
+    // Clamp the panel's left edge to stay within the viewport (with a small
+    // margin) regardless of alignment — on narrow/mobile screens a trigger
+    // near an edge would otherwise push the panel partly off-screen.
+    const panelWidth = Math.max(rect.width, 180);
+    const margin = 8;
+    const maxLeft = Math.max(margin, window.innerWidth - panelWidth - margin);
+    const idealLeft = align === "end" ? rect.right - panelWidth : rect.left;
+    const clampedLeft = Math.min(Math.max(idealLeft, margin), maxLeft);
     if (align === "end") {
-      setPosition({ top, left: null, right: window.innerWidth - rect.right, width: rect.width });
+      setPosition({ top, left: null, right: window.innerWidth - clampedLeft - panelWidth, width: rect.width });
     } else {
-      setPosition({ top, left: rect.left, right: null, width: rect.width });
+      setPosition({ top, left: clampedLeft, right: null, width: rect.width });
     }
   }, [align]);
 

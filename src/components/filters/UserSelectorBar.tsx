@@ -14,7 +14,7 @@ export function UserSelectorBar({ users, selectedUserId, onSelectUser }: UserSel
   const activeUsers = users.filter((u) => u.status === "active");
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter by employee">
+    <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter by employee">
       <button
         type="button"
         role="tab"
