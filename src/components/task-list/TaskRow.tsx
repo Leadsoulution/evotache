@@ -108,19 +108,24 @@ export function TaskRow({
     }
   }
 
+  const priorityColor = priorities.find((p) => p.id === task.priority)?.color ?? "#cbd5e1";
+  // Every <td> shares this so the row reads as one continuous card despite
+  // border-collapse:separate giving each cell its own border.
+  const cellClass = cn(
+    "overflow-hidden border-y border-slate-100 bg-white px-2 py-1.5 group-hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:group-hover:bg-slate-800/50",
+    selected && "!bg-indigo-50/60 dark:!bg-indigo-950/30",
+    dragHover === "before" && "!border-t-2 !border-t-indigo-500",
+    dragHover === "after" && "!border-b-2 !border-b-indigo-500"
+  );
+
   return (
     <tr
-      className={cn(
-        "group border-b border-slate-100 text-sm last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50",
-        selected && "bg-indigo-50/60 dark:bg-indigo-950/30",
-        dragHover === "before" && "shadow-[inset_0_2px_0_0_theme(colors.indigo.500)]",
-        dragHover === "after" && "shadow-[inset_0_-2px_0_0_theme(colors.indigo.500)]"
-      )}
+      className="group text-sm"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onDragLeave={() => setDragHover(null)}
     >
-      <td className="overflow-hidden px-2 py-1.5">
+      <td className={cn(cellClass, "rounded-l-lg border-l-4")} style={{ borderLeftColor: priorityColor }}>
         <div className="flex items-center gap-1">
           <span
             draggable={dragEnabled}
@@ -145,7 +150,7 @@ export function TaskRow({
           />
         </div>
       </td>
-      <td className="overflow-hidden px-1 py-1.5">
+      <td className={cellClass}>
         <div className="flex items-center gap-1" style={{ paddingLeft: depth * 20 }}>
           {hasChildren ? (
             <button
@@ -206,7 +211,7 @@ export function TaskRow({
         switch (columnId) {
           case "assignees":
             return (
-              <td key="assignees" className="overflow-hidden px-2 py-1.5">
+              <td key="assignees" className={cellClass}>
                 <AssigneeMenu
                   assignees={assignees}
                   value={task.assigneeIds}
@@ -217,19 +222,19 @@ export function TaskRow({
             );
           case "team":
             return (
-              <td key="team" className="overflow-hidden px-2 py-1.5">
+              <td key="team" className={cellClass}>
                 <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
               </td>
             );
           case "dueDate":
             return (
-              <td key="dueDate" className="overflow-hidden px-2 py-1.5">
+              <td key="dueDate" className={cellClass}>
                 <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
               </td>
             );
           case "priority":
             return (
-              <td key="priority" className="overflow-hidden px-2 py-1.5">
+              <td key="priority" className={cellClass}>
                 <PriorityMenu
                   value={task.priority}
                   priorities={priorities}
@@ -240,7 +245,7 @@ export function TaskRow({
             );
           case "status":
             return (
-              <td key="status" className="overflow-hidden px-2 py-1.5">
+              <td key="status" className={cellClass}>
                 <StatusMenu value={task.status} statuses={statuses} onChange={(status) => onUpdate(task.id, { status })} readOnly={!permissions.canEditStatus} />
               </td>
             );
@@ -248,7 +253,7 @@ export function TaskRow({
             const field = visibleCustomFields.find((f) => f.id === columnId);
             if (!field) return null;
             return (
-              <td key={field.id} className="overflow-hidden px-2 py-1.5">
+              <td key={field.id} className={cellClass}>
                 <CustomFieldCell
                   field={field}
                   value={task.customValues[field.id] ?? ""}
@@ -260,7 +265,7 @@ export function TaskRow({
           }
         }
       })}
-      <td className="overflow-hidden px-2 py-1.5 text-right">
+      <td className={cn(cellClass, "rounded-r-lg text-right")}>
         {permissions.canDelete && (
           <button
             type="button"

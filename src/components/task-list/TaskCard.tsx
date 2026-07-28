@@ -55,10 +55,15 @@ export function TaskCard({
   onAddSubtask,
   onOpenDetail,
 }: TaskCardProps) {
+  const priorityColor = priorities.find((p) => p.id === task.priority)?.color ?? "#cbd5e1";
+
   return (
     <div
-      className={cn("flex flex-col gap-2 border-b border-slate-100 px-3 py-3 last:border-0 dark:border-slate-800", selected && "bg-indigo-50/60 dark:bg-indigo-950/30")}
-      style={{ marginLeft: depth * 14 }}
+      className={cn(
+        "flex flex-col gap-2 rounded-lg border border-l-4 border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900",
+        selected && "bg-indigo-50/60 dark:bg-indigo-950/30"
+      )}
+      style={{ marginLeft: depth * 14, borderLeftColor: priorityColor }}
     >
       <div className="flex items-start gap-2">
         {hasChildren ? (

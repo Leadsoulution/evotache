@@ -221,7 +221,7 @@ export function TaskTable({
 
   return (
     <div className="hidden min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-800 dark:bg-slate-900">
-      <table className="border-collapse" style={{ tableLayout: "fixed", width: tableWidth }}>
+      <table className="border-separate" style={{ tableLayout: "fixed", width: tableWidth, borderSpacing: "0 6px" }}>
         <colgroup>
           <col style={{ width: 56 }} />
           {resizableColumns.map((col) => (

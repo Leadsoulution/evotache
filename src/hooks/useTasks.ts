@@ -167,6 +167,14 @@ export function useTasks(module: TaskModule): UseTasksResult {
         }
       }
 
+      // A task moved (back) to the workflow's first status ("To Do") jumps to
+      // the front of the manual order, so it's easy to spot right after the change.
+      const firstStatusId = statusesRef.current[0]?.id;
+      if (firstStatusId && finalPatch.status === firstStatusId && existingTask && existingTask.status !== firstStatusId) {
+        const minOrder = previous.length ? Math.min(...previous.map((t) => t.order)) : 0;
+        finalPatch = { ...finalPatch, order: minOrder - 1 };
+      }
+
       setTasks(previous.map((t) => (t.id === id ? { ...t, ...finalPatch, updatedAt: new Date().toISOString() } : t)));
       try {
         const updated = await updateTaskRequest(id, finalPatch);

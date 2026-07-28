@@ -140,30 +140,33 @@ function TaskCardGroup({
           <span className="font-normal normal-case text-slate-400">{group.rows.length}</span>
         </button>
       )}
-      {!sectionCollapsed &&
-        group.rows.map(({ task, depth, hasChildren }) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            depth={depth}
-            hasChildren={hasChildren}
-            collapsed={collapsedIds.has(task.id)}
-            onToggleCollapse={onToggleCollapse}
-            assignees={assignees}
-            teams={teams}
-            statuses={statuses}
-            priorities={priorities}
-            visibleColumns={visibleColumns}
-            attachmentCount={attachmentCounts[task.id] ?? 0}
-            selected={selectedIds.has(task.id)}
-            permissions={permissions}
-            onToggleSelect={onToggleSelect}
-            onUpdate={onUpdate}
-            onRequestDelete={onRequestDelete}
-            onAddSubtask={onAddSubtask}
-            onOpenDetail={onOpenDetail}
-          />
-        ))}
+      {!sectionCollapsed && (
+        <div className="flex flex-col gap-2 p-2">
+          {group.rows.map(({ task, depth, hasChildren }) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              depth={depth}
+              hasChildren={hasChildren}
+              collapsed={collapsedIds.has(task.id)}
+              onToggleCollapse={onToggleCollapse}
+              assignees={assignees}
+              teams={teams}
+              statuses={statuses}
+              priorities={priorities}
+              visibleColumns={visibleColumns}
+              attachmentCount={attachmentCounts[task.id] ?? 0}
+              selected={selectedIds.has(task.id)}
+              permissions={permissions}
+              onToggleSelect={onToggleSelect}
+              onUpdate={onUpdate}
+              onRequestDelete={onRequestDelete}
+              onAddSubtask={onAddSubtask}
+              onOpenDetail={onOpenDetail}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
