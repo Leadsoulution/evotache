@@ -14,6 +14,9 @@ import { GlobalFilterBar } from "@/components/filters/GlobalFilterBar";
 import { UserSelectorBar } from "@/components/filters/UserSelectorBar";
 import { StatTile } from "./StatTile";
 import { BarChart } from "./BarChart";
+import { StackedBarChart } from "./StackedBarChart";
+import { PieChart } from "./PieChart";
+import { VerticalBarChart } from "./VerticalBarChart";
 import { ChartCard } from "./ChartCard";
 import { PerformanceTable } from "./PerformanceTable";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
@@ -59,6 +62,10 @@ export function StatisticsView() {
   const byProject = useMemo(() => countByProject(tasks, projects), [tasks, projects]);
   const byTeam = useMemo(() => countByTeam(tasks, teams), [tasks, teams]);
   const weeklyTrend = useMemo(() => countCompletedByWeek(tasks, doneStatusId), [tasks, doneStatusId]);
+  const openByAssignee = useMemo(
+    () => countByAssignee(tasks.filter((t) => t.status !== doneStatusId), assignees),
+    [tasks, assignees, doneStatusId]
+  );
 
   const userPerformance = useMemo(() => performanceByUser(tasks, assignees, doneStatusId), [tasks, assignees, doneStatusId]);
   const teamPerformance = useMemo(() => performanceByTeam(tasks, teams, doneStatusId), [tasks, teams, doneStatusId]);
@@ -110,6 +117,15 @@ export function StatisticsView() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <ChartCard title="Workload by status">
+              <StackedBarChart data={byStatus} />
+            </ChartCard>
+            <ChartCard title="Total tasks by assignee">
+              <PieChart data={byAssignee} />
+            </ChartCard>
+            <ChartCard title="Open tasks by assignee">
+              <VerticalBarChart data={openByAssignee} />
+            </ChartCard>
             <ChartCard title="Tasks by status">
               <BarChart data={byStatus} />
             </ChartCard>
