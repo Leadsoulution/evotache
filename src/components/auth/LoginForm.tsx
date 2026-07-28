@@ -55,7 +55,6 @@ export function LoginForm() {
           <img src="/logo-dark.png" alt="EvoTask" className="mx-auto h-auto w-64 dark:hidden" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-light.png" alt="EvoTask" className="mx-auto hidden h-auto w-64 dark:block" />
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sign in to manage your tasks.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -93,6 +92,7 @@ export function LoginForm() {
           >
             {submitting ? "Signing in…" : "Sign in"}
           </button>
+          <p className="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">Sign in to manage your tasks.</p>
         </form>
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-white/60 p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">

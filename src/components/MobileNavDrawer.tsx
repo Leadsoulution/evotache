@@ -40,7 +40,9 @@ export function MobileNavDrawer({ navBadgeCounts }: MobileNavDrawerProps) {
             <aside className="relative flex h-full w-64 max-w-[80vw] animate-slide-up flex-col overflow-y-auto border-r border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-horizontal.png" alt="EvoTask" className="h-11 w-auto rounded-md" />
+                <img src="/logo-dark.png" alt="EvoTask" className="h-11 w-auto rounded-md dark:hidden" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-light.png" alt="EvoTask" className="hidden h-11 w-auto rounded-md dark:block" />
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
