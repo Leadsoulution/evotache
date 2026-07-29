@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { getNavItems } from "@/config/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Avatar } from "@/components/ui/Avatar";
 import { Menu } from "@/components/ui/Menu";
 import { NavBadge } from "@/components/NavBadge";
 import { ROLE_CONFIG } from "@/config/roleMeta";
-import { ChevronDownIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, DownloadIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { getAccountMenuOptions, handleAccountMenuChange } from "@/config/accountMenu";
 import type { NavBadgeCounts } from "@/hooks/useNavBadgeCounts";
@@ -23,6 +24,7 @@ export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const push = usePushSubscription();
+  const { canInstall, install } = useInstallPrompt();
 
   if (!user) return null;
   const navItems = getNavItems(user);
@@ -61,6 +63,16 @@ export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
         })}
       </nav>
       <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-3 dark:border-slate-800">
+        {canInstall && (
+          <button
+            type="button"
+            onClick={install}
+            className="flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
+          >
+            <DownloadIcon className="h-4 w-4" />
+            Install app
+          </button>
+        )}
         <ThemeToggle />
         <Menu
           options={getAccountMenuOptions(push.supported, push.subscribed)}
