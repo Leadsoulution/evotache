@@ -6,7 +6,7 @@ import { fetchMessages, markConversationRead, sendMessage } from "@/services/cha
 import { useToast } from "@/components/ui/Toast";
 import type { Message } from "@/types/chat";
 
-const MESSAGES_STORAGE_KEY = "evotasks.chatMessages.v1";
+const POLL_MS = 4_000;
 
 type LoadState = "loading" | "success" | "error";
 
@@ -40,17 +40,15 @@ export function useMessages(conversationId: string | null) {
     };
   }, [conversationId]);
 
-  // Cross-tab live sync, same mechanism as useConversations.
+  // Cross-device live-ish sync, same mechanism as useConversations.
   useEffect(() => {
     if (!conversationId) return;
-    function onStorage(event: StorageEvent) {
-      if (event.key !== MESSAGES_STORAGE_KEY) return;
-      fetchMessages(conversationId as string)
+    const interval = window.setInterval(() => {
+      fetchMessages(conversationId)
         .then((list) => setMessages(list))
         .catch(() => {});
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    }, POLL_MS);
+    return () => window.clearInterval(interval);
   }, [conversationId]);
 
   // Mark the thread read whenever it's open and has messages — covers both

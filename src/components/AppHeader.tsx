@@ -1,12 +1,13 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Avatar } from "@/components/ui/Avatar";
 import { Menu } from "@/components/ui/Menu";
-import { ACCOUNT_MENU_OPTIONS, handleAccountMenuChange } from "@/config/accountMenu";
+import { getAccountMenuOptions, handleAccountMenuChange } from "@/config/accountMenu";
 import type { NavBadgeCounts } from "@/hooks/useNavBadgeCounts";
 
 interface AppHeaderProps {
@@ -15,6 +16,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ navBadgeCounts }: AppHeaderProps) {
   const { user, logout } = useAuth();
+  const push = usePushSubscription();
 
   if (!user) return null;
 
@@ -29,9 +31,9 @@ export function AppHeader({ navBadgeCounts }: AppHeaderProps) {
         <NotificationBell align="end" />
         <ThemeToggle />
         <Menu
-          options={ACCOUNT_MENU_OPTIONS}
+          options={getAccountMenuOptions(push.supported, push.subscribed)}
           value={[]}
-          onChange={(next) => handleAccountMenuChange(next[0], logout)}
+          onChange={(next) => handleAccountMenuChange(next[0], { logout, togglePush: push.subscribed ? push.unsubscribe : push.subscribe })}
           ariaLabel="Account menu"
           align="end"
           renderTrigger={() => (

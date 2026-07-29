@@ -13,7 +13,6 @@ import {
   updatePriority,
   updateStatus,
 } from "@/services/taskMetaApi";
-import { isPriorityInUse, isStatusInUse } from "@/services/taskApi";
 import { useToast } from "@/components/ui/Toast";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 
@@ -100,7 +99,7 @@ export function useTaskMeta(): UseTaskMetaResult {
   const removeStatus = useCallback(
     async (id: string) => {
       try {
-        await deleteStatus(id, isStatusInUse);
+        await deleteStatus(id);
         setStatuses((current) => current.filter((s) => s.id !== id));
         return true;
       } catch (err) {
@@ -160,7 +159,7 @@ export function useTaskMeta(): UseTaskMetaResult {
   const removePriority = useCallback(
     async (id: string) => {
       try {
-        await deletePriority(id, isPriorityInUse);
+        await deletePriority(id);
         setPriorities((current) => current.filter((p) => p.id !== id));
         return true;
       } catch (err) {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { getNavItems } from "@/config/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Avatar } from "@/components/ui/Avatar";
@@ -11,7 +12,7 @@ import { NavBadge } from "@/components/NavBadge";
 import { ROLE_CONFIG } from "@/config/roleMeta";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { ACCOUNT_MENU_OPTIONS, handleAccountMenuChange } from "@/config/accountMenu";
+import { getAccountMenuOptions, handleAccountMenuChange } from "@/config/accountMenu";
 import type { NavBadgeCounts } from "@/hooks/useNavBadgeCounts";
 
 interface AppSidebarProps {
@@ -21,6 +22,7 @@ interface AppSidebarProps {
 export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const push = usePushSubscription();
 
   if (!user) return null;
   const navItems = getNavItems(user);
@@ -61,9 +63,9 @@ export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
       <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-3 dark:border-slate-800">
         <ThemeToggle />
         <Menu
-          options={ACCOUNT_MENU_OPTIONS}
+          options={getAccountMenuOptions(push.supported, push.subscribed)}
           value={[]}
-          onChange={(next) => handleAccountMenuChange(next[0], logout)}
+          onChange={(next) => handleAccountMenuChange(next[0], { logout, togglePush: push.subscribed ? push.unsubscribe : push.subscribe })}
           ariaLabel="Account menu"
           renderTrigger={() => (
             <span className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">

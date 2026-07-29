@@ -6,8 +6,7 @@ import { createGroupConversation, fetchConversations, fetchUnreadCounts, findOrC
 import { useToast } from "@/components/ui/Toast";
 import type { Conversation } from "@/types/chat";
 
-const CONVERSATIONS_STORAGE_KEY = "evotasks.chatConversations.v1";
-const MESSAGES_STORAGE_KEY = "evotasks.chatMessages.v1";
+const POLL_MS = 8_000;
 
 type LoadState = "loading" | "success" | "error";
 
@@ -42,22 +41,19 @@ export function useConversations() {
     };
   }, [userId]);
 
-  // Cross-tab live sync — the `storage` event only fires in OTHER tabs of the
-  // same origin, never the tab that made the write, so this is exactly the
-  // signal we want: "someone else just sent a message, refresh the list."
+  // Cross-device live-ish sync — polls the server so a message sent from
+  // another device/session shows up here without a manual refresh.
   useEffect(() => {
     if (!userId) return;
-    function onStorage(event: StorageEvent) {
-      if (event.key !== CONVERSATIONS_STORAGE_KEY && event.key !== MESSAGES_STORAGE_KEY) return;
-      loadConversationsData(userId as string)
+    const interval = window.setInterval(() => {
+      loadConversationsData(userId)
         .then((data) => {
           setConversations(data.conversations);
           setUnreadCounts(data.unreadCounts);
         })
         .catch(() => {});
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    }, POLL_MS);
+    return () => window.clearInterval(interval);
   }, [userId]);
 
   const refetch = useCallback(() => {
