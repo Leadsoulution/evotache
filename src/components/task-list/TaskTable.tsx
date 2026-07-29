@@ -313,6 +313,8 @@ export function TaskTable({
         {groups.map((group) => (
           <TaskGroup
             key={group.key}
+            groupKey={group.key}
+            groupField={groupField}
             label={group.label}
             rows={group.rows}
             assignees={assignees}

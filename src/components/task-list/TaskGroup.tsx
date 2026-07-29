@@ -4,14 +4,17 @@ import { useState } from "react";
 import { TaskRow } from "./TaskRow";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { getGroupColor } from "@/lib/taskGroupColor";
 import type { FlatTreeRow } from "@/lib/taskTree";
-import type { Assignee, Task } from "@/types/task";
+import type { Assignee, GroupField, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { CustomFieldDef } from "@/types/customField";
 import type { TaskPermissions } from "@/lib/taskPermissions";
 import type { Team } from "@/types/team";
 
 interface TaskGroupProps {
+  groupKey: string;
+  groupField: GroupField;
   label: string;
   rows: FlatTreeRow[];
   assignees: Assignee[];
@@ -40,6 +43,8 @@ interface TaskGroupProps {
 }
 
 export function TaskGroup({
+  groupKey,
+  groupField,
   label,
   rows,
   assignees,
@@ -67,21 +72,29 @@ export function TaskGroup({
   onDropOn,
 }: TaskGroupProps) {
   const [sectionCollapsed, setSectionCollapsed] = useState(false);
+  const color = getGroupColor(groupKey, groupField, statuses, priorities);
 
   return (
     <tbody>
       {showGroupHeader && (
         <tr>
-          <td colSpan={columnCount} className="bg-slate-50 px-3 py-1.5 dark:bg-slate-900/60">
+          <td
+            colSpan={columnCount}
+            className={cn("px-3 py-1.5", !color && "bg-slate-50 dark:bg-slate-900/60")}
+            style={color ? { backgroundColor: `${color}D9` } : undefined}
+          >
             <button
               type="button"
               onClick={() => setSectionCollapsed((c) => !c)}
-              className="flex items-center gap-1.5 rounded text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:text-slate-200"
+              className={cn(
+                "flex items-center gap-1.5 rounded text-xs font-semibold uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
+                color ? "text-white hover:text-white/80" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              )}
               aria-expanded={!sectionCollapsed}
             >
               <ChevronDownIcon className={cn("h-3.5 w-3.5 transition-transform", sectionCollapsed && "-rotate-90")} />
               {label}
-              <span className="font-normal normal-case text-slate-400">{rows.length}</span>
+              <span className={cn("font-normal normal-case", color ? "text-white/80" : "text-slate-400")}>{rows.length}</span>
             </button>
           </td>
         </tr>

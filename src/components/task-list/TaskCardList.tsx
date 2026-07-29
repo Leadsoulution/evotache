@@ -7,6 +7,7 @@ import type { VisibleColumns } from "./TaskRow";
 import type { TaskTableGroup } from "./TaskTable";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { getGroupColor } from "@/lib/taskGroupColor";
 import type { Assignee, GroupField, Task } from "@/types/task";
 import type { PriorityDef, StatusDef } from "@/types/taskMeta";
 import type { TaskPermissions } from "@/lib/taskPermissions";
@@ -59,6 +60,7 @@ export function TaskCardList({
         <TaskCardGroup
           key={group.key}
           group={group}
+          groupField={groupField}
           showHeader={groupField !== "none"}
           assignees={assignees}
           teams={teams}
@@ -88,6 +90,7 @@ export function TaskCardList({
 
 interface TaskCardGroupProps {
   group: TaskTableGroup;
+  groupField: GroupField;
   showHeader: boolean;
   assignees: Assignee[];
   teams: Team[];
@@ -108,6 +111,7 @@ interface TaskCardGroupProps {
 
 function TaskCardGroup({
   group,
+  groupField,
   showHeader,
   assignees,
   teams,
@@ -126,6 +130,7 @@ function TaskCardGroup({
   onOpenDetail,
 }: TaskCardGroupProps) {
   const [sectionCollapsed, setSectionCollapsed] = useState(false);
+  const color = getGroupColor(group.key, groupField, statuses, priorities);
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -133,11 +138,15 @@ function TaskCardGroup({
         <button
           type="button"
           onClick={() => setSectionCollapsed((c) => !c)}
-          className="flex w-full items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400"
+          className={cn(
+            "flex w-full items-center gap-1.5 border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide",
+            color ? "border-transparent text-white hover:text-white/80" : "border-slate-100 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400"
+          )}
+          style={color ? { backgroundColor: `${color}D9` } : undefined}
         >
           <ChevronDownIcon className={cn("h-3.5 w-3.5 transition-transform", sectionCollapsed && "-rotate-90")} />
           {group.label}
-          <span className="font-normal normal-case text-slate-400">{group.rows.length}</span>
+          <span className={cn("font-normal normal-case", color ? "text-white/80" : "text-slate-400")}>{group.rows.length}</span>
         </button>
       )}
       {!sectionCollapsed && (
