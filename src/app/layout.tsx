@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -18,6 +18,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EVOTASKS — Tasks",
   description: "A ClickUp-style task list built with Next.js, TypeScript, and Tailwind CSS.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "EvoTasks",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#e2231a",
 };
 
 const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem("evotasks.theme");var d=s==="dark"||(s!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);}catch(e){}})();`;
