@@ -221,14 +221,18 @@ export function TaskTable({
 
   return (
     <div className="hidden min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-800 dark:bg-slate-900">
-      <table className="border-separate" style={{ tableLayout: "fixed", width: tableWidth, borderSpacing: "0 6px" }}>
+      <table className="border-separate" style={{ tableLayout: "fixed", width: `max(${tableWidth}px, 100%)`, borderSpacing: "0 6px" }}>
         <colgroup>
           <col style={{ width: 56 }} />
           {resizableColumns.map((col) => (
             <col key={col.id} style={{ width: widthOf(col) }} />
           ))}
           {canManageFields && <col style={{ width: 36 }} />}
-          <col style={{ width: 40 }} />
+          {/* Deliberately unconstrained — absorbs any extra width beyond the
+              other (explicitly sized) columns, so group-header color bars and
+              row backgrounds fill the full container on wide screens instead
+              of stopping short with unstyled space to the right. */}
+          <col />
         </colgroup>
         <thead>
           <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
