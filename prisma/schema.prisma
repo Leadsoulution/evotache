@@ -39,9 +39,13 @@ model User {
   // (either a JSON array of strings, or JSON null) instead of String[]?.
   visibleSectionHrefs Json?
   hiddenColumnIds     String[]   @default([])
+  // AI agent "employee" account — never logs in with a password, excluded
+  // from assignee pickers, has an AgentConfig row with its persona/tools.
+  isAgent             Boolean    @default(false)
   createdAt           DateTime   @default(now())
 
   pushSubscriptions PushSubscription[]
+  agentConfig       AgentConfig?
 
   @@map("users")
 }
@@ -220,4 +224,67 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@map("push_subscriptions")
+}
+
+enum AgentKind {
+  internal
+  external
+}
+
+model AgentConfig {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind             AgentKind
+  systemPrompt     String
+  // "tasks","litiges","achats","email","telegram","whatsapp","websearch","gmail","drive","n8n"
+  enabledTools     String[]  @default([])
+  telegramChatId   String?
+  telegramLinkCode String?
+  whatsappNumber   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("agent_configs")
+}
+
+model AgentSchedule {
+  id              String    @id @default(cuid())
+  agentId         String
+  instructionText String
+  cronExpression  String
+  actionType      String
+  actionConfig    Json      @default("{}")
+  enabled         Boolean   @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@map("agent_schedules")
+}
+
+model AgentActionLog {
+  id        String   @id @default(cuid())
+  agentId   String
+  type      String
+  summary   String
+  payload   Json?
+  success   Boolean
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@map("agent_action_logs")
+}
+
+model AgentIntegration {
+  id          String    @id @default(cuid())
+  agentId     String
+  provider    String
+  credentials Json
+  status      String    @default("disconnected")
+  connectedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([agentId, provider])
+  @@map("agent_integrations")
 }

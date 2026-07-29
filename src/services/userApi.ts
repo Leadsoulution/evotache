@@ -22,7 +22,9 @@ export async function fetchUserById(id: string): Promise<AppUser | null> {
 
 export async function fetchAssignees(): Promise<Assignee[]> {
   const users = await fetchUsers();
-  return users.filter((u) => u.status === "active").map((u) => ({ id: u.id, name: u.name, color: u.color, photoDataUrl: u.photoDataUrl }));
+  return users
+    .filter((u) => u.status === "active" && !u.isAgent)
+    .map((u) => ({ id: u.id, name: u.name, color: u.color, photoDataUrl: u.photoDataUrl }));
 }
 
 interface CreateUserInput {

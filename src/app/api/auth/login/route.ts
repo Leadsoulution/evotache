@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   }
 
   const user = await db.user.findUnique({ where: { email: normalizedEmail } });
-  if (!user) {
+  if (!user || user.isAgent) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 

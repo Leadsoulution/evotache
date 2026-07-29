@@ -15,5 +15,6 @@ export function toPublicUser(user: DbUser): AppUser {
     createdAt: user.createdAt.toISOString(),
     visibleSectionHrefs: (user.visibleSectionHrefs as string[] | null) ?? null,
     hiddenColumnIds: user.hiddenColumnIds,
+    isAgent: user.isAgent,
   };
 }

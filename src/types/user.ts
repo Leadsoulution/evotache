@@ -16,4 +16,6 @@ export interface AppUser {
   visibleSectionHrefs: string[] | null;
   /** Column ids hidden for this user by an admin, across Tasks/Litiges/Achats — on top of their own self-service hidden columns. */
   hiddenColumnIds: string[];
+  /** AI agent "employee" account — never logs in, excluded from assignee pickers. */
+  isAgent: boolean;
 }
