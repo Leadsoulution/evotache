@@ -3,9 +3,9 @@ import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { toPublicMessage } from "@/lib/publicChat";
-import { notifyUser } from "@/lib/notify";
-import type { Prisma } from "@/generated/prisma/client";
-import type { ConversationType, MessageAttachmentKind } from "@/types/chat";
+import { sendMessageAsUser } from "@/lib/chatSend";
+import { runAgentTurn } from "@/lib/agent/runAgentTurn";
+import type { MessageAttachmentKind } from "@/types/chat";
 
 const MAX_FILE_BYTES = 6 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 30 * 1024 * 1024;
@@ -15,13 +15,6 @@ function inferMessageAttachmentKind(mimeType: string): MessageAttachmentKind {
   if (mimeType.startsWith("video/")) return "video";
   if (mimeType === "application/pdf") return "pdf";
   return "file";
-}
-
-function previewFor(senderName: string, text: string, attachmentCount: number, conversationType: ConversationType): string {
-  const prefix = conversationType === "group" ? `${senderName}: ` : "";
-  if (text.trim()) return `${prefix}${text.trim()}`;
-  if (attachmentCount > 1) return `${prefix}sent ${attachmentCount} files`;
-  return `${prefix}sent an attachment`;
 }
 
 export async function GET(request: NextRequest) {
@@ -85,28 +78,20 @@ export async function POST(request: NextRequest) {
     dataUrl: file.dataUrl,
   }));
 
-  const message = await db.message.create({
-    data: {
-      conversationId: body.conversationId,
-      senderId: sessionUser.id,
-      text: (body.text ?? "").trim(),
-      attachments: attachments as unknown as Prisma.InputJsonValue,
-    },
+  const message = await sendMessageAsUser({
+    conversation,
+    senderId: sessionUser.id,
+    senderName: sessionUser.name,
+    text: body.text ?? "",
+    attachments,
   });
 
-  const lastReadAt = { ...((conversation.lastReadAt as Record<string, string>) ?? {}), [sessionUser.id]: message.createdAt.toISOString() };
-  await db.conversation.update({
-    where: { id: body.conversationId },
-    data: {
-      lastMessageAt: message.createdAt,
-      lastMessagePreview: previewFor(sessionUser.name, body.text ?? "", attachments.length, conversation.type),
-      lastReadAt,
-    },
-  });
-
-  for (const participantId of conversation.participantIds) {
-    if (participantId === sessionUser.id) continue;
-    void notifyUser(participantId, { title: sessionUser.name, body: message.text || "Sent an attachment", url: "/chat" });
+  const otherParticipantIds = conversation.participantIds.filter((id) => id !== sessionUser.id);
+  if (otherParticipantIds.length > 0) {
+    const agentParticipants = await db.user.findMany({ where: { id: { in: otherParticipantIds }, isAgent: true }, select: { id: true } });
+    for (const agent of agentParticipants) {
+      void runAgentTurn({ agentId: agent.id, conversationId: conversation.id });
+    }
   }
 
   return NextResponse.json(toPublicMessage(message), { status: 201 });
