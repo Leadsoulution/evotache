@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { toPublicTask } from "@/lib/publicTask";
-import { notifyUser } from "@/lib/notify";
+import { notifyTaskAssignment } from "@/lib/taskNotify";
 import { canEditTasksFull, canEditTaskStatus } from "@/config/roleMeta";
 import { Prisma } from "@/generated/prisma/client";
 import type { Task } from "@/types/task";
@@ -48,9 +48,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   });
 
   const newlyAssigned = task.assigneeIds.filter((assigneeId) => !existing.assigneeIds.includes(assigneeId));
-  for (const assigneeId of newlyAssigned) {
-    void notifyUser(assigneeId, { title: "You were assigned a task", body: task.title, url: `/${task.module === "dispute" ? "disputes" : "tasks"}` });
-  }
+  void notifyTaskAssignment(newlyAssigned, task);
 
   return NextResponse.json(toPublicTask(task));
 }

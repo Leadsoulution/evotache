@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { getVisibilityScope } from "@/lib/visibility";
 import { toPublicTask } from "@/lib/publicTask";
-import { notifyUser } from "@/lib/notify";
+import { notifyTaskAssignment } from "@/lib/taskNotify";
 import { canCreateTasks } from "@/config/roleMeta";
 import type { Prisma } from "@/generated/prisma/client";
 import type { TaskDraft, TaskModule } from "@/types/task";
@@ -67,9 +67,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  for (const assigneeId of task.assigneeIds) {
-    void notifyUser(assigneeId, { title: "New task assigned", body: task.title, url: `/${task.module === "dispute" ? "disputes" : "tasks"}` });
-  }
+  void notifyTaskAssignment(task.assigneeIds, task);
 
   return NextResponse.json(toPublicTask(task), { status: 201 });
 }
