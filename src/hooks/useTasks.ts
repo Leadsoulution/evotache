@@ -130,28 +130,67 @@ export function useTasks(module: TaskModule): UseTasksResult {
     [toast, user, isAdmin, module, defaultStatusId, defaultPriorityId]
   );
 
+  // Completing a recurring task spawns the next occurrence as a new task —
+  // instead of recycling the same row (which loses history: it would never
+  // actually show up among the Done tasks). The completed instance keeps its
+  // own recurrence cleared, since the rule now lives on the new occurrence;
+  // otherwise reopening it by mistake would spawn a duplicate.
+  const spawnNextOccurrence = useCallback(
+    async (source: Task) => {
+      if (!source.recurrence) return;
+      const base = source.dueDate ? new Date(source.dueDate) : new Date();
+      const next = computeNextOccurrence(source.recurrence, base);
+      const y = next.getFullYear();
+      const m = String(next.getMonth() + 1).padStart(2, "0");
+      const d = String(next.getDate()).padStart(2, "0");
+      const firstId = statusesRef.current[0]?.id;
+      if (!firstId) return;
+      const siblings = tasksRef.current.filter((t) => t.parentId === source.parentId);
+      const now = new Date().toISOString();
+      const draft: TaskDraft = {
+        id: generateId(),
+        module: source.module,
+        title: source.title,
+        description: source.description,
+        status: firstId,
+        priority: source.priority,
+        assigneeIds: source.assigneeIds,
+        teamIds: source.teamIds,
+        excludedUserIds: source.excludedUserIds,
+        startDate: null,
+        dueDate: fromDateInputValue(`${y}-${m}-${d}`),
+        recurrence: source.recurrence,
+        parentId: source.parentId,
+        projectId: source.projectId,
+        customValues: source.customValues,
+        order: siblings.length ? Math.min(...siblings.map((t) => t.order)) - 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        const created = await createTaskRequest(draft);
+        await tasksSWR.mutate((current) => [...(current ?? tasksRef.current), created], { revalidate: false });
+        toast.success(`Next occurrence scheduled for ${next.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to schedule the next occurrence.");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toast]
+  );
+
   const updateTask = useCallback(
     async (id: string, patch: Partial<Task>) => {
       const previous = tasksRef.current;
       const existingTask = previous.find((t) => t.id === id);
       let finalPatch = patch;
 
-      // Recurring tasks don't stay "done" — moving one to the workflow's last
-      // status recycles it: jump the due date to the next occurrence and reset
-      // status back to the first column, instead of leaving it completed.
-      if (existingTask?.recurrence && patch.status && patch.status !== existingTask.status) {
-        const currentStatuses = statusesRef.current;
-        const doneId = currentStatuses[currentStatuses.length - 1]?.id;
-        const firstId = currentStatuses[0]?.id;
-        if (doneId && firstId && patch.status === doneId) {
-          const base = existingTask.dueDate ? new Date(existingTask.dueDate) : new Date();
-          const next = computeNextOccurrence(existingTask.recurrence, base);
-          const y = next.getFullYear();
-          const m = String(next.getMonth() + 1).padStart(2, "0");
-          const d = String(next.getDate()).padStart(2, "0");
-          finalPatch = { ...patch, status: firstId, dueDate: fromDateInputValue(`${y}-${m}-${d}`) };
-          toast.success(`Recurring task rescheduled — next due ${next.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
-        }
+      const currentStatuses = statusesRef.current;
+      const doneId = currentStatuses[currentStatuses.length - 1]?.id;
+      const completesRecurrence =
+        Boolean(existingTask?.recurrence) && Boolean(doneId) && patch.status === doneId && patch.status !== existingTask?.status;
+      if (completesRecurrence) {
+        finalPatch = { ...patch, recurrence: null };
       }
 
       // A task moved (back) to the workflow's first status ("To Do") jumps to
@@ -169,13 +208,14 @@ export function useTasks(module: TaskModule): UseTasksResult {
       try {
         const updated = await updateTaskRequest(id, finalPatch);
         await tasksSWR.mutate((current) => (current ?? previous).map((t) => (t.id === id ? updated : t)), { revalidate: false });
+        if (completesRecurrence && existingTask) await spawnNextOccurrence(existingTask);
       } catch (err) {
         await tasksSWR.mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to update task.");
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [toast]
+    [toast, spawnNextOccurrence]
   );
 
   const deleteTasks = useCallback(
