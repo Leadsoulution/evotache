@@ -55,7 +55,10 @@ export function TaskCard({
   onAddSubtask,
   onOpenDetail,
 }: TaskCardProps) {
-  const priorityColor = priorities.find((p) => p.id === task.priority)?.color ?? "#cbd5e1";
+  // Status, not priority — every task always has one (priority is often
+  // "none", which would leave the bar an invisible pale gray), and it then
+  // reads consistently with the group header color when grouped by status.
+  const statusColor = statuses.find((s) => s.id === task.status)?.color ?? "#cbd5e1";
 
   return (
     <div
@@ -63,7 +66,7 @@ export function TaskCard({
         "flex flex-col gap-2 rounded-lg border border-l-4 border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900",
         selected && "bg-indigo-50/60 dark:bg-indigo-950/30"
       )}
-      style={{ marginLeft: depth * 14, borderLeftColor: priorityColor }}
+      style={{ marginLeft: depth * 14, borderLeftColor: statusColor }}
     >
       <div className="flex items-start gap-2">
         {hasChildren ? (
