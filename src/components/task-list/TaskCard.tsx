@@ -4,7 +4,7 @@ import { StatusMenu } from "./StatusMenu";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
 import { TeamMenu } from "./TeamMenu";
-import { DueDateField } from "./DueDateField";
+import { DueDateMenu } from "./DueDateMenu";
 import type { VisibleColumns } from "./TaskRow";
 import { ChevronDownIcon, EyeIcon, PaperclipIcon, PlusIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
 import { describeRecurrence } from "@/lib/recurrence";
@@ -125,7 +125,7 @@ export function TaskCard({
           />
         )}
         {visibleColumns.dueDate && (
-          <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+          <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
         )}
         {visibleColumns.assignees && (
           <AssigneeMenu

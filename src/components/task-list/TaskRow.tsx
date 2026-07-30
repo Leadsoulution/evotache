@@ -6,7 +6,7 @@ import { StatusMenu } from "./StatusMenu";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
 import { TeamMenu } from "./TeamMenu";
-import { DueDateField } from "./DueDateField";
+import { DueDateMenu } from "./DueDateMenu";
 import { InlineEditableText } from "./InlineEditableText";
 import { CustomFieldCell } from "./CustomFieldCell";
 import { ChevronDownIcon, EyeIcon, GripVerticalIcon, PaperclipIcon, PlusIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
@@ -125,8 +125,11 @@ export function TaskRow({
       onDrop={handleDrop}
       onDragLeave={() => setDragHover(null)}
     >
-      <td className={cn(cellClass, "rounded-l-lg border-l-4")} style={{ borderLeftColor: priorityColor }}>
-        <div className="flex items-center gap-1">
+      <td className={cn(cellClass, "rounded-l-lg !p-0")}>
+        <div
+          className="flex h-full items-center gap-1 border-l-4 px-2 py-1.5"
+          style={{ marginLeft: depth * 14, borderLeftColor: priorityColor }}
+        >
           <span
             draggable={dragEnabled}
             onDragStart={() => onDragStart(task.id)}
@@ -229,7 +232,7 @@ export function TaskRow({
           case "dueDate":
             return (
               <td key="dueDate" className={cellClass}>
-                <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+                <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
               </td>
             );
           case "priority":

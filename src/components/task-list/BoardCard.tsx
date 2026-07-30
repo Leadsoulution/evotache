@@ -3,7 +3,7 @@
 import type { DragEvent } from "react";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
-import { DueDateField } from "./DueDateField";
+import { DueDateMenu } from "./DueDateMenu";
 import { PaperclipIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
 import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/cn";
@@ -78,7 +78,7 @@ export function BoardCard({
 
       <div className="flex flex-wrap items-center gap-1.5">
         <PriorityMenu value={task.priority} priorities={priorities} onChange={(priority) => onUpdate(task.id, { priority })} readOnly={!permissions.canEditFull} />
-        <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+        <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
       </div>
 
       <div className="flex items-center gap-2">

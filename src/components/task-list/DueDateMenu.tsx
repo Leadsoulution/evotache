@@ -8,9 +8,10 @@ import { isDueSoon, isOverdue } from "@/lib/date";
 import { cn } from "@/lib/cn";
 
 interface DueDateMenuProps {
-  startDate: string | null;
+  /** Omit both to render a single Due-date trigger only (e.g. a narrow table cell) instead of the Start date + Due date pair. */
+  startDate?: string | null;
   dueDate: string | null;
-  onChangeStart: (next: string | null) => void;
+  onChangeStart?: (next: string | null) => void;
   onChangeDue: (next: string | null) => void;
   readOnly?: boolean;
 }
@@ -76,7 +77,8 @@ function buildMonthGrid(viewMonth: Date): Date[] {
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
 
-export function DueDateMenu({ startDate, dueDate, onChangeStart, onChangeDue, readOnly }: DueDateMenuProps) {
+export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChangeDue, readOnly }: DueDateMenuProps) {
+  const showStart = Boolean(onChangeStart);
   const [open, setOpen] = useState(false);
   const [activeField, setActiveField] = useState<ActiveField>("due");
   const [viewMonth, setViewMonth] = useState(() => startOfDay(new Date()));
@@ -135,7 +137,7 @@ export function DueDateMenu({ startDate, dueDate, onChangeStart, onChangeDue, re
 
   function pick(date: Date) {
     const iso = toIso(date);
-    if (activeField === "start") onChangeStart(iso);
+    if (activeField === "start") onChangeStart?.(iso);
     else onChangeDue(iso);
     setViewMonth(startOfDay(date));
   }
@@ -168,19 +170,21 @@ export function DueDateMenu({ startDate, dueDate, onChangeStart, onChangeDue, re
 
   return (
     <div className="flex items-center gap-1.5">
-      <button
-        ref={startTriggerRef}
-        type="button"
-        onClick={() => openFor("start")}
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium",
-          open && activeField === "start" ? "border-indigo-400 ring-2 ring-indigo-100 dark:ring-indigo-950" : "border-slate-200 dark:border-slate-700",
-          startDate ? "text-slate-700 dark:text-slate-200" : "text-slate-400"
-        )}
-      >
-        <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
-        {startDate ? formatBoxValue(startDate) : "Start date"}
-      </button>
+      {showStart && (
+        <button
+          ref={startTriggerRef}
+          type="button"
+          onClick={() => openFor("start")}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium",
+            open && activeField === "start" ? "border-indigo-400 ring-2 ring-indigo-100 dark:ring-indigo-950" : "border-slate-200 dark:border-slate-700",
+            startDate ? "text-slate-700 dark:text-slate-200" : "text-slate-400"
+          )}
+        >
+          <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
+          {startDate ? formatBoxValue(startDate) : "Start date"}
+        </button>
+      )}
 
       <button
         ref={dueTriggerRef}
@@ -223,7 +227,7 @@ export function DueDateMenu({ startDate, dueDate, onChangeStart, onChangeDue, re
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeField === "start") onChangeStart(null);
+                    if (activeField === "start") onChangeStart?.(null);
                     else onChangeDue(null);
                   }}
                   className="mt-1 flex items-center gap-1 px-2.5 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
