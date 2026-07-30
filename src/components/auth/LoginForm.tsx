@@ -6,16 +6,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { AlertTriangleIcon } from "@/components/ui/icons";
 
-const DEMO_ACCOUNTS = [
-  { email: "elmahdi@evotasks.com", password: "admin123", role: "Admin" },
-  { email: "amine@evotasks.com", password: "admin123", role: "Admin" },
-  { email: "mouad@evotasks.com", password: "member123", role: "Member" },
-  { email: "yassine@evotasks.com", password: "member123", role: "Member" },
-  { email: "rabie@evotasks.com", password: "limited123", role: "Limited member" },
-  { email: "moha@evotasks.com", password: "limited123", role: "Limited member" },
-  { email: "reda@evotasks.com", password: "viewer123", role: "Viewer" },
-];
-
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
 
@@ -39,12 +29,6 @@ export function LoginForm() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function fillDemo(account: (typeof DEMO_ACCOUNTS)[number]) {
-    setEmail(account.email);
-    setPassword(account.password);
-    setError(null);
   }
 
   return (
@@ -94,26 +78,6 @@ export function LoginForm() {
           </button>
           <p className="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">Sign in to manage your tasks.</p>
         </form>
-
-        <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-white/60 p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
-          <p className="mb-2 font-medium text-slate-600 dark:text-slate-300">Demo accounts (mock auth, not for production)</p>
-          <ul className="space-y-1.5">
-            {DEMO_ACCOUNTS.map((account) => (
-              <li key={account.email} className="flex items-center justify-between gap-2">
-                <span>
-                  <span className="font-medium text-slate-600 dark:text-slate-300">{account.role}</span> — {account.email} / {account.password}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => fillDemo(account)}
-                  className="shrink-0 rounded-md border border-slate-200 px-2 py-0.5 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                >
-                  Use
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
     </div>
   );
