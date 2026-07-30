@@ -15,6 +15,7 @@ export function AdminTabs() {
     ...(canManageUsers(user.role) ? [{ href: "/admin", label: "Users" }] : []),
     ...(canManageUsers(user.role) ? [{ href: "/admin/agents", label: "AI agents" }] : []),
     ...(canManageWorkflow(user.role) ? [{ href: "/admin/workflow", label: "Statuses & priorities" }, { href: "/admin/fields", label: "Custom fields" }] : []),
+    ...(canManageUsers(user.role) ? [{ href: "/admin/backup", label: "Backup" }] : []),
   ];
 
   return (
