@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { canManageUsers } from "@/config/roleMeta";
 import { getDescendantIds } from "@/lib/taskTree";
 import { computeNextOccurrence } from "@/lib/recurrence";
-import { fromDateInputValue } from "@/lib/date";
+import { fromDateInputValue, toDateInputValue } from "@/lib/date";
 import type { Assignee, Task, TaskDraft, TaskModule } from "@/types/task";
 import type { AppUser } from "@/types/user";
 import type { StatusDef, PriorityDef } from "@/types/taskMeta";
@@ -56,7 +56,15 @@ export function useTasks(module: TaskModule): UseTasksResult {
   const prioritiesSWR = useSWR<PriorityDef[]>(user ? "priorities" : null, fetchPriorities);
   const tasksSWR = useSWR<Task[]>(user ? taskKey(module) : null, () => fetchTasks({ userId: user!.id, isAdmin, module, visibleUserIds: [] }));
 
-  const tasks = useMemo(() => tasksSWR.data ?? [], [tasksSWR.data]);
+  // A freshly spawned recurring task instance stays hidden until its due
+  // date actually arrives — otherwise every occurrence would clutter To Do
+  // the moment the previous one is completed, instead of surfacing when it's
+  // actually actionable. Non-recurring tasks are unaffected.
+  const tasks = useMemo(() => {
+    const all = tasksSWR.data ?? [];
+    const todayStr = toDateInputValue(new Date().toISOString());
+    return all.filter((t) => !t.recurrence || !t.dueDate || toDateInputValue(t.dueDate) <= todayStr);
+  }, [tasksSWR.data]);
   const statuses = useMemo(() => statusesSWR.data ?? [], [statusesSWR.data]);
   const priorities = useMemo(() => prioritiesSWR.data ?? [], [prioritiesSWR.data]);
   const assignees: Assignee[] = useMemo(
