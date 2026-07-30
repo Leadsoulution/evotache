@@ -48,7 +48,7 @@ export function AttachmentUploader({ onUploadFile, onAddLink }: AttachmentUpload
           <LinkIcon className="h-3.5 w-3.5" />
           Add link
         </button>
-        <span className="text-xs text-slate-400">Images, PDFs, videos, spreadsheets — up to 2MB each (demo limit).</span>
+        <span className="text-xs text-slate-400">Images, PDFs, videos, spreadsheets — up to 20MB each.</span>
       </div>
 
       {linkMode && (

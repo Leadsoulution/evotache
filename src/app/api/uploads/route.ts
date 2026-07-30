@@ -9,7 +9,7 @@ const MAX_BYTES_BY_FOLDER: Record<string, number> = {
   chat: 6 * 1024 * 1024,
   "custom-fields": 2 * 1024 * 1024,
   purchases: 2 * 1024 * 1024,
-  attachments: 2 * 1024 * 1024,
+  attachments: 20 * 1024 * 1024,
 };
 
 function extensionFor(file: File): string {

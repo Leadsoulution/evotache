@@ -91,6 +91,7 @@ model Task {
   assigneeIds     String[]   @default([])
   teamIds         String[]   @default([])
   excludedUserIds String[]   @default([])
+  startDate       DateTime?
   dueDate         DateTime?
   recurrence      Json?
   order           Float

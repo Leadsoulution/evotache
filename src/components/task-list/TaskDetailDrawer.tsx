@@ -6,7 +6,7 @@ import { StatusMenu } from "./StatusMenu";
 import { PriorityMenu } from "./PriorityMenu";
 import { AssigneeMenu } from "./AssigneeMenu";
 import { TeamMenu } from "./TeamMenu";
-import { DueDateField } from "./DueDateField";
+import { DueDateMenu } from "./DueDateMenu";
 import { RecurrenceMenu } from "./RecurrenceMenu";
 import { CustomFieldCell } from "./CustomFieldCell";
 import { AttachmentList } from "./AttachmentList";
@@ -138,9 +138,15 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
             readOnly={!permissions.canEditFull}
           />
         </div>
-        <div>
-          <p className="mb-1 text-xs font-medium text-slate-400">Due date</p>
-          <DueDateField value={task.dueDate} onChange={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+        <div className="col-span-2">
+          <p className="mb-1 text-xs font-medium text-slate-400">Dates</p>
+          <DueDateMenu
+            startDate={task.startDate}
+            dueDate={task.dueDate}
+            onChangeStart={(startDate) => onUpdate(task.id, { startDate })}
+            onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })}
+            readOnly={!permissions.canEditFull}
+          />
         </div>
         <div>
           <p className="mb-1 text-xs font-medium text-slate-400">Repeat</p>

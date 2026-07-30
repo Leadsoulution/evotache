@@ -106,6 +106,7 @@ export function useTasks(module: TaskModule): UseTasksResult {
         assigneeIds: isAdmin ? [] : [user.id],
         teamIds: [],
         excludedUserIds: [],
+        startDate: null,
         dueDate: options.dueDate ?? null,
         recurrence: null,
         parentId,

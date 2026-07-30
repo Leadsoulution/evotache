@@ -1,3 +1,4 @@
+import { toDateInputValue } from "@/lib/date";
 import type { Task } from "@/types/task";
 
 export interface GlobalFilters {
@@ -51,7 +52,7 @@ function taskMatchesGlobalFilters(task: Task, filters: GlobalFilters): boolean {
   if (filters.statuses.length && !filters.statuses.includes(task.status)) return false;
   if (filters.dateFrom || filters.dateTo) {
     if (!task.dueDate) return false;
-    const due = task.dueDate.slice(0, 10);
+    const due = toDateInputValue(task.dueDate);
     if (filters.dateFrom && due < filters.dateFrom) return false;
     if (filters.dateTo && due > filters.dateTo) return false;
   }

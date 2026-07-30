@@ -12,6 +12,7 @@ export function toPublicTask(task: DbTask): Task {
     assigneeIds: task.assigneeIds,
     teamIds: task.teamIds,
     excludedUserIds: task.excludedUserIds,
+    startDate: task.startDate ? task.startDate.toISOString() : null,
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
     recurrence: (task.recurrence as RecurrenceRule | null) ?? null,
     order: task.order,

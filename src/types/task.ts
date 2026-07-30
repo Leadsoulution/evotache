@@ -35,6 +35,7 @@ export interface Task {
   assigneeIds: string[];
   teamIds: string[];
   excludedUserIds: string[];
+  startDate: string | null;
   dueDate: string | null;
   recurrence: RecurrenceRule | null;
   order: number;

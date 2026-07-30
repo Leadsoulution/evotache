@@ -36,11 +36,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (!existing) return NextResponse.json({ error: "Task not found." }, { status: 404 });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude these server-owned fields from the update payload
-  const { id: _ignoredId, createdAt: _ignoredCreatedAt, updatedAt: _ignoredUpdatedAt, dueDate, recurrence, customValues, ...rest } = patch;
+  const { id: _ignoredId, createdAt: _ignoredCreatedAt, updatedAt: _ignoredUpdatedAt, startDate, dueDate, recurrence, customValues, ...rest } = patch;
   const task = await db.task.update({
     where: { id },
     data: {
       ...rest,
+      ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
       ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
       ...(recurrence !== undefined && { recurrence: recurrence === null ? Prisma.JsonNull : recurrence }),
       ...(customValues !== undefined && { customValues }),

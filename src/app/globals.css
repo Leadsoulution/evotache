@@ -24,6 +24,20 @@ body {
   color: var(--foreground);
 }
 
+/* iOS Safari auto-zooms the whole page when focusing a text input/select
+   whose font-size is under 16px, then leaves the page zoomed in until the
+   user manually pinches back out — this is what makes the app feel "zoomed
+   in, not responsive" specifically on iPhone (Android has no such behavior).
+   Most inputs here use text-xs/text-sm (12-14px), so force 16px on focus for
+   touch-only devices without changing the visual size on desktop. */
+@media (hover: none) and (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 @layer utilities {
   @keyframes fade-in {
     from {

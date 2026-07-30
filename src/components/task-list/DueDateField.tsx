@@ -36,7 +36,7 @@ export function DueDateField({ value, onChange, readOnly }: DueDateFieldProps) {
         value={toDateInputValue(value)}
         onChange={(event) => onChange(fromDateInputValue(event.target.value))}
         aria-label="Due date"
-        className="w-[100px] cursor-pointer bg-transparent text-xs outline-none [color-scheme:light] dark:[color-scheme:dark]"
+        className="min-w-[100px] cursor-pointer bg-transparent text-xs outline-none [color-scheme:light] dark:[color-scheme:dark]"
       />
     </label>
   );

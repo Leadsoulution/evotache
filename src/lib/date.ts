@@ -48,7 +48,15 @@ export function isDueSoon(iso: string | null): boolean {
 
 export function toDateInputValue(iso: string | null): string {
   if (!iso) return "";
-  return iso.slice(0, 10);
+  // Read back the *local* calendar date, not a naive slice of the UTC
+  // string — fromDateInputValue() stores local midnight converted to UTC,
+  // so in any timezone ahead of UTC that UTC string's date is one day
+  // earlier than what the user picked.
+  const date = new Date(iso);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function fromDateInputValue(value: string): string | null {

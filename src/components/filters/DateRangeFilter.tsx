@@ -13,11 +13,21 @@ interface DateRangeFilterProps {
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 [color-scheme:light] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950 dark:[color-scheme:dark]";
 
+// Local YYYY-MM-DD, not toISOString().slice(0, 10) — that converts through
+// UTC first, which silently shifts the date back a day in any timezone ahead
+// of UTC (the same bug class as the due-date picker).
+function toLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function isoDateDaysFromToday(offset: number): string {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() + offset);
-  return date.toISOString().slice(0, 10);
+  return toLocalDateString(date);
 }
 
 function startOfWeek(): string {
@@ -26,12 +36,12 @@ function startOfWeek(): string {
   const day = date.getDay();
   const diff = day === 0 ? 6 : day - 1; // Monday-start week
   date.setDate(date.getDate() - diff);
-  return date.toISOString().slice(0, 10);
+  return toLocalDateString(date);
 }
 
 function startOfMonth(): string {
   const date = new Date();
-  return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
+  return toLocalDateString(new Date(date.getFullYear(), date.getMonth(), 1));
 }
 
 const PRESETS: { label: string; from: () => string; to: () => string }[] = [

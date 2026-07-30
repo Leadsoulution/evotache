@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       assigneeIds: draft.assigneeIds ?? [],
       teamIds: draft.teamIds ?? [],
       excludedUserIds: draft.excludedUserIds ?? [],
+      startDate: draft.startDate ? new Date(draft.startDate) : null,
       dueDate: draft.dueDate ? new Date(draft.dueDate) : null,
       recurrence: (draft.recurrence as unknown as Prisma.InputJsonValue) ?? undefined,
       order,
