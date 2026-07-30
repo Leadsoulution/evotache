@@ -4,6 +4,7 @@ export type AgentTool =
   | "tasks"
   | "litiges"
   | "achats"
+  | "library"
   | "email"
   | "telegram"
   | "whatsapp"
@@ -24,6 +25,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
   { id: "tasks", label: "Tasks", description: "Read and update tasks, send reminders for overdue ones.", externalOnly: false },
   { id: "litiges", label: "Litiges", description: "Read and update litiges, send reminders for overdue ones.", externalOnly: false },
   { id: "achats", label: "Achats", description: "Create and update purchase records (no real payments).", externalOnly: false },
+  { id: "library", label: "Library", description: "Read company rules and reference documents (working hours, policies, ...).", externalOnly: false },
   { id: "email", label: "Email", description: "Send email notifications on the agent's behalf.", externalOnly: true },
   { id: "telegram", label: "Telegram", description: "Send and receive messages via a linked Telegram chat.", externalOnly: true },
   { id: "whatsapp", label: "WhatsApp", description: "Send and receive WhatsApp messages via Twilio.", externalOnly: true },

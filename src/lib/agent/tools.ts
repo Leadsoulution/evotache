@@ -124,6 +124,17 @@ const sendReminder: ToolDef = {
   },
 };
 
+const readLibrary: ToolDef = {
+  name: "read_library",
+  requires: ["library"],
+  description: "Read the company's library documents (working hours, policies, and other rules/reference material). Returns every document's title and full content.",
+  parameters: { type: "object", properties: {} },
+  execute: async () => {
+    const docs = await db.libraryDoc.findMany({ orderBy: { order: "asc" } });
+    return docs.map((doc) => ({ title: doc.title, content: doc.content }));
+  },
+};
+
 const listPurchaseItems: ToolDef = {
   name: "list_purchase_items",
   requires: ["achats"],
@@ -196,4 +207,4 @@ const updatePurchaseItem: ToolDef = {
   },
 };
 
-export const AGENT_TOOL_DEFS: ToolDef[] = [listOverdueItems, getStats, sendReminder, listPurchaseItems, createPurchaseItem, updatePurchaseItem];
+export const AGENT_TOOL_DEFS: ToolDef[] = [listOverdueItems, getStats, sendReminder, readLibrary, listPurchaseItems, createPurchaseItem, updatePurchaseItem];

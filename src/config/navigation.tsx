@@ -1,5 +1,6 @@
 import {
   AlertTriangleIcon,
+  BookOpenIcon,
   ChartBarIcon,
   ChatBubbleIcon,
   FolderIcon,
@@ -31,6 +32,7 @@ export const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/disputes", label: "Litiges", icon: ScaleIcon },
   { href: "/achats", label: "Achats", icon: ShoppingBagIcon },
   { href: "/overdue", label: "Overdue", icon: AlertTriangleIcon },
+  { href: "/library", label: "Library", icon: BookOpenIcon },
   { href: "/assistant", label: "AI Assistant", icon: SparklesIcon },
   { href: "/statistics", label: "Statistics", icon: ChartBarIcon },
 ];

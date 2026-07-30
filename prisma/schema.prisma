@@ -288,3 +288,15 @@ model AgentIntegration {
   @@unique([agentId, provider])
   @@map("agent_integrations")
 }
+
+model LibraryDoc {
+  id        String   @id @default(cuid())
+  title     String
+  // Markdown — readable for humans (rendered) and directly usable as plain-text context for AI agents.
+  content   String   @default("")
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("library_docs")
+}
