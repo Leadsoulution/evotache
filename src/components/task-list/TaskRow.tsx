@@ -108,11 +108,7 @@ export function TaskRow({
     }
   }
 
-  // Every row always has a status (unlike priority, which is often "none"
-  // and would leave the bar an invisible pale gray), so the accent bar is
-  // colored by status — it also then reads consistently with the group
-  // header color when grouped by status.
-  const statusColor = statuses.find((s) => s.id === task.status)?.color ?? "#cbd5e1";
+  const priorityColor = priorities.find((p) => p.id === task.priority)?.color ?? "#cbd5e1";
   // Every <td> shares this so the row reads as one continuous card despite
   // border-collapse:separate giving each cell its own border.
   const cellClass = cn(
@@ -132,7 +128,7 @@ export function TaskRow({
       <td className={cn(cellClass, "rounded-l-lg !p-0")}>
         <div
           className="flex h-full items-center gap-1 border-l-4 px-2 py-1.5"
-          style={{ marginLeft: depth * 14, borderLeftColor: statusColor }}
+          style={{ marginLeft: depth * 14, borderLeftColor: priorityColor }}
         >
           <span
             draggable={dragEnabled}
