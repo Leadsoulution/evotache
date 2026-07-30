@@ -1,19 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createTaskRequest, deleteTasksRequest, fetchAssignees, fetchTasks, updateTaskRequest } from "@/services/taskApi";
-import { fetchDefaultPriorityId, fetchDefaultStatusId, fetchStatuses } from "@/services/taskMetaApi";
+import { useCallback, useRef, useEffect, useMemo } from "react";
+import useSWR from "swr";
+import { createTaskRequest, deleteTasksRequest, fetchTasks, updateTaskRequest } from "@/services/taskApi";
+import { fetchStatuses, fetchPriorities } from "@/services/taskMetaApi";
 import { fetchUsers } from "@/services/userApi";
 import { generateId } from "@/lib/id";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/hooks/useAuth";
 import { canManageUsers } from "@/config/roleMeta";
 import { getDescendantIds } from "@/lib/taskTree";
-import { getVisibleUserIds } from "@/lib/orgChart";
 import { computeNextOccurrence } from "@/lib/recurrence";
 import { fromDateInputValue } from "@/lib/date";
 import type { Assignee, Task, TaskDraft, TaskModule } from "@/types/task";
-import type { StatusDef } from "@/types/taskMeta";
+import type { AppUser } from "@/types/user";
+import type { StatusDef, PriorityDef } from "@/types/taskMeta";
 
 type LoadState = "loading" | "success" | "error";
 
@@ -37,69 +38,54 @@ interface UseTasksResult {
   reorderTask: (id: string, order: number) => Promise<void>;
 }
 
+function taskKey(module: TaskModule) {
+  return ["tasks", module] as const;
+}
+
 export function useTasks(module: TaskModule): UseTasksResult {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [assignees, setAssignees] = useState<Assignee[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const toast = useToast();
-  const tasksRef = useRef<Task[]>([]);
-  const defaultsRef = useRef<{ statusId: string; priorityId: string }>({ statusId: "todo", priorityId: "none" });
+  const isAdmin = user ? canManageUsers(user.role) : false;
   const statusesRef = useRef<StatusDef[]>([]);
 
+  // Shared cache keys — reused verbatim by useUsers/useTaskMeta, so mounting
+  // both a task list and, say, the badge-count hook on the same page fetches
+  // each of these exactly once instead of once per hook instance.
+  const usersSWR = useSWR<AppUser[]>(user ? "users" : null, fetchUsers);
+  const statusesSWR = useSWR<StatusDef[]>(user ? "statuses" : null, fetchStatuses);
+  const prioritiesSWR = useSWR<PriorityDef[]>(user ? "priorities" : null, fetchPriorities);
+  const tasksSWR = useSWR<Task[]>(user ? taskKey(module) : null, () => fetchTasks({ userId: user!.id, isAdmin, module, visibleUserIds: [] }));
+
+  const tasks = useMemo(() => tasksSWR.data ?? [], [tasksSWR.data]);
+  const statuses = useMemo(() => statusesSWR.data ?? [], [statusesSWR.data]);
+  const priorities = useMemo(() => prioritiesSWR.data ?? [], [prioritiesSWR.data]);
+  const assignees: Assignee[] = useMemo(
+    () =>
+      (usersSWR.data ?? [])
+        .filter((u) => u.status === "active" && !u.isAgent)
+        .map((u) => ({ id: u.id, name: u.name, color: u.color, photoDataUrl: u.photoDataUrl })),
+    [usersSWR.data]
+  );
+  const defaultStatusId = statuses[0]?.id ?? "todo";
+  const defaultPriorityId = priorities[priorities.length - 1]?.id ?? "none";
+
+  const anyLoading = usersSWR.isLoading || statusesSWR.isLoading || prioritiesSWR.isLoading || tasksSWR.isLoading;
+  const anyError = usersSWR.error || statusesSWR.error || prioritiesSWR.error || tasksSWR.error;
+  const loadState: LoadState = anyError ? "error" : anyLoading ? "loading" : "success";
+  const errorMessage = anyError ? (anyError instanceof Error ? anyError.message : "Something went wrong.") : null;
+
+  const tasksRef = useRef<Task[]>(tasks);
   useEffect(() => {
     tasksRef.current = tasks;
   }, [tasks]);
-
-  const isAdmin = user ? canManageUsers(user.role) : false;
-
-  const load = useCallback(() => {
-    if (!user) return;
-    setLoadState("loading");
-    setErrorMessage(null);
-    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId(), fetchStatuses()])
-      .then(([allUsers, assigneeList, statusId, priorityId, statusList]) => {
-        const visibleUserIds = getVisibleUserIds(allUsers, user.id);
-        return fetchTasks({ userId: user.id, isAdmin, module, visibleUserIds }).then((taskList) => {
-          defaultsRef.current = { statusId, priorityId };
-          statusesRef.current = statusList;
-          setTasks(taskList);
-          setAssignees(assigneeList);
-          setLoadState("success");
-        });
-      })
-      .catch((err: unknown) => {
-        setLoadState("error");
-        setErrorMessage(err instanceof Error ? err.message : "Something went wrong.");
-      });
-  }, [user, isAdmin, module]);
-
   useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    Promise.all([fetchUsers(), fetchAssignees(), fetchDefaultStatusId(), fetchDefaultPriorityId(), fetchStatuses()])
-      .then(([allUsers, assigneeList, statusId, priorityId, statusList]) => {
-        const visibleUserIds = getVisibleUserIds(allUsers, user.id);
-        return fetchTasks({ userId: user.id, isAdmin, module, visibleUserIds }).then((taskList) => {
-          if (cancelled) return;
-          defaultsRef.current = { statusId, priorityId };
-          statusesRef.current = statusList;
-          setTasks(taskList);
-          setAssignees(assigneeList);
-          setLoadState("success");
-        });
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setLoadState("error");
-        setErrorMessage(err instanceof Error ? err.message : "Something went wrong.");
-      });
-    return () => {
-      cancelled = true;
-    };
+    statusesRef.current = statuses;
+  }, [statuses]);
+
+  const refetch = useCallback(() => {
+    void tasksSWR.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, isAdmin, module]);
+  }, [module]);
 
   const createTask = useCallback(
     async (title: string, options: CreateTaskOptions = {}) => {
@@ -110,14 +96,13 @@ export function useTasks(module: TaskModule): UseTasksResult {
       const id = generateId();
       const now = new Date().toISOString();
       const siblings = previous.filter((t) => t.parentId === parentId);
-      const { statusId, priorityId } = defaultsRef.current;
       const optimisticTask: Task = {
         id,
         module,
         title: trimmed,
         description: options.description ?? "",
-        status: options.status ?? statusId,
-        priority: options.priority ?? priorityId,
+        status: options.status ?? defaultStatusId,
+        priority: options.priority ?? defaultPriorityId,
         assigneeIds: isAdmin ? [] : [user.id],
         teamIds: [],
         excludedUserIds: [],
@@ -130,17 +115,18 @@ export function useTasks(module: TaskModule): UseTasksResult {
         createdAt: now,
         updatedAt: now,
       };
-      setTasks([...previous, optimisticTask]);
+      await tasksSWR.mutate([...previous, optimisticTask], { revalidate: false });
       try {
         const draft: TaskDraft = { ...optimisticTask };
         const created = await createTaskRequest(draft);
-        setTasks((current) => current.map((t) => (t.id === id ? created : t)));
+        await tasksSWR.mutate((current) => (current ?? previous).map((t) => (t.id === id ? created : t)), { revalidate: false });
       } catch (err) {
-        setTasks(previous);
+        await tasksSWR.mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to create task.");
       }
     },
-    [toast, user, isAdmin, module]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toast, user, isAdmin, module, defaultStatusId, defaultPriorityId]
   );
 
   const updateTask = useCallback(
@@ -153,9 +139,9 @@ export function useTasks(module: TaskModule): UseTasksResult {
       // status recycles it: jump the due date to the next occurrence and reset
       // status back to the first column, instead of leaving it completed.
       if (existingTask?.recurrence && patch.status && patch.status !== existingTask.status) {
-        const statuses = statusesRef.current;
-        const doneId = statuses[statuses.length - 1]?.id;
-        const firstId = statuses[0]?.id;
+        const currentStatuses = statusesRef.current;
+        const doneId = currentStatuses[currentStatuses.length - 1]?.id;
+        const firstId = currentStatuses[0]?.id;
         if (doneId && firstId && patch.status === doneId) {
           const base = existingTask.dueDate ? new Date(existingTask.dueDate) : new Date();
           const next = computeNextOccurrence(existingTask.recurrence, base);
@@ -175,15 +161,19 @@ export function useTasks(module: TaskModule): UseTasksResult {
         finalPatch = { ...finalPatch, order: minOrder - 1 };
       }
 
-      setTasks(previous.map((t) => (t.id === id ? { ...t, ...finalPatch, updatedAt: new Date().toISOString() } : t)));
+      await tasksSWR.mutate(
+        previous.map((t) => (t.id === id ? { ...t, ...finalPatch, updatedAt: new Date().toISOString() } : t)),
+        { revalidate: false }
+      );
       try {
         const updated = await updateTaskRequest(id, finalPatch);
-        setTasks((current) => current.map((t) => (t.id === id ? updated : t)));
+        await tasksSWR.mutate((current) => (current ?? previous).map((t) => (t.id === id ? updated : t)), { revalidate: false });
       } catch (err) {
-        setTasks(previous);
+        await tasksSWR.mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to update task.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [toast]
   );
 
@@ -192,14 +182,15 @@ export function useTasks(module: TaskModule): UseTasksResult {
       const previous = tasksRef.current;
       const descendantIds = ids.flatMap((id) => getDescendantIds(previous, id));
       const allRemoved = new Set([...ids, ...descendantIds]);
-      setTasks(previous.filter((t) => !allRemoved.has(t.id)));
+      await tasksSWR.mutate(previous.filter((t) => !allRemoved.has(t.id)), { revalidate: false });
       try {
         await deleteTasksRequest(ids);
       } catch (err) {
-        setTasks(previous);
+        await tasksSWR.mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to delete task.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [toast]
   );
 
@@ -210,5 +201,5 @@ export function useTasks(module: TaskModule): UseTasksResult {
     [updateTask]
   );
 
-  return { tasks, assignees, loadState, errorMessage, refetch: load, createTask, updateTask, deleteTasks, reorderTask };
+  return { tasks, assignees, loadState, errorMessage, refetch, createTask, updateTask, deleteTasks, reorderTask };
 }

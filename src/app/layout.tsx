@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SWRConfig } from "swr";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
@@ -54,11 +55,25 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
-        <ToastProvider>
-          <AuthProvider>
-            <AppShell>{children}</AppShell>
-          </AuthProvider>
-        </ToastProvider>
+        {/* Shared request cache: every hook that reads the same SWR key (users,
+            tasks, teams, ...) reuses one in-flight fetch and one cached
+            result, instead of each component instance fetching independently
+            — this is what collapses dozens of duplicate API calls per page
+            load down to one per resource. revalidateIfStale: false is the
+            important one — without it, SWR still re-fetches on every new
+            mount of a key (just deduped within dedupingInterval), which
+            isn't enough when mounts are staggered by data-dependent
+            rendering. Hooks that need fresh data opt in per-call via
+            `refreshInterval` (chat, badge counts) instead. */}
+        <SWRConfig
+          value={{ revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false, dedupingInterval: 60000 }}
+        >
+          <ToastProvider>
+            <AuthProvider>
+              <AppShell>{children}</AppShell>
+            </AuthProvider>
+          </ToastProvider>
+        </SWRConfig>
       </body>
     </html>
   );

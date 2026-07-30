@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskMeta } from "@/hooks/useTaskMeta";
 import { useConversations } from "@/hooks/useConversations";
 import { fetchTasks } from "@/services/taskApi";
 import { fetchPurchaseItems } from "@/services/purchaseApi";
-import { fetchUsers } from "@/services/userApi";
 import { getLastViewed, markViewed } from "@/services/notificationPrefsApi";
-import { getVisibleUserIds } from "@/lib/orgChart";
 import { canManageUsers } from "@/config/roleMeta";
 import type { Task } from "@/types/task";
 import type { PurchaseItem } from "@/types/purchase";
@@ -33,57 +32,55 @@ export interface NavBadgeCounts {
 const EMPTY_COUNTS: NavBadgeCounts = { "/tasks": 0, "/disputes": 0, "/achats": 0, "/chat": 0 };
 
 /** WhatsApp-style unread badges for the nav: tasks/litiges/achats assigned to
- * you and changed since you last opened that section, plus the chat unread total. */
+ * you and changed since you last opened that section, plus the chat unread total.
+ *
+ * Uses the same SWR keys as useTasks/usePurchaseItems ("tasks"/module and
+ * "purchase-items") so this hook — mounted globally in the app shell —
+ * shares its data with whatever page-level hooks are already fetching the
+ * same resources, instead of firing its own duplicate requests. */
 export function useNavBadgeCounts(): NavBadgeCounts {
   const { user } = useAuth();
   const { statuses } = useTaskMeta();
   const { unreadCounts } = useConversations();
   const pathname = usePathname();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [disputes, setDisputes] = useState<Task[]>([]);
-  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
   const [lastViewed, setLastViewed] = useState<Record<string, string>>({});
   const isAdmin = user ? canManageUsers(user.role) : false;
 
+  const tasksSWR = useSWR<Task[]>(
+    user ? ["tasks", "task"] : null,
+    () => fetchTasks({ userId: user!.id, isAdmin, module: "task", visibleUserIds: [] }),
+    { refreshInterval: POLL_MS }
+  );
+  const disputesSWR = useSWR<Task[]>(
+    user ? ["tasks", "dispute"] : null,
+    () => fetchTasks({ userId: user!.id, isAdmin, module: "dispute", visibleUserIds: [] }),
+    { refreshInterval: POLL_MS }
+  );
+  const purchasesSWR = useSWR<PurchaseItem[]>(
+    user ? "purchase-items" : null,
+    () => fetchPurchaseItems({ userId: user!.id, isAdmin }),
+    { refreshInterval: POLL_MS }
+  );
+
   useEffect(() => {
     if (!user) return;
-    const userId = user.id;
-    let cancelled = false;
+    getLastViewed(user.id)
+      .then((prefs) => setLastViewed(prefs))
+      .catch(() => {});
+  }, [user]);
 
-    function load() {
-      Promise.all([fetchUsers(), getLastViewed(userId)])
-        .then(([allUsers, prefs]) => {
-          const visibleUserIds = getVisibleUserIds(allUsers, userId);
-          return Promise.all([
-            fetchTasks({ userId, isAdmin, module: "task", visibleUserIds }),
-            fetchTasks({ userId, isAdmin, module: "dispute", visibleUserIds }),
-            fetchPurchaseItems({ userId, isAdmin }),
-          ]).then(([taskList, disputeList, purchaseList]) => {
-            if (cancelled) return;
-            setTasks(taskList);
-            setDisputes(disputeList);
-            setPurchases(purchaseList);
-            setLastViewed(prefs);
-          });
-        })
-        .catch(() => {});
-    }
-
-    load();
-    const interval = window.setInterval(load, POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-    // Re-run on every navigation too (not just mount + interval) so
-    // assigning something and switching pages reflects in the badge right
-    // away instead of waiting for the next poll tick.
+  // Re-revalidate on every navigation (not just the poll interval) so
+  // assigning something and switching pages reflects in the badge right away.
+  useEffect(() => {
+    if (!user) return;
+    void tasksSWR.mutate();
+    void disputesSWR.mutate();
+    void purchasesSWR.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, isAdmin, pathname]);
+  }, [pathname, user?.id]);
 
   // Visiting a tracked page clears its badge immediately instead of waiting
-  // for the next poll tick — setState only inside the .then(), per the
-  // set-state-in-effect rule.
+  // for the next poll tick.
   useEffect(() => {
     if (!user) return;
     const moduleKey = PATH_MODULE[pathname];
@@ -100,6 +97,9 @@ export function useNavBadgeCounts(): NavBadgeCounts {
 
   return useMemo(() => {
     if (!user) return EMPTY_COUNTS;
+    const tasks = tasksSWR.data ?? [];
+    const disputes = disputesSWR.data ?? [];
+    const purchases = purchasesSWR.data ?? [];
     const tasksSince = lastViewed.tasks ?? EPOCH;
     const disputesSince = lastViewed.disputes ?? EPOCH;
     const achatsSince = lastViewed.achats ?? EPOCH;
@@ -108,5 +108,5 @@ export function useNavBadgeCounts(): NavBadgeCounts {
     const achatsCount = purchases.filter((p) => p.assigneeIds.includes(user.id) && p.updatedAt > achatsSince).length;
     const chatCount = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
     return { "/tasks": tasksCount, "/disputes": disputesCount, "/achats": achatsCount, "/chat": chatCount };
-  }, [tasks, disputes, purchases, lastViewed, unreadCounts, user, doneStatusId]);
+  }, [tasksSWR.data, disputesSWR.data, purchasesSWR.data, lastViewed, unreadCounts, user, doneStatusId]);
 }

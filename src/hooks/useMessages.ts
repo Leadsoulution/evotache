@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchMessages, markConversationRead, sendMessage } from "@/services/chatApi";
 import { useToast } from "@/components/ui/Toast";
-import type { Message } from "@/types/chat";
 
 const POLL_MS = 4_000;
 
@@ -19,41 +19,18 @@ interface OutgoingAttachment {
 
 export function useMessages(conversationId: string | null) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
   const toast = useToast();
 
-  useEffect(() => {
-    if (!conversationId) return;
-    let cancelled = false;
-    fetchMessages(conversationId)
-      .then((list) => {
-        if (cancelled) return;
-        setMessages(list);
-        setLoadState("success");
-      })
-      .catch(() => {
-        if (!cancelled) setLoadState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [conversationId]);
-
-  // Cross-device live-ish sync, same mechanism as useConversations.
-  useEffect(() => {
-    if (!conversationId) return;
-    const interval = window.setInterval(() => {
-      fetchMessages(conversationId)
-        .then((list) => setMessages(list))
-        .catch(() => {});
-    }, POLL_MS);
-    return () => window.clearInterval(interval);
-  }, [conversationId]);
+  const { data, error, isLoading, mutate } = useSWR(
+    conversationId ? ["chat-messages", conversationId] : null,
+    () => fetchMessages(conversationId as string),
+    { refreshInterval: POLL_MS }
+  );
+  const messages = useMemo(() => data ?? [], [data]);
+  const loadState: LoadState = error ? "error" : isLoading ? "loading" : "success";
 
   // Mark the thread read whenever it's open and has messages — covers both
-  // the initial open and any message that arrives (own or via storage sync)
-  // while it stays open.
+  // the initial open and any message that arrives while it stays open.
   useEffect(() => {
     if (!conversationId || !user || messages.length === 0) return;
     markConversationRead(conversationId, user.id).catch(() => {});
@@ -64,14 +41,14 @@ export function useMessages(conversationId: string | null) {
       if (!conversationId || !user) return false;
       try {
         const message = await sendMessage({ conversationId, senderId: user.id, senderName: user.name, text, attachments });
-        setMessages((current) => [...current, message]);
+        await mutate([...messages, message], { revalidate: false });
         return true;
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to send the message.");
         return false;
       }
     },
-    [conversationId, user, toast]
+    [conversationId, user, messages, mutate, toast]
   );
 
   return { messages, loadState, send };

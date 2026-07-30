@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
+import useSWR from "swr";
 import { createUserRequest, deleteUserRequest, fetchUsers, updateUserRequest } from "@/services/userApi";
 import { useToast } from "@/components/ui/Toast";
 import type { AppUser, Role, UserStatus } from "@/types/user";
@@ -44,54 +45,26 @@ interface UseUsersResult {
   deleteUser: (id: string) => Promise<void>;
 }
 
-export function useUsers(): UseUsersResult {
-  const [users, setUsers] = useState<AppUser[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const toast = useToast();
-  const usersRef = useRef<AppUser[]>([]);
+/** Shared cache key — every component that calls useUsers() reuses the same
+ * in-flight request and cached result instead of each fetching independently. */
+const USERS_KEY = "users";
 
-  useEffect(() => {
-    usersRef.current = users;
-  }, [users]);
+export function useUsers(): UseUsersResult {
+  const toast = useToast();
+  const { data, error, isLoading, mutate } = useSWR<AppUser[]>(USERS_KEY, fetchUsers);
+  const users = useMemo(() => data ?? [], [data]);
+  const loadState: LoadState = error ? "error" : isLoading ? "loading" : "success";
+  const errorMessage = error ? (error instanceof Error ? error.message : "Something went wrong.") : null;
 
   const refetch = useCallback(() => {
-    setLoadState("loading");
-    setErrorMessage(null);
-    fetchUsers()
-      .then((list) => {
-        setUsers(list);
-        setLoadState("success");
-      })
-      .catch((err: unknown) => {
-        setLoadState("error");
-        setErrorMessage(err instanceof Error ? err.message : "Something went wrong.");
-      });
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchUsers()
-      .then((list) => {
-        if (cancelled) return;
-        setUsers(list);
-        setLoadState("success");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setLoadState("error");
-        setErrorMessage(err instanceof Error ? err.message : "Something went wrong.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void mutate();
+  }, [mutate]);
 
   const createUser = useCallback(
     async (input: CreateUserInput) => {
       try {
         const created = await createUserRequest(input);
-        setUsers((current) => [...current, created]);
+        await mutate([...(users), created], { revalidate: false });
         toast.success(`${created.name} was added.`);
         return true;
       } catch (err) {
@@ -99,12 +72,12 @@ export function useUsers(): UseUsersResult {
         return false;
       }
     },
-    [toast]
+    [users, mutate, toast]
   );
 
   const updateUser = useCallback(
     async (id: string, patch: UpdateUserPatch) => {
-      const previous = usersRef.current;
+      const previous = users;
       const userPatch: Partial<AppUser> = {
         ...(patch.name !== undefined && { name: patch.name }),
         ...(patch.email !== undefined && { email: patch.email }),
@@ -116,30 +89,30 @@ export function useUsers(): UseUsersResult {
         ...(patch.visibleSectionHrefs !== undefined && { visibleSectionHrefs: patch.visibleSectionHrefs }),
         ...(patch.hiddenColumnIds !== undefined && { hiddenColumnIds: patch.hiddenColumnIds }),
       };
-      setUsers(previous.map((u) => (u.id === id ? { ...u, ...userPatch } : u)));
+      await mutate(previous.map((u) => (u.id === id ? { ...u, ...userPatch } : u)), { revalidate: false });
       try {
         const updated = await updateUserRequest(id, patch);
-        setUsers((current) => current.map((u) => (u.id === id ? updated : u)));
+        await mutate((current) => (current ?? previous).map((u) => (u.id === id ? updated : u)), { revalidate: false });
       } catch (err) {
-        setUsers(previous);
+        await mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to update user.");
       }
     },
-    [toast]
+    [users, mutate, toast]
   );
 
   const deleteUser = useCallback(
     async (id: string) => {
-      const previous = usersRef.current;
-      setUsers(previous.filter((u) => u.id !== id));
+      const previous = users;
+      await mutate(previous.filter((u) => u.id !== id), { revalidate: false });
       try {
         await deleteUserRequest(id);
       } catch (err) {
-        setUsers(previous);
+        await mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to delete user.");
       }
     },
-    [toast]
+    [users, mutate, toast]
   );
 
   return { users, loadState, errorMessage, refetch, createUser, updateUser, deleteUser };

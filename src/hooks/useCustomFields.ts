@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo } from "react";
+import useSWR from "swr";
 import { createCustomField, deleteCustomField, fetchCustomFields, updateCustomField } from "@/services/customFieldApi";
 import { useToast } from "@/components/ui/Toast";
 import type { CustomFieldDef, CustomFieldOption, CustomFieldType } from "@/types/customField";
@@ -15,68 +16,54 @@ interface UseCustomFieldsResult {
   removeField: (id: string) => Promise<void>;
 }
 
-export function useCustomFields(): UseCustomFieldsResult {
-  const [fields, setFields] = useState<CustomFieldDef[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const toast = useToast();
+const CUSTOM_FIELDS_KEY = "custom-fields";
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchCustomFields()
-      .then((list) => {
-        if (cancelled) return;
-        setFields(list);
-        setLoadState("success");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLoadState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export function useCustomFields(): UseCustomFieldsResult {
+  const toast = useToast();
+  const { data, error, isLoading, mutate } = useSWR<CustomFieldDef[]>(CUSTOM_FIELDS_KEY, fetchCustomFields);
+  const fields = useMemo(() => data ?? [], [data]);
+  const loadState: LoadState = error ? "error" : isLoading ? "loading" : "success";
 
   const addField = useCallback(
     async (input: { name: string; type: CustomFieldType; options: CustomFieldOption[] }) => {
       try {
         const created = await createCustomField(input);
-        setFields((current) => [...current, created]);
+        await mutate([...fields, created], { revalidate: false });
         return true;
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to add field.");
         return false;
       }
     },
-    [toast]
+    [fields, mutate, toast]
   );
 
   const editField = useCallback(
     async (id: string, patch: Partial<Pick<CustomFieldDef, "name" | "options">>) => {
       const previous = fields;
-      setFields((current) => current.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+      await mutate(previous.map((f) => (f.id === id ? { ...f, ...patch } : f)), { revalidate: false });
       try {
         await updateCustomField(id, patch);
       } catch (err) {
-        setFields(previous);
+        await mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to update field.");
       }
     },
-    [fields, toast]
+    [fields, mutate, toast]
   );
 
   const removeField = useCallback(
     async (id: string) => {
       const previous = fields;
-      setFields((current) => current.filter((f) => f.id !== id));
+      await mutate(previous.filter((f) => f.id !== id), { revalidate: false });
       try {
         await deleteCustomField(id);
       } catch (err) {
-        setFields(previous);
+        await mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to delete field.");
       }
     },
-    [fields, toast]
+    [fields, mutate, toast]
   );
 
   return { fields, loadState, addField, editField, removeField };

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import useSWR from "swr";
 import {
   createPriority,
   createStatus,
@@ -33,66 +34,51 @@ interface UseTaskMetaResult {
   movePriority: (id: string, direction: 1 | -1) => Promise<void>;
 }
 
+const STATUSES_KEY = "statuses";
+const PRIORITIES_KEY = "priorities";
+
 export function useTaskMeta(): UseTaskMetaResult {
-  const [statuses, setStatuses] = useState<StatusDef[]>([]);
-  const [priorities, setPriorities] = useState<PriorityDef[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
   const toast = useToast();
+  const statusesSWR = useSWR<StatusDef[]>(STATUSES_KEY, fetchStatuses);
+  const prioritiesSWR = useSWR<PriorityDef[]>(PRIORITIES_KEY, fetchPriorities);
+  const statuses = statusesSWR.data ?? [];
+  const priorities = prioritiesSWR.data ?? [];
+  const loadState: LoadState =
+    statusesSWR.error || prioritiesSWR.error ? "error" : statusesSWR.isLoading || prioritiesSWR.isLoading ? "loading" : "success";
 
-  const load = useCallback(() => {
-    setLoadState("loading");
-    Promise.all([fetchStatuses(), fetchPriorities()])
-      .then(([statusList, priorityList]) => {
-        setStatuses(statusList);
-        setPriorities(priorityList);
-        setLoadState("success");
-      })
-      .catch(() => setLoadState("error"));
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([fetchStatuses(), fetchPriorities()])
-      .then(([statusList, priorityList]) => {
-        if (cancelled) return;
-        setStatuses(statusList);
-        setPriorities(priorityList);
-        setLoadState("success");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLoadState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
+  const refetch = useCallback(() => {
+    void statusesSWR.mutate();
+    void prioritiesSWR.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addStatus = useCallback(
     async (input: { label: string; color: string }) => {
       try {
         const created = await createStatus(input);
-        setStatuses((current) => [...current, created]);
+        await statusesSWR.mutate([...statuses, created], { revalidate: false });
         return true;
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to add status.");
         return false;
       }
     },
-    [toast]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [statuses, toast]
   );
 
   const editStatus = useCallback(
     async (id: string, patch: Partial<Pick<StatusDef, "label" | "color">>) => {
       const previous = statuses;
-      setStatuses((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+      await statusesSWR.mutate(previous.map((s) => (s.id === id ? { ...s, ...patch } : s)), { revalidate: false });
       try {
         await updateStatus(id, patch);
       } catch (err) {
-        setStatuses(previous);
+        await statusesSWR.mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to update status.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [statuses, toast]
   );
 
@@ -100,14 +86,15 @@ export function useTaskMeta(): UseTaskMetaResult {
     async (id: string) => {
       try {
         await deleteStatus(id);
-        setStatuses((current) => current.filter((s) => s.id !== id));
+        await statusesSWR.mutate(statuses.filter((s) => s.id !== id), { revalidate: false });
         return true;
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to delete status.");
         return false;
       }
     },
-    [toast]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [statuses, toast]
   );
 
   const moveStatus = useCallback(
@@ -117,14 +104,15 @@ export function useTaskMeta(): UseTaskMetaResult {
       if (index === -1 || targetIndex < 0 || targetIndex >= statuses.length) return;
       const next = [...statuses];
       [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-      setStatuses(next);
+      await statusesSWR.mutate(next, { revalidate: false });
       try {
         await reorderStatuses(next.map((s) => s.id));
       } catch {
-        setStatuses(statuses);
+        await statusesSWR.mutate(statuses, { revalidate: false });
         toast.error("Failed to reorder statuses.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [statuses, toast]
   );
 
@@ -132,27 +120,29 @@ export function useTaskMeta(): UseTaskMetaResult {
     async (input: { label: string; color: string }) => {
       try {
         const created = await createPriority(input);
-        setPriorities((current) => [...current, created]);
+        await prioritiesSWR.mutate([...priorities, created], { revalidate: false });
         return true;
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to add priority.");
         return false;
       }
     },
-    [toast]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [priorities, toast]
   );
 
   const editPriority = useCallback(
     async (id: string, patch: Partial<Pick<PriorityDef, "label" | "color">>) => {
       const previous = priorities;
-      setPriorities((current) => current.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+      await prioritiesSWR.mutate(previous.map((p) => (p.id === id ? { ...p, ...patch } : p)), { revalidate: false });
       try {
         await updatePriority(id, patch);
       } catch (err) {
-        setPriorities(previous);
+        await prioritiesSWR.mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to update priority.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [priorities, toast]
   );
 
@@ -160,14 +150,15 @@ export function useTaskMeta(): UseTaskMetaResult {
     async (id: string) => {
       try {
         await deletePriority(id);
-        setPriorities((current) => current.filter((p) => p.id !== id));
+        await prioritiesSWR.mutate(priorities.filter((p) => p.id !== id), { revalidate: false });
         return true;
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to delete priority.");
         return false;
       }
     },
-    [toast]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [priorities, toast]
   );
 
   const movePriority = useCallback(
@@ -177,14 +168,15 @@ export function useTaskMeta(): UseTaskMetaResult {
       if (index === -1 || targetIndex < 0 || targetIndex >= priorities.length) return;
       const next = [...priorities];
       [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-      setPriorities(next);
+      await prioritiesSWR.mutate(next, { revalidate: false });
       try {
         await reorderPriorities(next.map((p) => p.id));
       } catch {
-        setPriorities(priorities);
+        await prioritiesSWR.mutate(priorities, { revalidate: false });
         toast.error("Failed to reorder priorities.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [priorities, toast]
   );
 
@@ -192,7 +184,7 @@ export function useTaskMeta(): UseTaskMetaResult {
     statuses,
     priorities,
     loadState,
-    refetch: load,
+    refetch,
     addStatus,
     editStatus,
     removeStatus,

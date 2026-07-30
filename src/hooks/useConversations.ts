@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
 import { createGroupConversation, fetchConversations, fetchUnreadCounts, findOrCreateDirectConversation } from "@/services/chatApi";
 import { useToast } from "@/components/ui/Toast";
-import type { Conversation } from "@/types/chat";
 
 const POLL_MS = 8_000;
 
@@ -17,55 +17,20 @@ async function loadConversationsData(userId: string) {
 
 export function useConversations() {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [loadState, setLoadState] = useState<LoadState>("loading");
   const toast = useToast();
   const userId = user?.id;
 
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    loadConversationsData(userId)
-      .then((data) => {
-        if (cancelled) return;
-        setConversations(data.conversations);
-        setUnreadCounts(data.unreadCounts);
-        setLoadState("success");
-      })
-      .catch(() => {
-        if (!cancelled) setLoadState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
+  const { data, error, isLoading, mutate } = useSWR(userId ? ["chat-conversations", userId] : null, () => loadConversationsData(userId as string), {
+    refreshInterval: POLL_MS,
+  });
 
-  // Cross-device live-ish sync — polls the server so a message sent from
-  // another device/session shows up here without a manual refresh.
-  useEffect(() => {
-    if (!userId) return;
-    const interval = window.setInterval(() => {
-      loadConversationsData(userId)
-        .then((data) => {
-          setConversations(data.conversations);
-          setUnreadCounts(data.unreadCounts);
-        })
-        .catch(() => {});
-    }, POLL_MS);
-    return () => window.clearInterval(interval);
-  }, [userId]);
+  const conversations = data?.conversations ?? [];
+  const unreadCounts = data?.unreadCounts ?? {};
+  const loadState: LoadState = error ? "error" : isLoading ? "loading" : "success";
 
   const refetch = useCallback(() => {
-    if (!userId) return;
-    loadConversationsData(userId)
-      .then((data) => {
-        setConversations(data.conversations);
-        setUnreadCounts(data.unreadCounts);
-        setLoadState("success");
-      })
-      .catch(() => setLoadState("error"));
-  }, [userId]);
+    void mutate();
+  }, [mutate]);
 
   const startDirectConversation = useCallback(
     async (otherUserId: string) => {
