@@ -126,10 +126,12 @@ export function TaskRow({
       onDragLeave={() => setDragHover(null)}
     >
       <td className={cn(cellClass, "rounded-l-lg !p-0")}>
-        <div
-          className="flex h-full items-center gap-1 border-l-4 px-2 py-1.5"
-          style={{ marginLeft: depth * 14, borderLeftColor: priorityColor }}
-        >
+        <div className="flex h-full items-center gap-1.5 px-2 py-1.5" style={{ marginLeft: depth * 14 }}>
+          <span
+            className="w-1.5 shrink-0 self-stretch rounded-full"
+            style={{ backgroundColor: priorityColor }}
+            aria-hidden="true"
+          />
           <span
             draggable={dragEnabled}
             onDragStart={() => onDragStart(task.id)}
