@@ -9,19 +9,11 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ColorSwatchPicker } from "./ColorSwatchPicker";
 import { ImageIcon, XIcon } from "@/components/ui/icons";
 import { AGENT_TOOLS } from "@/types/agent";
+import { uploadFile } from "@/services/uploadApi";
 import type { Agent, AgentKind, AgentTool } from "@/types/agent";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
 
 export interface AgentFormValues {
   name: string;
@@ -46,6 +38,7 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
   const [color, setColor] = useState(randomPaletteColor());
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [kind, setKind] = useState<AgentKind>("internal");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [enabledTools, setEnabledTools] = useState<AgentTool[]>([]);
@@ -97,7 +90,14 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       return;
     }
     setPhotoError(null);
-    setPhotoDataUrl(await readFileAsDataUrl(file));
+    setPhotoUploading(true);
+    try {
+      setPhotoDataUrl(await uploadFile(file, "avatars"));
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Failed to upload photo.");
+    } finally {
+      setPhotoUploading(false);
+    }
   }
 
   function toggleTool(toolId: AgentTool) {
@@ -164,8 +164,8 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
               <div className="flex items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                   <ImageIcon className="h-3.5 w-3.5" />
-                  {photoDataUrl ? "Change photo" : "Upload photo"}
-                  <input type="file" accept="image/*" onChange={handlePhotoChange} className="sr-only" />
+                  {photoUploading ? "Uploading…" : photoDataUrl ? "Change photo" : "Upload photo"}
+                  <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={photoUploading} className="sr-only" />
                 </label>
                 {photoDataUrl && (
                   <button

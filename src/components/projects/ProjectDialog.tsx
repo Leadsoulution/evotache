@@ -9,6 +9,7 @@ import { TeamMenu } from "@/components/task-list/TeamMenu";
 import { UserExcludeMenu } from "@/components/ui/UserExcludeMenu";
 import { randomPaletteColor } from "@/config/colorPalette";
 import { ImageIcon, XIcon } from "@/components/ui/icons";
+import { uploadFile } from "@/services/uploadApi";
 import type { Project } from "@/types/project";
 import type { Team } from "@/types/team";
 import type { AppUser } from "@/types/user";
@@ -29,15 +30,6 @@ interface ProjectDialogProps {
   }) => Promise<boolean>;
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
 
@@ -50,6 +42,7 @@ export function ProjectDialog({ open, project, teams, users, onClose, onSubmit }
   const [excludedUserIds, setExcludedUserIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -97,7 +90,14 @@ export function ProjectDialog({ open, project, teams, users, onClose, onSubmit }
       return;
     }
     setLogoError(null);
-    setLogoDataUrl(await readFileAsDataUrl(file));
+    setLogoUploading(true);
+    try {
+      setLogoDataUrl(await uploadFile(file, "logos"));
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : "Failed to upload logo.");
+    } finally {
+      setLogoUploading(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -137,8 +137,8 @@ export function ProjectDialog({ open, project, teams, users, onClose, onSubmit }
               <div className="flex items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                   <ImageIcon className="h-3.5 w-3.5" />
-                  {logoDataUrl ? "Change logo" : "Upload logo"}
-                  <input type="file" accept="image/*" onChange={handleLogoChange} className="sr-only" />
+                  {logoUploading ? "Uploading…" : logoDataUrl ? "Change logo" : "Upload logo"}
+                  <input type="file" accept="image/*" onChange={handleLogoChange} disabled={logoUploading} className="sr-only" />
                 </label>
                 {logoDataUrl && (
                   <button

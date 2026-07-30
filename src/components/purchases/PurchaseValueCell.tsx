@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { formatBytes } from "@/lib/attachmentUtils";
 import { getBadgeStyle } from "@/lib/badgeColor";
 import { MAX_PURCHASE_FILE_BYTES } from "@/services/purchaseApi";
+import { uploadFile } from "@/services/uploadApi";
 import { cn } from "@/lib/cn";
 import type { PurchaseColumnDef } from "@/types/purchase";
 
@@ -19,15 +20,6 @@ interface PurchaseValueCellProps {
   value: string;
   onChange: (next: string) => void;
   readOnly?: boolean;
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 const textInputClass =
@@ -39,6 +31,7 @@ export function PurchaseValueCell({ column, value, onChange, readOnly }: Purchas
   const [draft, setDraft] = useState(value);
   const [lastValue, setLastValue] = useState(value);
   const [preview, setPreview] = useState<MediaPreview | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Keep the local draft in sync whenever the committed value changes from
   // outside this cell (e.g. after a save round-trip) — render-time reset,
@@ -56,7 +49,14 @@ export function PurchaseValueCell({ column, value, onChange, readOnly }: Purchas
       toast.error(`"${file.name}" exceeds ${formatBytes(MAX_PURCHASE_FILE_BYTES)}.`);
       return;
     }
-    onChange(await readFileAsDataUrl(file));
+    setUploading(true);
+    try {
+      onChange(await uploadFile(file, "purchases"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload file.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   if (column.type === "text") {
@@ -192,11 +192,12 @@ export function PurchaseValueCell({ column, value, onChange, readOnly }: Purchas
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
-        className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 dark:border-slate-700"
+        disabled={uploading}
+        className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700"
         aria-label={`Upload ${column.name}`}
       >
         <ImageIcon className="h-4 w-4" />
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="sr-only" />
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="sr-only" />
       </button>
     );
   }
@@ -234,11 +235,12 @@ export function PurchaseValueCell({ column, value, onChange, readOnly }: Purchas
     <button
       type="button"
       onClick={() => fileInputRef.current?.click()}
-      className="flex h-10 w-16 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 dark:border-slate-700"
+      disabled={uploading}
+      className="flex h-10 w-16 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700"
       aria-label={`Upload ${column.name}`}
     >
       <VideoIcon className="h-4 w-4" />
-      <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileChange} className="sr-only" />
+      <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileChange} disabled={uploading} className="sr-only" />
     </button>
   );
 }

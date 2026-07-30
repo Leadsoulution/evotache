@@ -7,6 +7,7 @@ import { MAX_CHAT_FILE_BYTES } from "@/services/chatApi";
 import { useToast } from "@/components/ui/Toast";
 import { formatBytes } from "@/lib/attachmentUtils";
 import { cn } from "@/lib/cn";
+import { uploadFile } from "@/services/uploadApi";
 
 interface PendingFile {
   id: string;
@@ -23,15 +24,6 @@ interface OutgoingAttachment {
 
 interface MessageComposerProps {
   onSend: (text: string, attachments: OutgoingAttachment[]) => Promise<boolean>;
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 export function MessageComposer({ onSend }: MessageComposerProps) {
@@ -65,14 +57,21 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
     if (sending) return;
     if (!text.trim() && pendingFiles.length === 0) return;
     setSending(true);
-    const attachments: OutgoingAttachment[] = await Promise.all(
-      pendingFiles.map(async (pending) => ({
-        name: pending.file.name,
-        mimeType: pending.file.type || "application/octet-stream",
-        sizeBytes: pending.file.size,
-        dataUrl: await readFileAsDataUrl(pending.file),
-      }))
-    );
+    let attachments: OutgoingAttachment[];
+    try {
+      attachments = await Promise.all(
+        pendingFiles.map(async (pending) => ({
+          name: pending.file.name,
+          mimeType: pending.file.type || "application/octet-stream",
+          sizeBytes: pending.file.size,
+          dataUrl: await uploadFile(pending.file, "chat"),
+        }))
+      );
+    } catch (err) {
+      setSending(false);
+      toast.error(err instanceof Error ? err.message : "Failed to upload attachment.");
+      return;
+    }
     const success = await onSend(text, attachments);
     setSending(false);
     if (success) {

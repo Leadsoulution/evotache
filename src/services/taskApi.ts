@@ -1,4 +1,3 @@
-import { deleteAttachmentsForTask } from "@/services/attachmentApi";
 import { fetchAssignees as fetchActiveUserAssignees } from "@/services/userApi";
 import type { Assignee, Task, TaskDraft, TaskModule } from "@/types/task";
 
@@ -54,6 +53,6 @@ export async function deleteTasksRequest(ids: string[]): Promise<void> {
     body: JSON.stringify({ ids }),
   });
   if (!response.ok) return parseErrorOrThrow(response);
-  const { deletedIds } = (await response.json()) as { deletedIds: string[] };
-  await Promise.all(deletedIds.map((id) => deleteAttachmentsForTask(id)));
+  // Attachment cleanup (rows + Storage files) now happens server-side in
+  // /api/tasks/bulk-delete, since Attachment is a real table, not localStorage.
 }

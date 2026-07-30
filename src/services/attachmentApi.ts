@@ -1,61 +1,31 @@
-import { generateId } from "@/lib/id";
+import { uploadFile as uploadToStorage } from "@/services/uploadApi";
 import type { Attachment, AttachmentKind } from "@/types/attachment";
-
-const STORAGE_KEY = "evotasks.attachments.v1";
-const NETWORK_DELAY_MS = 300;
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 
 export class ApiError extends Error {}
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function readAll(): Attachment[] {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as Attachment[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeAll(items: Attachment[]): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+async function parseErrorOrThrow(response: Response): Promise<never> {
+  const body = await response.json().catch(() => null);
+  throw new ApiError(body?.error ?? "Something went wrong.");
 }
 
 export function inferAttachmentKind(mimeType: string): AttachmentKind {
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType.startsWith("video/")) return "video";
   if (mimeType === "application/pdf") return "pdf";
-  if (
-    mimeType.includes("spreadsheet") ||
-    mimeType.includes("excel") ||
-    mimeType === "text/csv"
-  ) {
-    return "spreadsheet";
-  }
+  if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || mimeType === "text/csv") return "spreadsheet";
   return "file";
 }
 
 export async function fetchAttachmentCountsByTask(): Promise<Record<string, number>> {
-  const counts: Record<string, number> = {};
-  for (const attachment of readAll()) {
-    counts[attachment.taskId] = (counts[attachment.taskId] ?? 0) + 1;
-  }
-  return counts;
+  const response = await fetch("/api/attachments/counts");
+  if (!response.ok) return {};
+  return response.json();
 }
 
 export async function fetchAttachments(taskId: string): Promise<Attachment[]> {
-  await delay(150);
-  return readAll()
-    .filter((a) => a.taskId === taskId)
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const response = await fetch(`/api/tasks/${taskId}/attachments`);
+  if (!response.ok) return [];
+  return response.json();
 }
 
 interface AddFileInput {
@@ -63,34 +33,25 @@ interface AddFileInput {
   name: string;
   mimeType: string;
   sizeBytes: number;
-  dataUrl: string;
+  file: File;
   uploadedBy: string;
 }
 
 export async function addFileAttachment(input: AddFileInput): Promise<Attachment> {
-  await delay(NETWORK_DELAY_MS);
-  if (input.sizeBytes > MAX_FILE_BYTES) {
-    throw new ApiError(`File is too large (max ${Math.round(MAX_FILE_BYTES / 1024 / 1024)}MB per file in this demo).`);
-  }
-  const existing = readAll();
-  const currentTotal = existing.reduce((sum, a) => sum + a.sizeBytes, 0);
-  if (currentTotal + input.sizeBytes > MAX_TOTAL_BYTES) {
-    throw new ApiError("Storage limit reached for this demo. Delete some attachments first.");
-  }
-  const attachment: Attachment = {
-    id: generateId("attachment"),
-    taskId: input.taskId,
-    name: input.name,
-    kind: inferAttachmentKind(input.mimeType),
-    mimeType: input.mimeType,
-    sizeBytes: input.sizeBytes,
-    dataUrl: input.dataUrl,
-    linkUrl: null,
-    uploadedBy: input.uploadedBy,
-    createdAt: new Date().toISOString(),
-  };
-  writeAll([...existing, attachment]);
-  return attachment;
+  const url = await uploadToStorage(input.file, "attachments");
+  const response = await fetch(`/api/tasks/${input.taskId}/attachments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name,
+      kind: inferAttachmentKind(input.mimeType),
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      url,
+    }),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
 }
 
 interface AddLinkInput {
@@ -101,30 +62,24 @@ interface AddLinkInput {
 }
 
 export async function addLinkAttachment(input: AddLinkInput): Promise<Attachment> {
-  await delay(200);
   let normalizedUrl = input.linkUrl.trim();
   if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
-  const attachment: Attachment = {
-    id: generateId("attachment"),
-    taskId: input.taskId,
-    name: input.name.trim() || normalizedUrl,
-    kind: "link",
-    mimeType: "text/uri-list",
-    sizeBytes: 0,
-    dataUrl: null,
-    linkUrl: normalizedUrl,
-    uploadedBy: input.uploadedBy,
-    createdAt: new Date().toISOString(),
-  };
-  writeAll([...readAll(), attachment]);
-  return attachment;
+  const response = await fetch(`/api/tasks/${input.taskId}/attachments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name.trim() || normalizedUrl,
+      kind: "link",
+      mimeType: "text/uri-list",
+      sizeBytes: 0,
+      linkUrl: normalizedUrl,
+    }),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
 }
 
-export async function deleteAttachment(id: string): Promise<void> {
-  await delay(200);
-  writeAll(readAll().filter((a) => a.id !== id));
-}
-
-export async function deleteAttachmentsForTask(taskId: string): Promise<void> {
-  writeAll(readAll().filter((a) => a.taskId !== taskId));
+export async function deleteAttachment(taskId: string, id: string): Promise<void> {
+  const response = await fetch(`/api/tasks/${taskId}/attachments/${id}`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
 }

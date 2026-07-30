@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { formatBytes } from "@/lib/attachmentUtils";
 import { getBadgeStyle } from "@/lib/badgeColor";
 import { MAX_CUSTOM_FIELD_FILE_BYTES } from "@/services/customFieldApi";
+import { uploadFile } from "@/services/uploadApi";
 import { cn } from "@/lib/cn";
 import type { CustomFieldDef } from "@/types/customField";
 
@@ -21,19 +22,11 @@ interface CustomFieldCellProps {
   readOnly?: boolean;
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 export function CustomFieldCell({ field, value, onChange, readOnly }: CustomFieldCellProps) {
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<MediaPreview | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -43,7 +36,14 @@ export function CustomFieldCell({ field, value, onChange, readOnly }: CustomFiel
       toast.error(`"${file.name}" exceeds ${formatBytes(MAX_CUSTOM_FIELD_FILE_BYTES)}.`);
       return;
     }
-    onChange(await readFileAsDataUrl(file));
+    setUploading(true);
+    try {
+      onChange(await uploadFile(file, "custom-fields"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload file.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   if (field.type === "select") {
@@ -131,11 +131,12 @@ export function CustomFieldCell({ field, value, onChange, readOnly }: CustomFiel
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
-        className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 dark:border-slate-700"
+        disabled={uploading}
+        className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700"
         aria-label={`Upload ${field.name}`}
       >
         <ImageIcon className="h-4 w-4" />
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="sr-only" />
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="sr-only" />
       </button>
     );
   }
@@ -173,11 +174,12 @@ export function CustomFieldCell({ field, value, onChange, readOnly }: CustomFiel
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
-        className="flex h-10 w-16 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 dark:border-slate-700"
+        disabled={uploading}
+        className="flex h-10 w-16 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700"
         aria-label={`Upload ${field.name}`}
       >
         <VideoIcon className="h-4 w-4" />
-        <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileChange} className="sr-only" />
+        <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileChange} disabled={uploading} className="sr-only" />
       </button>
     );
   }

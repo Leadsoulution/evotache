@@ -15,20 +15,12 @@ import { BUILT_IN_COLUMNS } from "@/components/task-list/ColumnsMenu";
 import { ASSIGNED_TO_COLUMN_ID, EXCLUDED_COLUMN_ID } from "@/components/purchases/PurchaseTable";
 import { useCustomFields } from "@/hooks/useCustomFields";
 import { usePurchaseColumns } from "@/hooks/usePurchaseColumns";
+import { uploadFile } from "@/services/uploadApi";
 import type { AppUser, Role } from "@/types/user";
 import type { Team } from "@/types/team";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
 
 export interface UserFormValues {
   name: string;
@@ -64,6 +56,7 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
   const [color, setColor] = useState(randomPaletteColor());
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [managerIds, setManagerIds] = useState<string[]>([]);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const [visibleSectionHrefs, setVisibleSectionHrefs] = useState<string[]>(BASE_NAV_ITEMS.map((item) => item.href));
@@ -123,7 +116,14 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
       return;
     }
     setPhotoError(null);
-    setPhotoDataUrl(await readFileAsDataUrl(file));
+    setPhotoUploading(true);
+    try {
+      setPhotoDataUrl(await uploadFile(file, "avatars"));
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Failed to upload photo.");
+    } finally {
+      setPhotoUploading(false);
+    }
   }
 
   function toggleTeam(teamId: string) {
@@ -215,10 +215,10 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
             <Avatar name={name || "?"} color={color} photoDataUrl={photoDataUrl} size="lg" />
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 aria-disabled:pointer-events-none aria-disabled:opacity-60">
                   <ImageIcon className="h-3.5 w-3.5" />
-                  {photoDataUrl ? "Change photo" : "Upload photo"}
-                  <input type="file" accept="image/*" onChange={handlePhotoChange} className="sr-only" />
+                  {photoUploading ? "Uploading…" : photoDataUrl ? "Change photo" : "Upload photo"}
+                  <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={photoUploading} className="sr-only" />
                 </label>
                 {photoDataUrl && (
                   <button

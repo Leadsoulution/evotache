@@ -28,18 +28,12 @@ export function useAttachments(taskId: string) {
   const uploadFile = useCallback(
     async (file: File, uploadedBy: string) => {
       try {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
         const created = await addFileAttachment({
           taskId,
           name: file.name,
           mimeType: file.type || "application/octet-stream",
           sizeBytes: file.size,
-          dataUrl,
+          file,
           uploadedBy,
         });
         setAttachments((current) => [...current, created]);
@@ -67,13 +61,13 @@ export function useAttachments(taskId: string) {
       const previous = attachments;
       setAttachments((current) => current.filter((a) => a.id !== id));
       try {
-        await deleteAttachment(id);
+        await deleteAttachment(taskId, id);
       } catch (err) {
         setAttachments(previous);
         toast.error(err instanceof Error ? err.message : "Failed to delete attachment.");
       }
     },
-    [attachments, toast]
+    [attachments, taskId, toast]
   );
 
   return { attachments, loading, uploadFile, addLink, removeAttachment };

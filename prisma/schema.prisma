@@ -300,3 +300,34 @@ model LibraryDoc {
 
   @@map("library_docs")
 }
+
+// Task-level file/link attachments. `url` points at Supabase Storage (or is
+// null for link-kind attachments, which use linkUrl instead).
+model Attachment {
+  id         String   @id @default(cuid())
+  taskId     String
+  name       String
+  kind       String
+  mimeType   String
+  sizeBytes  Int
+  url        String?
+  linkUrl    String?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  @@map("attachments")
+}
+
+model ArchivedItem {
+  id         String    @id @default(cuid())
+  module     String
+  originalId String
+  title      String
+  archivedAt DateTime  @default(now())
+  archivedBy String
+  // Path to the full serialized payload in Supabase Storage — deliberately
+  // not stored here, so archiving actually shrinks the database.
+  storageKey String
+
+  @@map("archived_items")
+}

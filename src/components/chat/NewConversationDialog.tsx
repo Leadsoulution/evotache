@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckIcon, ImageIcon, SearchIcon, UsersIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { uploadFile } from "@/services/uploadApi";
 import type { AppUser } from "@/types/user";
 import type { Conversation } from "@/types/chat";
 
@@ -19,15 +20,6 @@ interface NewConversationDialogProps {
   onCreated: (conversation: Conversation) => void;
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
 
@@ -37,6 +29,7 @@ export function NewConversationDialog({ open, users, currentUserId, onClose, onS
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
   const [groupAvatar, setGroupAvatar] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
 
@@ -73,7 +66,12 @@ export function NewConversationDialog({ open, users, currentUserId, onClose, onS
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !file.type.startsWith("image/")) return;
-    setGroupAvatar(await readFileAsDataUrl(file));
+    setAvatarUploading(true);
+    try {
+      setGroupAvatar(await uploadFile(file, "avatars"));
+    } finally {
+      setAvatarUploading(false);
+    }
   }
 
   async function handleCreateGroup(event: FormEvent<HTMLFormElement>) {
@@ -137,9 +135,9 @@ export function NewConversationDialog({ open, users, currentUserId, onClose, onS
                   <UsersIcon className="h-5 w-5" />
                 </span>
               )}
-              <label className="absolute -bottom-1 -right-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-indigo-600 text-white">
+              <label className="absolute -bottom-1 -right-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-indigo-600 text-white aria-disabled:cursor-not-allowed aria-disabled:opacity-60" aria-disabled={avatarUploading}>
                 <ImageIcon className="h-3 w-3" />
-                <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
+                <input type="file" accept="image/*" onChange={handleAvatarChange} disabled={avatarUploading} className="sr-only" />
               </label>
             </div>
             <input value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="Group name" className={inputClass} />

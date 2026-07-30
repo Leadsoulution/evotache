@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ImageIcon, PlusIcon, UsersIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { uploadFile } from "@/services/uploadApi";
 import type { Conversation } from "@/types/chat";
 import type { AppUser } from "@/types/user";
 
@@ -23,20 +24,12 @@ interface GroupInfoPanelProps {
   onLeave: () => void;
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 export function GroupInfoPanel({ open, conversation, users, currentUserId, onClose, onRename, onUpdateAvatar, onAddMembers, onRemoveMember, onLeave }: GroupInfoPanelProps) {
   const [name, setName] = useState("");
   const [adding, setAdding] = useState(false);
   const [pendingLeave, setPendingLeave] = useState(false);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
 
   // Reset the draft whenever the panel transitions from closed to open, at
@@ -66,7 +59,12 @@ export function GroupInfoPanel({ open, conversation, users, currentUserId, onClo
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !file.type.startsWith("image/")) return;
-    onUpdateAvatar(await readFileAsDataUrl(file));
+    setAvatarUploading(true);
+    try {
+      onUpdateAvatar(await uploadFile(file, "avatars"));
+    } finally {
+      setAvatarUploading(false);
+    }
   }
 
   return createPortal(
@@ -91,9 +89,9 @@ export function GroupInfoPanel({ open, conversation, users, currentUserId, onClo
               </span>
             )}
             {isOwner && (
-              <label className="absolute -bottom-1 -right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-indigo-600 text-white">
+              <label className="absolute -bottom-1 -right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-indigo-600 text-white aria-disabled:cursor-not-allowed aria-disabled:opacity-60" aria-disabled={avatarUploading}>
                 <ImageIcon className="h-3.5 w-3.5" />
-                <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
+                <input type="file" accept="image/*" onChange={handleAvatarChange} disabled={avatarUploading} className="sr-only" />
               </label>
             )}
           </div>
