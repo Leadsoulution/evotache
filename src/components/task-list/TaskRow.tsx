@@ -9,6 +9,7 @@ import { TeamMenu } from "./TeamMenu";
 import { DueDateMenu } from "./DueDateMenu";
 import { InlineEditableText } from "./InlineEditableText";
 import { CustomFieldCell } from "./CustomFieldCell";
+import { TaskTreeConnector } from "./TaskTreeConnector";
 import { ChevronDownIcon, EyeIcon, GripVerticalIcon, ListChecksIcon, PaperclipIcon, PlusIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
 import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/cn";
@@ -28,9 +29,9 @@ export interface VisibleColumns {
 
 interface TaskRowProps {
   task: Task;
-  depth: number;
   hasChildren: boolean;
   childCount: number;
+  ancestorContinues: boolean[];
   collapsed: boolean;
   onToggleCollapse: (id: string) => void;
   assignees: Assignee[];
@@ -57,9 +58,9 @@ interface TaskRowProps {
 
 export function TaskRow({
   task,
-  depth,
   hasChildren,
   childCount,
+  ancestorContinues,
   collapsed,
   onToggleCollapse,
   assignees,
@@ -110,7 +111,6 @@ export function TaskRow({
     }
   }
 
-  const priorityColor = priorities.find((p) => p.id === task.priority)?.color ?? "#cbd5e1";
   // Every <td> shares this so the row reads as one continuous card despite
   // border-collapse:separate giving each cell its own border.
   const cellClass = cn(
@@ -127,11 +127,8 @@ export function TaskRow({
       onDrop={handleDrop}
       onDragLeave={() => setDragHover(null)}
     >
-      <td className={cn(cellClass, "rounded-l-lg !p-0")}>
-        <div
-          className="flex h-full items-center gap-1 border-l-4 px-2 py-1.5"
-          style={{ marginLeft: depth * 14, borderLeftColor: priorityColor }}
-        >
+      <td className={cn(cellClass, "rounded-l-lg")}>
+        <div className="flex items-center gap-1">
           <span
             draggable={dragEnabled}
             onDragStart={() => onDragStart(task.id)}
@@ -155,8 +152,9 @@ export function TaskRow({
           />
         </div>
       </td>
-      <td className={cellClass}>
-        <div className="flex items-center gap-1" style={{ paddingLeft: depth * 20 }}>
+      <td className={cn(cellClass, "!p-0")}>
+        <div className="flex h-full items-center gap-1 px-2 py-1.5">
+          <TaskTreeConnector ancestorContinues={ancestorContinues} />
           {hasChildren ? (
             <button
               type="button"

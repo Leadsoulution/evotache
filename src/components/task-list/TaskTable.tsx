@@ -217,15 +217,13 @@ export function TaskTable({
   // is driven explicitly from the column widths (min 880px, same as the old
   // static layout) rather than left to "auto", which some browsers just
   // clamp to the container instead of letting it grow for horizontal scroll.
-  const tableWidth = Math.max(880, 104 + 40 + (canManageFields ? 36 : 0) + resizableColumns.reduce((sum, col) => sum + widthOf(col), 0));
+  const tableWidth = Math.max(880, 56 + 40 + (canManageFields ? 36 : 0) + resizableColumns.reduce((sum, col) => sum + widthOf(col), 0));
 
   return (
     <div className="hidden min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-800 dark:bg-slate-900">
       <table className="border-separate" style={{ tableLayout: "fixed", width: `max(${tableWidth}px, 100%)`, borderSpacing: "0 6px" }}>
         <colgroup>
-          {/* Wider than the checkbox alone needs, so deeply-nested subtasks'
-              indented color bar has room without clipping the checkbox. */}
-          <col style={{ width: 104 }} />
+          <col style={{ width: 56 }} />
           {resizableColumns.map((col) => (
             <col key={col.id} style={{ width: widthOf(col) }} />
           ))}
