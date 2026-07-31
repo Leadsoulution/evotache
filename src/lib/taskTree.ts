@@ -6,12 +6,6 @@ export interface FlatTreeRow {
   depth: number;
   hasChildren: boolean;
   childCount: number;
-  /** One entry per ancestor level (length === depth). The last entry says
-   * whether this row itself has a following sibling (so its own connector's
-   * vertical line continues past the branch point); earlier entries say
-   * whether that ancestor level still has more siblings coming (so a plain
-   * pass-through line renders through this row at that column). */
-  ancestorContinues: boolean[];
 }
 
 function buildChildrenMap(tasks: Task[]): Map<string, Task[]> {
@@ -80,16 +74,14 @@ export function flattenVisibleTree(topLevelTasksInOrder: Task[], allTasks: Task[
   const childrenMap = buildChildrenMap(allTasks);
   const rows: FlatTreeRow[] = [];
 
-  function walk(task: Task, depth: number, ancestorContinues: boolean[]) {
+  function walk(task: Task, depth: number) {
     const children = childrenMap.get(task.id) ?? [];
-    rows.push({ task, depth, hasChildren: children.length > 0, childCount: children.length, ancestorContinues });
+    rows.push({ task, depth, hasChildren: children.length > 0, childCount: children.length });
     if (children.length > 0 && !collapsedIds.has(task.id)) {
-      children.forEach((child, index) => {
-        walk(child, depth + 1, [...ancestorContinues, index < children.length - 1]);
-      });
+      for (const child of children) walk(child, depth + 1);
     }
   }
 
-  for (const task of topLevelTasksInOrder) walk(task, 0, []);
+  for (const task of topLevelTasksInOrder) walk(task, 0);
   return rows;
 }
