@@ -26,6 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setUser(restoredUser);
         setStatus(restoredUser ? "authenticated" : "unauthenticated");
+        // Reaching this point means the app loaded fine — clear the
+        // chunk-error auto-reload guard so a genuinely new stale-cache
+        // error after a future deploy can still trigger one recovery reload.
+        window.sessionStorage.removeItem("evotasks.chunkErrorReloaded");
       })
       .catch(() => {
         if (cancelled) return;

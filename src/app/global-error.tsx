@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isChunkLoadError, recoverFromChunkError } from "@/lib/chunkErrorRecovery";
 
 // Root-level fallback — catches errors even in the root layout itself
 // (auth/session loading, fonts, providers). Next.js replaces the whole
@@ -8,6 +9,7 @@ import { useEffect } from "react";
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
+    if (isChunkLoadError(error)) recoverFromChunkError();
   }, [error]);
 
   return (
