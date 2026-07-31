@@ -100,12 +100,13 @@ export function TaskGroup({
         </tr>
       )}
       {!sectionCollapsed &&
-        rows.map(({ task, depth, hasChildren }) => (
+        rows.map(({ task, depth, hasChildren, childCount }) => (
           <TaskRow
             key={task.id}
             task={task}
             depth={depth}
             hasChildren={hasChildren}
+            childCount={childCount}
             collapsed={collapsedIds.has(task.id)}
             onToggleCollapse={onToggleCollapse}
             assignees={assignees}

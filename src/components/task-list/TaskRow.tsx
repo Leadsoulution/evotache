@@ -9,7 +9,7 @@ import { TeamMenu } from "./TeamMenu";
 import { DueDateMenu } from "./DueDateMenu";
 import { InlineEditableText } from "./InlineEditableText";
 import { CustomFieldCell } from "./CustomFieldCell";
-import { ChevronDownIcon, EyeIcon, GripVerticalIcon, PaperclipIcon, PlusIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, EyeIcon, GripVerticalIcon, ListChecksIcon, PaperclipIcon, PlusIcon, RepeatIcon, TrashIcon } from "@/components/ui/icons";
 import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/cn";
 import type { Assignee, Task } from "@/types/task";
@@ -30,6 +30,7 @@ interface TaskRowProps {
   task: Task;
   depth: number;
   hasChildren: boolean;
+  childCount: number;
   collapsed: boolean;
   onToggleCollapse: (id: string) => void;
   assignees: Assignee[];
@@ -58,6 +59,7 @@ export function TaskRow({
   task,
   depth,
   hasChildren,
+  childCount,
   collapsed,
   onToggleCollapse,
   assignees,
@@ -180,6 +182,12 @@ export function TaskRow({
           {task.recurrence && (
             <span className="shrink-0 text-indigo-400 dark:text-indigo-300" title={describeRecurrence(task.recurrence)}>
               <RepeatIcon className="h-3.5 w-3.5" />
+            </span>
+          )}
+          {hasChildren && (
+            <span className="flex shrink-0 items-center gap-0.5 text-slate-400" title={`${childCount} subtask(s)`}>
+              <ListChecksIcon className="h-3.5 w-3.5" />
+              <span className="text-xs">{childCount}</span>
             </span>
           )}
           {attachmentCount > 0 && (

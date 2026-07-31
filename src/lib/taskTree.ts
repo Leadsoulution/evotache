@@ -5,6 +5,7 @@ export interface FlatTreeRow {
   task: Task;
   depth: number;
   hasChildren: boolean;
+  childCount: number;
 }
 
 function buildChildrenMap(tasks: Task[]): Map<string, Task[]> {
@@ -75,7 +76,7 @@ export function flattenVisibleTree(topLevelTasksInOrder: Task[], allTasks: Task[
 
   function walk(task: Task, depth: number) {
     const children = childrenMap.get(task.id) ?? [];
-    rows.push({ task, depth, hasChildren: children.length > 0 });
+    rows.push({ task, depth, hasChildren: children.length > 0, childCount: children.length });
     if (children.length > 0 && !collapsedIds.has(task.id)) {
       for (const child of children) walk(child, depth + 1);
     }
