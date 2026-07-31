@@ -112,7 +112,7 @@ export function TaskRow({
   // Every <td> shares this so the row reads as one continuous card despite
   // border-collapse:separate giving each cell its own border.
   const cellClass = cn(
-    "overflow-hidden border-y border-slate-100 bg-white px-2 py-1.5 group-hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:group-hover:bg-slate-800/50",
+    "overflow-hidden border-y border-amber-100 bg-amber-50 px-2 py-1.5 group-hover:bg-amber-100 dark:border-amber-950 dark:bg-amber-950/20 dark:group-hover:bg-amber-950/40",
     selected && "!bg-indigo-50/60 dark:!bg-indigo-950/30",
     dragHover === "before" && "!border-t-2 !border-t-indigo-500",
     dragHover === "after" && "!border-b-2 !border-b-indigo-500"
