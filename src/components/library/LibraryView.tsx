@@ -10,7 +10,15 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { ErrorState } from "@/components/task-list/ErrorState";
 import { BookOpenIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { COLOR_PALETTE } from "@/config/colorPalette";
 import { cn } from "@/lib/cn";
+
+/** Documents don't have a stored color, so one is derived deterministically
+ * from position — stable across reloads, and reuses the same palette as
+ * Projects/Teams/Users elsewhere in the app instead of inventing a new one. */
+function docColor(index: number): string {
+  return COLOR_PALETTE[index % COLOR_PALETTE.length];
+}
 
 export function LibraryView() {
   const { user } = useAuth();
@@ -29,7 +37,9 @@ export function LibraryView() {
   // first document whenever activeId hasn't been set yet or no longer
   // matches an existing doc (e.g. it was just deleted).
   const effectiveActiveId = activeId && docs.some((d) => d.id === activeId) ? activeId : (docs[0]?.id ?? null);
-  const activeDoc = docs.find((d) => d.id === effectiveActiveId) ?? null;
+  const activeDocIndex = docs.findIndex((d) => d.id === effectiveActiveId);
+  const activeDoc = activeDocIndex >= 0 ? docs[activeDocIndex] : null;
+  const activeColor = activeDocIndex >= 0 ? docColor(activeDocIndex) : COLOR_PALETTE[0];
   const pendingDeleteDoc = docs.find((d) => d.id === pendingDeleteId) ?? null;
 
   function startEditing() {
@@ -75,31 +85,41 @@ export function LibraryView() {
 
       {loadState === "success" && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
-            {docs.map((doc) => (
-              <button
-                key={doc.id}
-                type="button"
-                draggable={canEdit}
-                onDragStart={() => onDragStart(doc.id)}
-                onDragOver={(event) => onDragOverColumn(event, doc.id)}
-                onDrop={() => onDrop(doc.id)}
-                onDragEnd={onDragEnd}
-                onClick={() => {
-                  setActiveId(doc.id);
-                  setEditing(false);
-                }}
-                className={cn(
-                  "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-                  effectiveActiveId === doc.id
-                    ? "border-indigo-500 bg-indigo-600 text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800",
-                  dropTarget?.id === doc.id && (dropTarget.edge === "before" ? "border-l-4 border-l-indigo-500" : "border-r-4 border-r-indigo-500")
-                )}
-              >
-                {doc.title}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 pb-4 dark:border-slate-800">
+            {docs.map((doc, index) => {
+              const color = docColor(index);
+              const active = effectiveActiveId === doc.id;
+              return (
+                <button
+                  key={doc.id}
+                  type="button"
+                  draggable={canEdit}
+                  onDragStart={() => onDragStart(doc.id)}
+                  onDragOver={(event) => onDragOverColumn(event, doc.id)}
+                  onDrop={() => onDrop(doc.id)}
+                  onDragEnd={onDragEnd}
+                  onClick={() => {
+                    setActiveId(doc.id);
+                    setEditing(false);
+                  }}
+                  style={
+                    active
+                      ? { backgroundImage: `linear-gradient(135deg, ${color}, ${color}cc)`, boxShadow: `0 6px 16px -4px ${color}80` }
+                      : { borderColor: `${color}55` }
+                  }
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-semibold transition-all duration-150",
+                    active
+                      ? "translate-y-[-1px] border-transparent text-white"
+                      : "bg-white text-slate-600 hover:-translate-y-px hover:shadow-md dark:bg-slate-900 dark:text-slate-300",
+                    dropTarget?.id === doc.id && (dropTarget.edge === "before" ? "border-l-4 border-l-indigo-500" : "border-r-4 border-r-indigo-500")
+                  )}
+                >
+                  {!active && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
+                  {doc.title}
+                </button>
+              );
+            })}
             {canEdit && (
               <button
                 type="button"
@@ -122,7 +142,12 @@ export function LibraryView() {
           )}
 
           {activeDoc && (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div
+              className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white dark:border-slate-800 dark:bg-slate-900"
+              style={{ boxShadow: `0 1px 2px rgba(15,23,42,0.06), 0 20px 40px -20px ${activeColor}66, 0 8px 16px -8px rgba(15,23,42,0.12)` }}
+            >
+              <div className="h-1.5 w-full" style={{ backgroundImage: `linear-gradient(90deg, ${activeColor}, ${activeColor}55)` }} />
+              <div className="p-6">
               {editing ? (
                 <div className="flex flex-col gap-3">
                   <input
@@ -158,7 +183,18 @@ export function LibraryView() {
               ) : (
                 <div className="flex flex-col gap-4">
                   <div className="flex items-start justify-between gap-3">
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">{activeDoc.title}</h2>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+                        style={{
+                          backgroundImage: `linear-gradient(135deg, ${activeColor}, ${activeColor}aa)`,
+                          boxShadow: `0 4px 10px -2px ${activeColor}88`,
+                        }}
+                      >
+                        <BookOpenIcon className="h-5 w-5" />
+                      </span>
+                      <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">{activeDoc.title}</h2>
+                    </div>
                     {canEdit && (
                       <div className="flex shrink-0 items-center gap-1">
                         <button
@@ -183,6 +219,7 @@ export function LibraryView() {
                   <MarkdownLite content={activeDoc.content} />
                 </div>
               )}
+              </div>
             </div>
           )}
         </div>
