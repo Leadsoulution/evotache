@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Avatar } from "@/components/ui/Avatar";
@@ -43,6 +44,7 @@ export function AppHeader({ navBadgeCounts }: AppHeaderProps) {
           </button>
         )}
         <NotificationBell align="end" />
+        <LanguageToggle />
         <ThemeToggle />
         <Menu
           options={getAccountMenuOptions(push.supported, push.subscribed)}

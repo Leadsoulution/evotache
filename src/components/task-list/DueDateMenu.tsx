@@ -5,7 +5,9 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from "@/components/ui/icons";
 import { isDueSoon, isOverdue } from "@/lib/date";
+import { useLanguage } from "@/hooks/useLanguage";
 import { cn } from "@/lib/cn";
+import type { TranslationKey } from "@/i18n/en";
 
 interface DueDateMenuProps {
   /** Omit both to render a single Due-date trigger only (e.g. a narrow table cell) instead of the Start date + Due date pair. */
@@ -51,7 +53,7 @@ function formatBoxValue(iso: string | null): string {
 }
 
 interface Shortcut {
-  label: string;
+  label: TranslationKey;
   date: Date;
 }
 
@@ -61,13 +63,13 @@ function buildShortcuts(today: Date): Shortcut[] {
   const nextWeek = addDays(today, ((1 - dow + 7) % 7) || 7);
   const nextWeekend = addDays(thisWeekend, 7);
   return [
-    { label: "Today", date: today },
-    { label: "Tomorrow", date: addDays(today, 1) },
-    { label: "This weekend", date: thisWeekend },
-    { label: "Next week", date: nextWeek },
-    { label: "Next weekend", date: nextWeekend },
-    { label: "2 weeks", date: addDays(today, 14) },
-    { label: "4 weeks", date: addDays(today, 28) },
+    { label: "dueDate.today", date: today },
+    { label: "dueDate.tomorrow", date: addDays(today, 1) },
+    { label: "dueDate.thisWeekend", date: thisWeekend },
+    { label: "dueDate.nextWeek", date: nextWeek },
+    { label: "dueDate.nextWeekend", date: nextWeekend },
+    { label: "dueDate.twoWeeks", date: addDays(today, 14) },
+    { label: "dueDate.fourWeeks", date: addDays(today, 28) },
   ];
 }
 
@@ -78,6 +80,7 @@ function buildMonthGrid(viewMonth: Date): Date[] {
 }
 
 export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChangeDue, readOnly }: DueDateMenuProps) {
+  const { t } = useLanguage();
   const showStart = Boolean(onChangeStart);
   const [open, setOpen] = useState(false);
   const [activeField, setActiveField] = useState<ActiveField>("due");
@@ -159,7 +162,7 @@ export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChange
     return (
       <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium", toneClass)}>
         <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
-        {dueDate ? formatShort(new Date(dueDate)) : "No due date"}
+        {dueDate ? formatShort(new Date(dueDate)) : t("tasks.noDueDate")}
       </span>
     );
   }
@@ -182,7 +185,7 @@ export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChange
           )}
         >
           <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
-          {startDate ? formatBoxValue(startDate) : "Start date"}
+          {startDate ? formatBoxValue(startDate) : t("dueDate.startDate")}
         </button>
       )}
 
@@ -197,7 +200,7 @@ export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChange
         )}
       >
         <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
-        {dueDate ? formatBoxValue(dueDate) : "Due date"}
+        {dueDate ? formatBoxValue(dueDate) : t("dueDate.dueDate")}
       </button>
 
       {open &&
@@ -219,7 +222,7 @@ export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChange
                   onClick={() => pick(shortcut.date)}
                   className="flex items-center justify-between px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
-                  <span>{shortcut.label}</span>
+                  <span>{t(shortcut.label)}</span>
                   <span className="text-slate-400">{formatShort(shortcut.date)}</span>
                 </button>
               ))}
@@ -233,7 +236,7 @@ export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChange
                   className="mt-1 flex items-center gap-1 px-2.5 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                 >
                   <XIcon className="h-3 w-3" />
-                  Clear
+                  {t("dueDate.clear")}
                 </button>
               )}
             </div>
@@ -249,7 +252,7 @@ export function DueDateMenu({ startDate = null, dueDate, onChangeStart, onChange
                     onClick={() => setViewMonth(today)}
                     className="rounded px-1.5 py-0.5 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950"
                   >
-                    Today
+                    {t("dueDate.today")}
                   </button>
                   <button
                     type="button"

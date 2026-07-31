@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { getNavItems } from "@/config/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { Avatar } from "@/components/ui/Avatar";
 import { Menu } from "@/components/ui/Menu";
 import { NavBadge } from "@/components/NavBadge";
@@ -22,6 +24,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const pathname = usePathname();
   const push = usePushSubscription();
   const { canInstall, install } = useInstallPrompt();
@@ -57,7 +60,7 @@ export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
                 <Icon className="h-4 w-4" />
                 <NavBadge count={badgeCount} />
               </span>
-              {item.label}
+              {t(item.label)}
             </Link>
           );
         })}
@@ -73,6 +76,7 @@ export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
             Install app
           </button>
         )}
+        <LanguageToggle />
         <ThemeToggle />
         <Menu
           options={getAccountMenuOptions(push.supported, push.subscribed)}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useLanguage } from "@/hooks/useLanguage";
 import { cn } from "@/lib/cn";
 
 interface ConfirmDialogProps {
@@ -19,12 +20,13 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   destructive,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useLanguage();
   const confirmRef = useRef<HTMLButtonElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
@@ -71,7 +73,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </button>
           <button
             ref={confirmRef}
@@ -82,7 +84,7 @@ export function ConfirmDialog({
               destructive ? "bg-red-600 hover:bg-red-500 focus-visible:ring-red-500" : "bg-indigo-600 hover:bg-indigo-500 focus-visible:ring-indigo-500"
             )}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("common.confirm")}
           </button>
         </div>
       </div>

@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ColorSwatchPicker } from "./ColorSwatchPicker";
 import { ImageIcon, XIcon } from "@/components/ui/icons";
 import { BASE_NAV_ITEMS } from "@/config/navigation";
+import { useLanguage } from "@/hooks/useLanguage";
 import { BUILT_IN_COLUMNS } from "@/components/task-list/ColumnsMenu";
 import { ASSIGNED_TO_COLUMN_ID, EXCLUDED_COLUMN_ID } from "@/components/purchases/PurchaseTable";
 import { useCustomFields } from "@/hooks/useCustomFields";
@@ -49,6 +50,7 @@ function teamIdsForUser(teams: Team[], userId: string): string[] {
 }
 
 export function UserFormDialog({ open, editingUser, users, teams, onClose, onSubmit }: UserFormDialogProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -326,7 +328,7 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
                     onChange={() => toggleSection(item.href)}
                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
                   />
-                  <span className="text-sm text-slate-700 dark:text-slate-200">{item.label}</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-200">{t(item.label)}</span>
                 </label>
               ))}
             </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { getNavItems } from "@/config/navigation";
 import { NavBadge } from "@/components/NavBadge";
 import { MenuIcon, XIcon } from "@/components/ui/icons";
@@ -18,6 +19,7 @@ interface MobileNavDrawerProps {
 export function MobileNavDrawer({ navBadgeCounts }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
+  const { t } = useLanguage();
   const pathname = usePathname();
 
   if (!user) return null;
@@ -73,7 +75,7 @@ export function MobileNavDrawer({ navBadgeCounts }: MobileNavDrawerProps) {
                         <Icon className="h-4 w-4" />
                         <NavBadge count={badgeCount} />
                       </span>
-                      {item.label}
+                      {t(item.label)}
                     </Link>
                   );
                 })}

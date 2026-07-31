@@ -3,12 +3,14 @@
 import { useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { PlusIcon } from "@/components/ui/icons";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface NewTaskRowProps {
   onCreate: (title: string) => void;
 }
 
 export function NewTaskRow({ onCreate }: NewTaskRowProps) {
+  const { t } = useLanguage();
   const [value, setValue] = useState("");
   const [active, setActive] = useState(false);
 
@@ -44,8 +46,8 @@ export function NewTaskRow({ onCreate }: NewTaskRowProps) {
           if (!value.trim()) setActive(false);
         }}
         onKeyDown={onKeyDown}
-        placeholder="Add task"
-        aria-label="New task title"
+        placeholder={t("tasks.addTask")}
+        aria-label={t("tasks.addTask")}
         className="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
       />
       {active && value.trim() && (
@@ -55,7 +57,7 @@ export function NewTaskRow({ onCreate }: NewTaskRowProps) {
           onClick={submit}
           className="shrink-0 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500"
         >
-          Add
+          {t("common.add")}
         </button>
       )}
     </div>

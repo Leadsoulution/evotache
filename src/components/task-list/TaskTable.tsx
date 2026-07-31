@@ -6,7 +6,9 @@ import { NewTaskRow } from "./NewTaskRow";
 import { ColumnResizeHandle } from "./ColumnResizeHandle";
 import { CustomFieldHeaderMenu } from "./CustomFieldHeaderMenu";
 import { AddCustomFieldPopover } from "./AddCustomFieldPopover";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { VisibleColumns } from "./TaskRow";
+import type { TranslationKey } from "@/i18n/en";
 import { computeOrderBetween } from "@/lib/taskQuery";
 import { applyColumnOrder } from "@/lib/columnOrder";
 import { useColumnDragReorder } from "@/hooks/useColumnDragReorder";
@@ -44,6 +46,17 @@ const FIXED_COLUMNS: Record<keyof VisibleColumns, ColumnDef> = {
 };
 
 const TASK_COLUMN: ColumnDef = { id: "task", label: "Task", defaultWidth: 260, minWidth: 180 };
+
+// Fixed columns' English `label` above still drives width/order/drag logic
+// unchanged — this maps id -> translation key just for what's rendered.
+const COLUMN_LABEL_KEYS: Record<string, TranslationKey> = {
+  task: "tasks.col.task",
+  assignees: "tasks.col.assignees",
+  team: "tasks.col.department",
+  dueDate: "tasks.col.dueDate",
+  priority: "tasks.col.priority",
+  status: "tasks.col.status",
+};
 const MAX_COLUMN_WIDTH = 640;
 
 const CUSTOM_FIELD_TYPE_LABEL: Record<CustomFieldType, string> = {
@@ -125,6 +138,7 @@ export function TaskTable({
   onReorder,
   onCreate,
 }: TaskTableProps) {
+  const { t } = useLanguage();
   const checkboxRefs = useRef(new Map<string, HTMLInputElement>());
   const draggedId = useRef<string | null>(null);
 
@@ -293,7 +307,7 @@ export function TaskTable({
                           col.label
                         )
                       ) : (
-                        col.label
+                        (COLUMN_LABEL_KEYS[col.id] ? t(COLUMN_LABEL_KEYS[col.id]) : col.label)
                       )}
                     </span>
                   </div>

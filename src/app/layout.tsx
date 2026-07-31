@@ -4,6 +4,7 @@ import "./globals.css";
 import { SWRConfig } from "swr";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AuthProvider } from "@/hooks/useAuth";
+import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppShell } from "@/components/AppShell";
 
 const geistSans = Geist({
@@ -41,7 +42,7 @@ const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem("evotasks.
 // missing users, or "changes don't show up" confusion — it just quietly
 // reseeds. Keeps session/theme so this never signs anyone out.
 const SEED_VERSION = "11";
-const SEED_RESET_SCRIPT = `(function(){try{var v="${SEED_VERSION}";var k="evotasks.seedVersion";if(localStorage.getItem(k)!==v){var keys=Object.keys(localStorage);for(var i=0;i<keys.length;i++){var key=keys[i];if(key.indexOf("evotasks.")===0&&key!=="evotasks.session.v1"&&key!=="evotasks.theme"){localStorage.removeItem(key);}}localStorage.setItem(k,v);}}catch(e){}})();`;
+const SEED_RESET_SCRIPT = `(function(){try{var v="${SEED_VERSION}";var k="evotasks.seedVersion";if(localStorage.getItem(k)!==v){var keys=Object.keys(localStorage);for(var i=0;i<keys.length;i++){var key=keys[i];if(key.indexOf("evotasks.")===0&&key!=="evotasks.session.v1"&&key!=="evotasks.theme"&&key!=="evotasks.locale"){localStorage.removeItem(key);}}localStorage.setItem(k,v);}}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -70,7 +71,9 @@ export default function RootLayout({
         >
           <ToastProvider>
             <AuthProvider>
-              <AppShell>{children}</AppShell>
+              <LanguageProvider>
+                <AppShell>{children}</AppShell>
+              </LanguageProvider>
             </AuthProvider>
           </ToastProvider>
         </SWRConfig>

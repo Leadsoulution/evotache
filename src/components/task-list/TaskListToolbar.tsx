@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu } from "@/components/ui/Menu";
+import { useLanguage } from "@/hooks/useLanguage";
 import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProjectAvatar } from "@/components/projects/ProjectAvatar";
@@ -116,6 +117,7 @@ export function TaskListToolbar({
   viewMode,
   onViewModeChange,
 }: TaskListToolbarProps) {
+  const { t } = useLanguage();
   const statusOptions = statuses.map((status) => ({
     value: status.id,
     label: status.label,
@@ -150,22 +152,22 @@ export function TaskListToolbar({
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search tasks..."
-            aria-label="Search tasks"
+            placeholder={t("tasks.searchPlaceholder")}
+            aria-label={t("tasks.searchPlaceholder")}
             className="w-full min-w-0 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 sm:w-56 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950"
           />
         </div>
 
-        <FilterMenu label="Status" count={statusFilter.length} options={statusOptions} value={statusFilter} onChange={onStatusFilterChange} />
-        <FilterMenu label="Priority" count={priorityFilter.length} options={priorityOptions} value={priorityFilter} onChange={onPriorityFilterChange} />
-        <FilterMenu label="Assignee" count={assigneeFilter.length} options={assigneeOptions} value={assigneeFilter} onChange={onAssigneeFilterChange} />
+        <FilterMenu label={t("tasks.status")} count={statusFilter.length} options={statusOptions} value={statusFilter} onChange={onStatusFilterChange} />
+        <FilterMenu label={t("tasks.priority")} count={priorityFilter.length} options={priorityOptions} value={priorityFilter} onChange={onPriorityFilterChange} />
+        <FilterMenu label={t("tasks.assignee")} count={assigneeFilter.length} options={assigneeOptions} value={assigneeFilter} onChange={onAssigneeFilterChange} />
         {projects.length > 0 && (
-          <FilterMenu label="Project" count={projectFilter.length} options={projectOptions} value={projectFilter} onChange={onProjectFilterChange} />
+          <FilterMenu label={t("tasks.project")} count={projectFilter.length} options={projectOptions} value={projectFilter} onChange={onProjectFilterChange} />
         )}
         {teams.length > 0 && (
-          <FilterMenu label="Department" count={teamFilter.length} options={teamOptions} value={teamFilter} onChange={onTeamFilterChange} />
+          <FilterMenu label={t("tasks.department")} count={teamFilter.length} options={teamOptions} value={teamFilter} onChange={onTeamFilterChange} />
         )}
-        <FilterMenu label="Type" count={taskTypeFilter.length} options={TASK_TYPE_OPTIONS} value={taskTypeFilter} onChange={(next) => onTaskTypeFilterChange(next as TaskTypeFilter[])} />
+        <FilterMenu label={t("tasks.type")} count={taskTypeFilter.length} options={TASK_TYPE_OPTIONS} value={taskTypeFilter} onChange={(next) => onTaskTypeFilterChange(next as TaskTypeFilter[])} />
 
         <button
           type="button"
@@ -179,7 +181,7 @@ export function TaskListToolbar({
           )}
         >
           <UserIcon className="h-3.5 w-3.5" />
-          My Tasks
+          {t("tasks.myTasks")}
         </button>
 
         <div className="mx-1 hidden h-5 w-px bg-slate-200 sm:block dark:bg-slate-700" />
@@ -191,7 +193,7 @@ export function TaskListToolbar({
               value={[groupField]}
               onChange={(next) => onGroupFieldChange(next[0] as GroupField)}
               ariaLabel="Group by"
-              renderTrigger={() => <ToolbarButton label={`Group: ${GROUP_OPTIONS.find((o) => o.value === groupField)?.label}`} />}
+              renderTrigger={() => <ToolbarButton label={`${t("tasks.group")}: ${GROUP_OPTIONS.find((o) => o.value === groupField)?.label}`} />}
             />
 
             <div className="flex items-center gap-1">
@@ -200,7 +202,7 @@ export function TaskListToolbar({
                 value={[sortField]}
                 onChange={(next) => onSortFieldChange(next[0] as SortField)}
                 ariaLabel="Sort by"
-                renderTrigger={() => <ToolbarButton label={`Sort: ${SORT_OPTIONS.find((o) => o.value === sortField)?.label}`} />}
+                renderTrigger={() => <ToolbarButton label={`${t("tasks.sort")}: ${SORT_OPTIONS.find((o) => o.value === sortField)?.label}`} />}
               />
               <button
                 type="button"
