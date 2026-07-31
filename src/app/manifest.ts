@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 // Bump this whenever the icon files change — Android/desktop PWA installs
 // cache the manifest aggressively, and a changed URL is the most reliable
 // way to get them to notice the icon is different on their next check.
-const ICON_VERSION = "2";
+const ICON_VERSION = "3";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
