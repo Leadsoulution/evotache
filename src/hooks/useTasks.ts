@@ -177,7 +177,17 @@ export function useTasks(module: TaskModule): UseTasksResult {
       };
       try {
         const created = await createTaskRequest(draft);
-        await tasksSWR.mutate((current) => [...(current ?? tasksRef.current), created], { revalidate: false });
+        // Dedupe by id rather than blindly appending — a concurrent
+        // revalidation of this same SWR key could otherwise already have
+        // picked up the newly created row by the time this resolves,
+        // leaving it listed twice.
+        await tasksSWR.mutate(
+          (current) => {
+            const list = current ?? tasksRef.current;
+            return list.some((t) => t.id === created.id) ? list : [...list, created];
+          },
+          { revalidate: false }
+        );
         toast.success(`Next occurrence scheduled for ${next.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to schedule the next occurrence.");
