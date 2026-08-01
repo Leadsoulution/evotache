@@ -36,6 +36,7 @@ interface UseTasksResult {
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   deleteTasks: (ids: string[]) => Promise<void>;
   reorderTask: (id: string, order: number) => Promise<void>;
+  bulkSetParent: (ids: string[], parentId: string) => Promise<void>;
 }
 
 function taskKey(module: TaskModule) {
@@ -260,5 +261,36 @@ export function useTasks(module: TaskModule): UseTasksResult {
     [updateTask]
   );
 
-  return { tasks, assignees, loadState, errorMessage, refetch, createTask, updateTask, deleteTasks, reorderTask };
+  const bulkSetParent = useCallback(
+    async (ids: string[], parentId: string) => {
+      const previous = tasksRef.current;
+      const idSet = new Set(ids);
+      const existingChildren = previous.filter((t) => t.parentId === parentId && !idSet.has(t.id));
+      let nextOrder = existingChildren.length ? Math.max(...existingChildren.map((t) => t.order)) + 1 : 0;
+      const patchById = new Map<string, Partial<Task>>();
+      for (const id of ids) {
+        patchById.set(id, { parentId, order: nextOrder });
+        nextOrder += 1;
+      }
+      await tasksSWR.mutate(
+        previous.map((t) => {
+          const patch = patchById.get(t.id);
+          return patch ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t;
+        }),
+        { revalidate: false }
+      );
+      try {
+        const updated = await Promise.all(ids.map((id) => updateTaskRequest(id, patchById.get(id) as Partial<Task>)));
+        const updatedById = new Map(updated.map((t) => [t.id, t]));
+        await tasksSWR.mutate((current) => (current ?? previous).map((t) => updatedById.get(t.id) ?? t), { revalidate: false });
+      } catch (err) {
+        await tasksSWR.mutate(previous, { revalidate: false });
+        toast.error(err instanceof Error ? err.message : "Failed to move tasks.");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toast]
+  );
+
+  return { tasks, assignees, loadState, errorMessage, refetch, createTask, updateTask, deleteTasks, reorderTask, bulkSetParent };
 }

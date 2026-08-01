@@ -26,7 +26,7 @@ import { ErrorState } from "./ErrorState";
 import { TaskDetailDrawer } from "./TaskDetailDrawer";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { groupTasks, sortTasks } from "@/lib/taskQuery";
-import { countDescendants, filterTopLevelTasks, flattenVisibleTree, getChildren } from "@/lib/taskTree";
+import { countDescendants, filterTopLevelTasks, flattenVisibleTree, getChildren, getDescendantIds } from "@/lib/taskTree";
 import { fetchAttachmentCountsByTask } from "@/services/attachmentApi";
 import type { GroupField, SortDirection, SortField, Task, TaskFilters, TaskModule, TaskTypeFilter } from "@/types/task";
 
@@ -39,7 +39,7 @@ interface TaskListViewProps {
 export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   const { user } = useAuth();
   const permissions = getTaskPermissions(user?.role);
-  const { tasks, assignees, loadState, errorMessage, refetch, createTask, updateTask, deleteTasks, reorderTask } = useTasks(module);
+  const { tasks, assignees, loadState, errorMessage, refetch, createTask, updateTask, deleteTasks, reorderTask, bulkSetParent } = useTasks(module);
   const { statuses, priorities, loadState: metaLoadState } = useTaskMeta();
   const { fields: customFields, addField, editField, removeField } = useCustomFields();
   const canManageFields = user ? canManageWorkflow(user.role) : false;
@@ -76,6 +76,23 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
 
   const assigneeNameById = useMemo(() => Object.fromEntries(assignees.map((a) => [a.id, a.name])), [assignees]);
   const allTasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+
+  // Candidate parents for the "move under…" bulk action — everything except
+  // the selected tasks themselves and their own descendants, since either
+  // would create a cycle.
+  const parentCandidates = useMemo(() => {
+    if (selectedIds.size === 0) return [];
+    const blocked = new Set(selectedIds);
+    for (const id of selectedIds) {
+      for (const descendantId of getDescendantIds(tasks, id)) blocked.add(descendantId);
+    }
+    return tasks.filter((t) => !blocked.has(t.id)).map((t) => ({ id: t.id, title: t.title }));
+  }, [tasks, selectedIds]);
+
+  async function handleBulkSetParent(parentId: string) {
+    await bulkSetParent(Array.from(selectedIds), parentId);
+    setSelectedIds(new Set());
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -331,6 +348,8 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         selectedCount={selectedIds.size}
         onBulkDelete={() => setPendingDeleteIds(Array.from(selectedIds))}
         onClearSelection={() => setSelectedIds(new Set())}
+        parentCandidates={parentCandidates}
+        onBulkSetParent={handleBulkSetParent}
         visibleCount={totalRows}
         totalCount={tasks.length}
         viewMode={viewMode}

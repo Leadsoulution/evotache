@@ -6,7 +6,7 @@ import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProjectAvatar } from "@/components/projects/ProjectAvatar";
 import { ColumnsMenu } from "./ColumnsMenu";
-import { ChevronDownIcon, KanbanIcon, ListIcon, RepeatIcon, SearchIcon, SortIcon, TrashIcon, UserIcon, XIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, CornerDownRightIcon, KanbanIcon, ListIcon, RepeatIcon, SearchIcon, SortIcon, TrashIcon, UserIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { Assignee, GroupField, SortDirection, SortField, TaskTypeFilter } from "@/types/task";
 import type { MenuOption } from "@/components/ui/Menu";
@@ -72,6 +72,8 @@ interface TaskListToolbarProps {
   selectedCount: number;
   onBulkDelete: () => void;
   onClearSelection: () => void;
+  parentCandidates: { id: string; title: string }[];
+  onBulkSetParent: (parentId: string) => void;
   visibleCount: number;
   totalCount: number;
   viewMode: TaskViewMode;
@@ -112,6 +114,8 @@ export function TaskListToolbar({
   selectedCount,
   onBulkDelete,
   onClearSelection,
+  parentCandidates,
+  onBulkSetParent,
   visibleCount,
   totalCount,
   viewMode,
@@ -255,6 +259,17 @@ export function TaskListToolbar({
       {selectedCount > 0 && (
         <div className="flex animate-fade-in items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
           <span className="font-medium">{selectedCount} selected</span>
+          <Menu
+            options={parentCandidates.map((t) => ({ value: t.id, label: t.title }))}
+            value={[]}
+            onChange={(next) => next[0] && onBulkSetParent(next[0])}
+            ariaLabel="Move under…"
+            renderTrigger={() => (
+              <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-indigo-600 hover:bg-indigo-100 focus-visible:outline-none dark:text-indigo-300 dark:hover:bg-indigo-900">
+                <CornerDownRightIcon className="h-3.5 w-3.5" /> Move under…
+              </span>
+            )}
+          />
           <button
             type="button"
             onClick={onBulkDelete}
