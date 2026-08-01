@@ -52,7 +52,7 @@ interface TaskRowProps {
   registerCheckboxRef: (id: string, el: HTMLInputElement | null) => void;
   onCheckboxKeyNav: (id: string, direction: 1 | -1) => void;
   onDragStart: (id: string) => void;
-  onDropOn: (id: string, edge: "before" | "after") => void;
+  onDropOn: (id: string, edge: "before" | "after" | "onto") => void;
 }
 
 export function TaskRow({
@@ -82,13 +82,16 @@ export function TaskRow({
   onDragStart,
   onDropOn,
 }: TaskRowProps) {
-  const [dragHover, setDragHover] = useState<"before" | "after" | null>(null);
+  const [dragHover, setDragHover] = useState<"before" | "after" | "onto" | null>(null);
 
   function handleDragOver(event: ReactDragEvent<HTMLTableRowElement>) {
     if (!dragEnabled) return;
     event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
-    const edge = event.clientY - rect.top < rect.height / 2 ? "before" : "after";
+    const ratio = (event.clientY - rect.top) / rect.height;
+    // Top/bottom quarters reorder as a sibling; the middle half drops the
+    // dragged task in as a subtask of this row (nesting via drag).
+    const edge = ratio < 0.25 ? "before" : ratio > 0.75 ? "after" : "onto";
     setDragHover(edge);
   }
 
@@ -117,7 +120,8 @@ export function TaskRow({
     "overflow-hidden border-y border-amber-100 bg-amber-50 px-2 py-1.5 group-hover:bg-amber-100 dark:border-amber-950 dark:bg-amber-950/20 dark:group-hover:bg-amber-950/40",
     selected && "!bg-indigo-50/60 dark:!bg-indigo-950/30",
     dragHover === "before" && "!border-t-2 !border-t-indigo-500",
-    dragHover === "after" && "!border-b-2 !border-b-indigo-500"
+    dragHover === "after" && "!border-b-2 !border-b-indigo-500",
+    dragHover === "onto" && "!bg-indigo-100 ring-1 ring-inset ring-indigo-400 dark:!bg-indigo-950/50 dark:ring-indigo-500"
   );
 
   return (

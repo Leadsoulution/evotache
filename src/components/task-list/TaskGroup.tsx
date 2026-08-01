@@ -39,7 +39,7 @@ interface TaskGroupProps {
   registerCheckboxRef: (id: string, el: HTMLInputElement | null) => void;
   onCheckboxKeyNav: (id: string, direction: 1 | -1) => void;
   onDragStart: (id: string) => void;
-  onDropOn: (id: string, edge: "before" | "after") => void;
+  onDropOn: (id: string, edge: "before" | "after" | "onto") => void;
 }
 
 export function TaskGroup({

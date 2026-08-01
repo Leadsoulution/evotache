@@ -10,6 +10,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import type { VisibleColumns } from "./TaskRow";
 import type { TranslationKey } from "@/i18n/en";
 import { computeOrderBetween } from "@/lib/taskQuery";
+import { getDescendantIds } from "@/lib/taskTree";
 import { applyColumnOrder } from "@/lib/columnOrder";
 import { useColumnDragReorder } from "@/hooks/useColumnDragReorder";
 import { COLOR_PALETTE } from "@/config/colorPalette";
@@ -207,13 +208,27 @@ export function TaskTable({
     draggedId.current = id;
   }
 
-  function onDropOn(targetId: string, edge: "before" | "after") {
+  function onDropOn(targetId: string, edge: "before" | "after" | "onto") {
     const sourceId = draggedId.current;
     draggedId.current = null;
     if (!sourceId || sourceId === targetId) return;
     const sourceTask = allTasksById.get(sourceId);
     const targetTask = allTasksById.get(targetId);
-    if (!sourceTask || !targetTask || sourceTask.parentId !== targetTask.parentId) return;
+    if (!sourceTask || !targetTask) return;
+
+    if (edge === "onto") {
+      // Nest the dragged task as a subtask of the row it's dropped on —
+      // guard against dropping a task onto its own descendant (would create a cycle).
+      const descendantIds = getDescendantIds(Array.from(allTasksById.values()), sourceId);
+      if (descendantIds.includes(targetId)) return;
+      const targetChildren = Array.from(allTasksById.values()).filter((t) => t.parentId === targetId);
+      const lastChild = targetChildren.reduce<Task | undefined>((max, t) => (!max || t.order > max.order ? t : max), undefined);
+      const nextOrder = computeOrderBetween(lastChild?.order, undefined);
+      onUpdate(sourceId, { parentId: targetId, order: nextOrder });
+      return;
+    }
+
+    if (sourceTask.parentId !== targetTask.parentId) return;
     const siblingRows = allRows.filter((r) => r.task.parentId === targetTask.parentId);
     const index = siblingRows.findIndex((r) => r.task.id === targetId);
     if (index === -1) return;
