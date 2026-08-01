@@ -49,7 +49,7 @@ export async function runAgentTurn({ agentId, conversationId }: RunAgentTurnInpu
   const chatMessages: ChatMessage[] = [
     {
       role: "system",
-      content: `${agentUser.agentConfig.systemPrompt || `You are ${agentUser.name}, an AI assistant inside EvoTasks.`}\n\nToday's date is ${today}. You are chatting inside the EvoTasks app. Be concise and helpful. Use the available tools to look up real data before answering questions about tasks, litiges, or achats — never guess.`,
+      content: `${agentUser.agentConfig.systemPrompt || `You are ${agentUser.name}, an AI assistant inside EvoTasks.`}\n\nToday's date is ${today}. You are chatting inside the EvoTasks app. Be concise and helpful. Use the available tools to look up real data before answering questions about tasks, litiges, or achats — never guess. When asked to create, update, or send something (a task, litige, purchase item, reminder, etc.), you must actually call the matching tool — never reply that something was done unless the tool call for it actually succeeded.`,
     },
     ...history.map((m): ChatMessage => ({
       role: m.senderId === agentId ? "assistant" : "user",

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
-import { isOverdue } from "@/lib/date";
+import { isOverdue, fromDateInputValue } from "@/lib/date";
 import { notifyUser } from "@/lib/notify";
 import { emailUser } from "@/lib/email";
 import type { AgentTool } from "@/types/agent";
@@ -135,6 +135,66 @@ const readLibrary: ToolDef = {
   },
 };
 
+const createTask: ToolDef = {
+  name: "create_task",
+  requires: ["tasks", "litiges"],
+  description:
+    "Create a new task or litige. Always tell the user it was created only after this tool actually returns successfully — never claim success without calling it.",
+  parameters: {
+    type: "object",
+    properties: {
+      module: { type: "string", enum: ["task", "dispute"], description: "\"task\" for Tasks, \"dispute\" for Litiges." },
+      title: { type: "string" },
+      description: { type: "string", description: "Optional longer description." },
+      priority: { type: "string", description: "Priority label matching an existing priority (e.g. \"Urgent\", \"High\", \"Normal\", \"Low\"). Omit for the default." },
+      dueDate: { type: "string", description: "Optional due date as YYYY-MM-DD." },
+      assigneeNames: { type: "array", items: { type: "string" }, description: "Optional names of users to assign (matched case-insensitively)." },
+    },
+    required: ["module", "title"],
+  },
+  execute: async (args, ctx) => {
+    const taskModule = args.module as "task" | "dispute";
+    assertModuleAllowed(taskModule, ctx);
+    const title = (args.title as string | undefined)?.trim();
+    if (!title) throw new Error("A title is required.");
+
+    const statuses = await db.statusDef.findMany({ orderBy: { order: "asc" } });
+    const firstStatusId = statuses[0]?.id;
+    if (!firstStatusId) throw new Error("No statuses are configured yet.");
+
+    const priorities = await db.priorityDef.findMany({ orderBy: { order: "asc" } });
+    const requestedPriority = (args.priority as string | undefined)?.trim().toLowerCase();
+    const matchedPriority = requestedPriority ? priorities.find((p) => p.label.toLowerCase() === requestedPriority) : undefined;
+    const priorityId = matchedPriority?.id ?? priorities[priorities.length - 1]?.id ?? "none";
+
+    let assigneeIds: string[] = [];
+    const assigneeNames = args.assigneeNames as string[] | undefined;
+    if (Array.isArray(assigneeNames) && assigneeNames.length > 0) {
+      const users = await db.user.findMany({ where: { status: "active" } });
+      assigneeIds = assigneeNames
+        .map((name) => users.find((u) => u.name.toLowerCase().includes(name.trim().toLowerCase())))
+        .filter((u): u is NonNullable<typeof u> => Boolean(u))
+        .map((u) => u.id);
+    }
+
+    const dueDateInput = args.dueDate as string | undefined;
+    const maxOrder = await db.task.aggregate({ where: { module: taskModule }, _max: { order: true } });
+    const task = await db.task.create({
+      data: {
+        module: taskModule,
+        title,
+        description: (args.description as string | undefined) ?? "",
+        status: firstStatusId,
+        priority: priorityId,
+        assigneeIds,
+        dueDate: dueDateInput ? fromDateInputValue(dueDateInput) : null,
+        order: (maxOrder._max.order ?? -1) + 1,
+      },
+    });
+    return { id: task.id, title: task.title, module: taskModule, assignedCount: assigneeIds.length };
+  },
+};
+
 const listPurchaseItems: ToolDef = {
   name: "list_purchase_items",
   requires: ["achats"],
@@ -207,4 +267,13 @@ const updatePurchaseItem: ToolDef = {
   },
 };
 
-export const AGENT_TOOL_DEFS: ToolDef[] = [listOverdueItems, getStats, sendReminder, readLibrary, listPurchaseItems, createPurchaseItem, updatePurchaseItem];
+export const AGENT_TOOL_DEFS: ToolDef[] = [
+  listOverdueItems,
+  getStats,
+  sendReminder,
+  createTask,
+  readLibrary,
+  listPurchaseItems,
+  createPurchaseItem,
+  updatePurchaseItem,
+];
