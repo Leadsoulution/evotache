@@ -13,6 +13,7 @@ export const fr: Record<TranslationKey, string> = {
   "nav.litiges": "Litiges",
   "nav.achats": "Achats",
   "nav.overdue": "En retard",
+  "nav.reminders": "Relances",
   "nav.library": "Bibliothèque",
   "nav.aiAssistant": "Assistant IA",
   "nav.statistics": "Statistiques",

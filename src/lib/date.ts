@@ -64,6 +64,23 @@ export function fromDateInputValue(value: string): string | null {
   return new Date(`${value}T00:00:00`).toISOString();
 }
 
+/** Same local-time reasoning as toDateInputValue(), extended with hours/minutes for `<input type="datetime-local">`. */
+export function toDateTimeInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+export function fromDateTimeInputValue(value: string): string | null {
+  if (!value) return null;
+  return new Date(value).toISOString();
+}
+
 export function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diffMs / 60000);

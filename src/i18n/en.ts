@@ -12,6 +12,7 @@ export const en = {
   "nav.litiges": "Litiges",
   "nav.achats": "Achats",
   "nav.overdue": "Overdue",
+  "nav.reminders": "Reminders",
   "nav.library": "Library",
   "nav.aiAssistant": "AI Assistant",
   "nav.statistics": "Statistics",

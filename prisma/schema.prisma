@@ -271,6 +271,38 @@ model AgentSchedule {
   @@map("agent_schedules")
 }
 
+model ReminderRule {
+  id    String  @id @default(cuid())
+  name  String
+  // "overdue_escalation" | "meeting"
+  kind    String
+  enabled Boolean @default(true)
+
+  // overdue_escalation config
+  timesOfDay     String[] @default([]) // "HH:mm", Africa/Casablanca local time
+  notifyAssignee Boolean  @default(true)
+  notifyManager  Boolean  @default(true)
+
+  // meeting config (one-shot: fires once, not recurring)
+  meetingAt       DateTime?
+  minutesBefore   Int?
+  wholeTeam       Boolean   @default(false)
+  audienceUserIds String[]  @default([])
+  audienceTeamIds String[]  @default([])
+
+  // delivery
+  viaPush      Boolean @default(true)
+  viaAgentChat Boolean @default(true)
+  agentId      String?
+
+  lastRunAt DateTime?
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reminder_rules")
+}
+
 model AgentActionLog {
   id        String   @id @default(cuid())
   agentId   String

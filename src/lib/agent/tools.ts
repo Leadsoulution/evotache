@@ -707,6 +707,143 @@ const deleteLibraryDoc: ToolDef = {
   },
 };
 
+const listReminderRules: ToolDef = {
+  name: "list_reminder_rules",
+  requires: ["reminders"],
+  description: "List all scheduled reminder rules (overdue-task escalations and meeting reminders), with their schedule and last-sent time.",
+  parameters: { type: "object", properties: {} },
+  execute: async () => {
+    const rules = await db.reminderRule.findMany({ orderBy: { createdAt: "asc" } });
+    return rules.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind,
+      enabled: r.enabled,
+      timesOfDay: r.timesOfDay,
+      meetingAt: r.meetingAt?.toISOString() ?? null,
+      minutesBefore: r.minutesBefore,
+      lastRunAt: r.lastRunAt?.toISOString() ?? null,
+    }));
+  },
+};
+
+const createReminderRule: ToolDef = {
+  name: "create_reminder_rule",
+  requires: ["reminders"],
+  description:
+    'Create a scheduled reminder rule. kind="overdue_escalation" nudges people about their overdue tasks at fixed times every day. kind="meeting" sends a one-time reminder a set number of minutes before a specific date/time. Delivered via push notification and/or a chat message from this agent, depending on the via* flags (both default to true).',
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      kind: { type: "string", enum: ["overdue_escalation", "meeting"] },
+      timesOfDay: { type: "array", items: { type: "string" }, description: "overdue_escalation only — 24h \"HH:mm\" local times, e.g. [\"09:00\",\"13:00\",\"17:00\"]." },
+      notifyAssignee: { type: "boolean", description: "overdue_escalation only — notify the task's assignee. Defaults to true." },
+      notifyManager: { type: "boolean", description: "overdue_escalation only — also notify the assignee's manager(s). Defaults to true." },
+      meetingAt: { type: "string", description: "meeting only — ISO datetime of the meeting." },
+      minutesBefore: { type: "number", description: "meeting only — how many minutes before meetingAt to send the reminder." },
+      wholeTeam: { type: "boolean", description: "meeting only — notify every active user. Defaults to false." },
+      audienceNames: { type: "array", items: { type: "string" }, description: "meeting only — people to notify by name, if not wholeTeam." },
+      audienceDepartmentNames: { type: "array", items: { type: "string" }, description: "meeting only — departments to notify by name, if not wholeTeam." },
+      viaPush: { type: "boolean" },
+      viaAgentChat: { type: "boolean" },
+    },
+    required: ["name", "kind"],
+  },
+  execute: async (args, ctx) => {
+    const name = (args.name as string | undefined)?.trim();
+    if (!name) throw new Error("A name is required.");
+    const kind = args.kind as string;
+    if (kind !== "overdue_escalation" && kind !== "meeting") throw new Error('kind must be "overdue_escalation" or "meeting".');
+
+    const rule = await db.reminderRule.create({
+      data: {
+        name,
+        kind,
+        timesOfDay: Array.isArray(args.timesOfDay) ? (args.timesOfDay as string[]) : [],
+        notifyAssignee: typeof args.notifyAssignee === "boolean" ? args.notifyAssignee : true,
+        notifyManager: typeof args.notifyManager === "boolean" ? args.notifyManager : true,
+        meetingAt: typeof args.meetingAt === "string" ? new Date(args.meetingAt) : null,
+        minutesBefore: typeof args.minutesBefore === "number" ? args.minutesBefore : null,
+        wholeTeam: typeof args.wholeTeam === "boolean" ? args.wholeTeam : false,
+        audienceUserIds: await resolveUserIds(args.audienceNames),
+        audienceTeamIds: await resolveTeamIds(args.audienceDepartmentNames),
+        viaPush: typeof args.viaPush === "boolean" ? args.viaPush : true,
+        viaAgentChat: typeof args.viaAgentChat === "boolean" ? args.viaAgentChat : true,
+        agentId: ctx.agentId,
+        createdBy: ctx.agentId,
+      },
+    });
+    return { id: rule.id, name: rule.name, kind: rule.kind };
+  },
+};
+
+const updateReminderRule: ToolDef = {
+  name: "update_reminder_rule",
+  requires: ["reminders"],
+  description: "Update an existing reminder rule by id (find the id with list_reminder_rules first). Only the fields provided are changed.",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      name: { type: "string" },
+      enabled: { type: "boolean" },
+      timesOfDay: { type: "array", items: { type: "string" } },
+      notifyAssignee: { type: "boolean" },
+      notifyManager: { type: "boolean" },
+      meetingAt: { type: "string" },
+      minutesBefore: { type: "number" },
+      wholeTeam: { type: "boolean" },
+      audienceNames: { type: "array", items: { type: "string" } },
+      audienceDepartmentNames: { type: "array", items: { type: "string" } },
+      viaPush: { type: "boolean" },
+      viaAgentChat: { type: "boolean" },
+    },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.reminderRule.findUnique({ where: { id } });
+    if (!existing) throw new Error("Reminder rule not found.");
+    const data: Prisma.ReminderRuleUpdateInput = {};
+    if (typeof args.name === "string" && args.name.trim()) data.name = args.name.trim();
+    if (typeof args.enabled === "boolean") data.enabled = args.enabled;
+    if (Array.isArray(args.timesOfDay)) data.timesOfDay = args.timesOfDay as string[];
+    if (typeof args.notifyAssignee === "boolean") data.notifyAssignee = args.notifyAssignee;
+    if (typeof args.notifyManager === "boolean") data.notifyManager = args.notifyManager;
+    if (typeof args.meetingAt === "string") {
+      data.meetingAt = new Date(args.meetingAt);
+      data.lastRunAt = null; // rescheduling a meeting means it hasn't "happened" yet
+    }
+    if (typeof args.minutesBefore === "number") data.minutesBefore = args.minutesBefore;
+    if (typeof args.wholeTeam === "boolean") data.wholeTeam = args.wholeTeam;
+    if (args.audienceNames !== undefined) data.audienceUserIds = await resolveUserIds(args.audienceNames);
+    if (args.audienceDepartmentNames !== undefined) data.audienceTeamIds = await resolveTeamIds(args.audienceDepartmentNames);
+    if (typeof args.viaPush === "boolean") data.viaPush = args.viaPush;
+    if (typeof args.viaAgentChat === "boolean") data.viaAgentChat = args.viaAgentChat;
+    const rule = await db.reminderRule.update({ where: { id }, data });
+    return { id: rule.id, name: rule.name };
+  },
+};
+
+const deleteReminderRule: ToolDef = {
+  name: "delete_reminder_rule",
+  requires: ["reminders"],
+  description: "Permanently delete a reminder rule by id (find the id with list_reminder_rules first). This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: { id: { type: "string" } },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.reminderRule.findUnique({ where: { id } });
+    if (!existing) throw new Error("Reminder rule not found.");
+    await db.reminderRule.delete({ where: { id } });
+    return { deletedId: id };
+  },
+};
+
 export const AGENT_TOOL_DEFS: ToolDef[] = [
   listOverdueItems,
   getStats,
@@ -733,4 +870,8 @@ export const AGENT_TOOL_DEFS: ToolDef[] = [
   addDepartmentMember,
   removeDepartmentMember,
   deleteDepartment,
+  listReminderRules,
+  createReminderRule,
+  updateReminderRule,
+  deleteReminderRule,
 ];
