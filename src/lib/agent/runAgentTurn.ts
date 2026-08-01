@@ -8,6 +8,12 @@ import type { AgentTool } from "@/types/agent";
 const OPENAI_MODEL = "gpt-4o-mini";
 const MAX_TOOL_ITERATIONS = 5;
 const MAX_HISTORY_MESSAGES = 30;
+// Per-call cap so a slow/hanging OpenAI request can't block the turn (and
+// leave the client's typing bubble stuck) indefinitely.
+const OPENAI_TIMEOUT_MS = 20_000;
+// Overall cap across every iteration of the tool-call loop, so a chain of
+// several slow calls can't compound into a multi-minute wait either.
+const MAX_TURN_MS = 45_000;
 
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -64,17 +70,30 @@ export async function runAgentTurn({ agentId, conversationId }: RunAgentTurnInpu
     ];
 
     let finalText = "";
+    const turnStartedAt = Date.now();
     try {
       for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: OPENAI_MODEL,
-            messages: chatMessages,
-            tools: availableTools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } })),
-          }),
-        });
+        if (Date.now() - turnStartedAt > MAX_TURN_MS) {
+          finalText = "Sorry, that's taking longer than expected — please try again.";
+          break;
+        }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+        let response: Response;
+        try {
+          response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: OPENAI_MODEL,
+              messages: chatMessages,
+              tools: availableTools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } })),
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
         if (!response.ok) {
           finalText = "Sorry, I ran into an error and couldn't respond.";
           break;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteMessage, editMessage, fetchMessages, fetchTypingAgentIds, markConversationRead, sendMessage } from "@/services/chatApi";
@@ -11,6 +11,11 @@ const POLL_MS = 4_000;
 // with no tool calls) can land in 1-2s, faster than POLL_MS, so a typing
 // bubble polled on the same cadence is easily never observed at all.
 const TYPING_POLL_MS = 1_200;
+// Safety net: if an agent has been "typing" longer than this, stop showing
+// it client-side even if the server still reports it — covers the case
+// where a stuck/crashed turn never clears its own flag, so the bubble can
+// never look permanently frozen no matter what went wrong server-side.
+const MAX_TYPING_DISPLAY_MS = 60_000;
 
 type LoadState = "loading" | "success" | "error";
 
@@ -33,11 +38,31 @@ export function useMessages(conversationId: string | null) {
   const messages = useMemo(() => data ?? [], [data]);
   const loadState: LoadState = error ? "error" : isLoading ? "loading" : "success";
 
-  const { data: typingAgentIds, mutate: mutateTyping } = useSWR(
+  const { data: rawTypingAgentIds, mutate: mutateTyping } = useSWR(
     conversationId ? ["chat-typing", conversationId] : null,
     () => fetchTypingAgentIds(conversationId as string),
     { refreshInterval: TYPING_POLL_MS }
   );
+
+  // Tracks when each agentId first appeared in rawTypingAgentIds, so
+  // typingAgentIds below can hide it past MAX_TYPING_DISPLAY_MS regardless
+  // of what the server still reports. Naturally resets on conversation
+  // switches too, since rawTypingAgentIds itself goes empty while the new
+  // SWR key loads.
+  const typingSinceRef = useRef<Map<string, number>>(new Map());
+  const [typingAgentIds, setTypingAgentIds] = useState<string[]>([]);
+  useEffect(() => {
+    const ids = rawTypingAgentIds ?? [];
+    const now = Date.now();
+    const since = typingSinceRef.current;
+    for (const id of Array.from(since.keys())) {
+      if (!ids.includes(id)) since.delete(id);
+    }
+    for (const id of ids) {
+      if (!since.has(id)) since.set(id, now);
+    }
+    setTypingAgentIds(ids.filter((id) => now - (since.get(id) ?? now) < MAX_TYPING_DISPLAY_MS));
+  }, [rawTypingAgentIds]);
 
   // Mark the thread read whenever it's open and has messages — covers both
   // the initial open and any message that arrives while it stays open.
@@ -107,5 +132,5 @@ export function useMessages(conversationId: string | null) {
     [messages, mutate, toast]
   );
 
-  return { messages, loadState, send, edit, remove, typingAgentIds: typingAgentIds ?? [] };
+  return { messages, loadState, send, edit, remove, typingAgentIds };
 }
