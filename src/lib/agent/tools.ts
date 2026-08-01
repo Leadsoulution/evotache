@@ -6,6 +6,7 @@ import { emailUser } from "@/lib/email";
 import { toPublicTask } from "@/lib/publicTask";
 import { getDescendantIds } from "@/lib/taskTree";
 import { deleteFile } from "@/lib/storage";
+import { listDriveFiles, listRecentGmail, readDriveFile, sendGmail } from "@/lib/googleApi";
 import type { AgentTool } from "@/types/agent";
 
 export interface ToolContext {
@@ -844,6 +845,74 @@ const deleteReminderRule: ToolDef = {
   },
 };
 
+const sendEmailGmail: ToolDef = {
+  name: "send_email_gmail",
+  requires: ["gmail"],
+  description: "Send an email from the connected Gmail account.",
+  parameters: {
+    type: "object",
+    properties: {
+      to: { type: "string", description: "Recipient email address." },
+      subject: { type: "string" },
+      body: { type: "string" },
+    },
+    required: ["to", "subject", "body"],
+  },
+  execute: async (args) => {
+    const to = (args.to as string | undefined)?.trim();
+    const subject = (args.subject as string | undefined)?.trim();
+    const body = args.body as string | undefined;
+    if (!to || !subject || !body) throw new Error("to, subject, and body are required.");
+    const result = await sendGmail(to, subject, body);
+    return { sent: true, messageId: result.id };
+  },
+};
+
+const listRecentEmails: ToolDef = {
+  name: "list_recent_emails",
+  requires: ["gmail"],
+  description: "List recent emails in the connected Gmail inbox, optionally filtered with Gmail search syntax (e.g. \"from:someone@example.com\", \"is:unread\").",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Optional Gmail search query." },
+      maxResults: { type: "number", description: "Max emails to return (default 10, max 25)." },
+    },
+  },
+  execute: async (args) => {
+    const query = args.query as string | undefined;
+    const maxResults = typeof args.maxResults === "number" ? args.maxResults : 10;
+    return listRecentGmail(query, maxResults);
+  },
+};
+
+const listDriveFilesTool: ToolDef = {
+  name: "list_drive_files",
+  requires: ["drive"],
+  description: "List files in the connected Google Drive, optionally filtered by a name search.",
+  parameters: {
+    type: "object",
+    properties: { query: { type: "string", description: "Optional text to search for in file names." } },
+  },
+  execute: async (args) => listDriveFiles(args.query as string | undefined),
+};
+
+const readDriveFileTool: ToolDef = {
+  name: "read_drive_file",
+  requires: ["drive"],
+  description: "Read the text content of a Google Drive file by id (find the id with list_drive_files first). Supports Google Docs, Google Sheets, and plain-text files.",
+  parameters: {
+    type: "object",
+    properties: { fileId: { type: "string" } },
+    required: ["fileId"],
+  },
+  execute: async (args) => {
+    const fileId = args.fileId as string;
+    const content = await readDriveFile(fileId);
+    return { content };
+  },
+};
+
 export const AGENT_TOOL_DEFS: ToolDef[] = [
   listOverdueItems,
   getStats,
@@ -874,4 +943,8 @@ export const AGENT_TOOL_DEFS: ToolDef[] = [
   createReminderRule,
   updateReminderRule,
   deleteReminderRule,
+  sendEmailGmail,
+  listRecentEmails,
+  listDriveFilesTool,
+  readDriveFileTool,
 ];
