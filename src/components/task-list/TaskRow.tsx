@@ -102,6 +102,17 @@ export function TaskRow({
     setDragHover(null);
   }
 
+  // The row is full of nested elements (menus, buttons, checkboxes); moving
+  // the pointer between them fires a bubbled dragleave even though the
+  // pointer never actually left the row, which cleared the highlight right
+  // before the drop landed and made drops silently no-op. Only clear it once
+  // the pointer has genuinely left the row's bounding box.
+  function handleDragLeave(event: ReactDragEvent<HTMLTableRowElement>) {
+    const related = event.relatedTarget as Node | null;
+    if (related && event.currentTarget.contains(related)) return;
+    setDragHover(null);
+  }
+
   function onCheckboxKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -129,7 +140,7 @@ export function TaskRow({
       className="group text-sm"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      onDragLeave={() => setDragHover(null)}
+      onDragLeave={handleDragLeave}
     >
       <td className={cn(cellClass, "rounded-l-lg !p-0")}>
         <div
@@ -138,7 +149,13 @@ export function TaskRow({
         >
           <span
             draggable={dragEnabled}
-            onDragStart={() => onDragStart(task.id)}
+            onDragStart={(event) => {
+              // Some browsers (Firefox in particular) refuse to start a
+              // native drag unless dataTransfer carries data.
+              event.dataTransfer.setData("text/plain", task.id);
+              event.dataTransfer.effectAllowed = "move";
+              onDragStart(task.id);
+            }}
             className={cn(
               "cursor-grab text-slate-300 opacity-0 group-hover:opacity-100 dark:text-slate-600",
               !dragEnabled && "invisible"
