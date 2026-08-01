@@ -84,29 +84,31 @@ export function TaskRow({
 }: TaskRowProps) {
   const [dragHover, setDragHover] = useState<"before" | "after" | "onto" | null>(null);
 
+  // Top/bottom quarters reorder as a sibling; the middle half drops the
+  // dragged task in as a subtask of this row (nesting via drag).
+  function computeEdge(event: ReactDragEvent<HTMLTableRowElement>): "before" | "after" | "onto" {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = (event.clientY - rect.top) / rect.height;
+    return ratio < 0.25 ? "before" : ratio > 0.75 ? "after" : "onto";
+  }
+
   function handleDragOver(event: ReactDragEvent<HTMLTableRowElement>) {
     if (!dragEnabled) return;
     event.preventDefault();
-    const rect = event.currentTarget.getBoundingClientRect();
-    const ratio = (event.clientY - rect.top) / rect.height;
-    // Top/bottom quarters reorder as a sibling; the middle half drops the
-    // dragged task in as a subtask of this row (nesting via drag).
-    const edge = ratio < 0.25 ? "before" : ratio > 0.75 ? "after" : "onto";
-    setDragHover(edge);
+    setDragHover(computeEdge(event));
   }
 
   function handleDrop(event: ReactDragEvent<HTMLTableRowElement>) {
     if (!dragEnabled) return;
     event.preventDefault();
-    if (dragHover) onDropOn(task.id, dragHover);
+    // Recomputed fresh from the event rather than trusting the `dragHover`
+    // state: some browsers fire a spurious dragleave (with no relatedTarget)
+    // right before the drop, which would otherwise reset the state to null
+    // at the exact moment we need it and make the drop silently no-op.
+    onDropOn(task.id, computeEdge(event));
     setDragHover(null);
   }
 
-  // The row is full of nested elements (menus, buttons, checkboxes); moving
-  // the pointer between them fires a bubbled dragleave even though the
-  // pointer never actually left the row, which cleared the highlight right
-  // before the drop landed and made drops silently no-op. Only clear it once
-  // the pointer has genuinely left the row's bounding box.
   function handleDragLeave(event: ReactDragEvent<HTMLTableRowElement>) {
     const related = event.relatedTarget as Node | null;
     if (related && event.currentTarget.contains(related)) return;
