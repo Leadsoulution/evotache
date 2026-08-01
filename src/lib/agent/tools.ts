@@ -3,6 +3,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { isOverdue, fromDateInputValue } from "@/lib/date";
 import { notifyUser } from "@/lib/notify";
 import { emailUser } from "@/lib/email";
+import { toPublicTask } from "@/lib/publicTask";
+import { getDescendantIds } from "@/lib/taskTree";
+import { deleteFile } from "@/lib/storage";
 import type { AgentTool } from "@/types/agent";
 
 export interface ToolContext {
@@ -41,6 +44,29 @@ function assertModuleAllowed(module: "task" | "dispute", ctx: ToolContext): void
 async function doneStatusId(): Promise<string | null> {
   const statuses = await db.statusDef.findMany({ orderBy: { order: "asc" } });
   return statuses[statuses.length - 1]?.id ?? null;
+}
+
+/** Fuzzy case-insensitive name -> id resolution for secondary references
+ * (assignees, department members). Deliberately forgiving here — the worst
+ * case for a wrong secondary reference (e.g. wrong assignee) is much milder
+ * than for a wrong primary mutation target, which every new tool below
+ * requires an exact id for instead. */
+async function resolveUserIds(names: unknown): Promise<string[]> {
+  if (!Array.isArray(names) || names.length === 0) return [];
+  const users = await db.user.findMany({ where: { status: "active" } });
+  return (names as string[])
+    .map((name) => users.find((u) => u.name.toLowerCase().includes(name.trim().toLowerCase())))
+    .filter((u): u is NonNullable<typeof u> => Boolean(u))
+    .map((u) => u.id);
+}
+
+async function resolveTeamIds(names: unknown): Promise<string[]> {
+  if (!Array.isArray(names) || names.length === 0) return [];
+  const teams = await db.team.findMany();
+  return (names as string[])
+    .map((name) => teams.find((t) => t.name.toLowerCase().includes(name.trim().toLowerCase())))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t))
+    .map((t) => t.id);
 }
 
 const listOverdueItems: ToolDef = {
@@ -167,15 +193,7 @@ const createTask: ToolDef = {
     const matchedPriority = requestedPriority ? priorities.find((p) => p.label.toLowerCase() === requestedPriority) : undefined;
     const priorityId = matchedPriority?.id ?? priorities[priorities.length - 1]?.id ?? "none";
 
-    let assigneeIds: string[] = [];
-    const assigneeNames = args.assigneeNames as string[] | undefined;
-    if (Array.isArray(assigneeNames) && assigneeNames.length > 0) {
-      const users = await db.user.findMany({ where: { status: "active" } });
-      assigneeIds = assigneeNames
-        .map((name) => users.find((u) => u.name.toLowerCase().includes(name.trim().toLowerCase())))
-        .filter((u): u is NonNullable<typeof u> => Boolean(u))
-        .map((u) => u.id);
-    }
+    const assigneeIds = await resolveUserIds(args.assigneeNames);
 
     const dueDateInput = args.dueDate as string | undefined;
     const maxOrder = await db.task.aggregate({ where: { module: taskModule }, _max: { order: true } });
@@ -192,6 +210,124 @@ const createTask: ToolDef = {
       },
     });
     return { id: task.id, title: task.title, module: taskModule, assignedCount: assigneeIds.length };
+  },
+};
+
+const listTasks: ToolDef = {
+  name: "list_tasks",
+  requires: ["tasks", "litiges"],
+  description: "List tasks or litiges, optionally filtered by status and/or a title search. Use this to find a task's id before calling update_task or delete_task.",
+  parameters: {
+    type: "object",
+    properties: {
+      module: { type: "string", enum: ["task", "dispute"], description: "\"task\" for Tasks, \"dispute\" for Litiges." },
+      status: { type: "string", description: "Optional status label to filter by (e.g. \"To Do\", \"Done\")." },
+      search: { type: "string", description: "Optional case-insensitive text to search for in the title." },
+    },
+    required: ["module"],
+  },
+  execute: async (args, ctx) => {
+    const taskModule = args.module as "task" | "dispute";
+    assertModuleAllowed(taskModule, ctx);
+    const statuses = await db.statusDef.findMany({ orderBy: { order: "asc" } });
+    const statusLabel = (args.status as string | undefined)?.trim().toLowerCase();
+    const statusId = statusLabel ? statuses.find((s) => s.label.toLowerCase() === statusLabel)?.id : undefined;
+    const search = (args.search as string | undefined)?.trim().toLowerCase();
+
+    const items = await db.task.findMany({ where: { module: taskModule, ...(statusId && { status: statusId }) } });
+    const filtered = search ? items.filter((t) => t.title.toLowerCase().includes(search)) : items;
+    const userIds = Array.from(new Set(filtered.flatMap((t) => t.assigneeIds)));
+    const users = await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } });
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
+    const statusLabelById = new Map(statuses.map((s) => [s.id, s.label]));
+
+    return filtered.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: statusLabelById.get(t.status) ?? t.status,
+      priority: t.priority,
+      dueDate: t.dueDate ? t.dueDate.toISOString().slice(0, 10) : null,
+      assignees: t.assigneeIds.map((id) => nameById.get(id) ?? id),
+    }));
+  },
+};
+
+const updateTask: ToolDef = {
+  name: "update_task",
+  requires: ["tasks", "litiges"],
+  description: "Update an existing task or litige by id (find the id with list_tasks first). Only the fields provided are changed.",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      description: { type: "string" },
+      status: { type: "string", description: "Status label matching an existing status (e.g. \"To Do\", \"Done\")." },
+      priority: { type: "string", description: "Priority label matching an existing priority." },
+      dueDate: { type: "string", description: "New due date as YYYY-MM-DD, or an empty string to clear it." },
+      assigneeNames: { type: "array", items: { type: "string" }, description: "Replaces the full assignee list (matched case-insensitively)." },
+    },
+    required: ["id"],
+  },
+  execute: async (args, ctx) => {
+    const id = args.id as string;
+    const existing = await db.task.findUnique({ where: { id } });
+    if (!existing) throw new Error("Task/litige not found.");
+    assertModuleAllowed(existing.module, ctx);
+
+    const data: Prisma.TaskUpdateInput = {};
+    if (typeof args.title === "string" && args.title.trim()) data.title = args.title.trim();
+    if (typeof args.description === "string") data.description = args.description;
+
+    if (typeof args.status === "string") {
+      const statusArg = args.status.trim().toLowerCase();
+      const statuses = await db.statusDef.findMany();
+      const match = statuses.find((s) => s.label.toLowerCase() === statusArg);
+      if (!match) throw new Error(`No status named "${args.status}".`);
+      data.status = match.id;
+    }
+    if (typeof args.priority === "string") {
+      const priorityArg = args.priority.trim().toLowerCase();
+      const priorities = await db.priorityDef.findMany();
+      const match = priorities.find((p) => p.label.toLowerCase() === priorityArg);
+      if (!match) throw new Error(`No priority named "${args.priority}".`);
+      data.priority = match.id;
+    }
+    if (typeof args.dueDate === "string") data.dueDate = args.dueDate ? fromDateInputValue(args.dueDate) : null;
+    if (args.assigneeNames !== undefined) data.assigneeIds = await resolveUserIds(args.assigneeNames);
+
+    const task = await db.task.update({ where: { id }, data });
+    return { id: task.id, title: task.title };
+  },
+};
+
+const deleteTask: ToolDef = {
+  name: "delete_task",
+  requires: ["tasks", "litiges"],
+  description: "Permanently delete a task or litige by id (find the id with list_tasks first), including all of its subtasks and attachments. This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: { id: { type: "string" } },
+    required: ["id"],
+  },
+  execute: async (args, ctx) => {
+    const id = args.id as string;
+    const existing = await db.task.findUnique({ where: { id } });
+    if (!existing) throw new Error("Task/litige not found.");
+    assertModuleAllowed(existing.module, ctx);
+
+    // Same cleanup as src/app/api/tasks/bulk-delete/route.ts: Attachment has
+    // no FK relation to Task, so it isn't covered by Task.parent's cascade.
+    const allTasks = (await db.task.findMany()).map(toPublicTask);
+    const descendantIds = getDescendantIds(allTasks, id);
+    const allIdsToDelete = [id, ...descendantIds];
+    const attachments = await db.attachment.findMany({ where: { taskId: { in: allIdsToDelete } } });
+    await db.attachment.deleteMany({ where: { taskId: { in: allIdsToDelete } } });
+    for (const attachment of attachments) {
+      if (attachment.url) void deleteFile(attachment.url);
+    }
+    await db.task.delete({ where: { id } }); // cascades descendant Task rows
+    return { deletedId: id, deletedCount: allIdsToDelete.length };
   },
 };
 
@@ -267,13 +403,334 @@ const updatePurchaseItem: ToolDef = {
   },
 };
 
+const deletePurchaseItem: ToolDef = {
+  name: "delete_purchase_item",
+  requires: ["achats"],
+  description: "Permanently delete a purchase (Achats) row by id (find the id with list_purchase_items first). This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: { id: { type: "string" } },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.purchaseItem.findUnique({ where: { id } });
+    if (!existing) throw new Error("Purchase item not found.");
+    await db.purchaseItem.delete({ where: { id } });
+    return { deletedId: id };
+  },
+};
+
+const listProjects: ToolDef = {
+  name: "list_projects",
+  requires: ["projects"],
+  description: "List all projects with their department names and excluded users.",
+  parameters: { type: "object", properties: {} },
+  execute: async () => {
+    const [projects, teams, users] = await Promise.all([db.project.findMany(), db.team.findMany(), db.user.findMany()]);
+    const teamNameById = new Map(teams.map((t) => [t.id, t.name]));
+    const userNameById = new Map(users.map((u) => [u.id, u.name]));
+    return projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      departments: p.teamIds.map((id) => teamNameById.get(id) ?? id),
+      excludedUsers: p.excludedUserIds.map((id) => userNameById.get(id) ?? id),
+    }));
+  },
+};
+
+const createProject: ToolDef = {
+  name: "create_project",
+  requires: ["projects"],
+  description: "Create a new project.",
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      description: { type: "string" },
+      color: { type: "string", description: "Optional hex color, e.g. \"#6366f1\". A random one is used if omitted." },
+      departmentNames: { type: "array", items: { type: "string" }, description: "Optional department names to associate (matched case-insensitively)." },
+    },
+    required: ["name"],
+  },
+  execute: async (args) => {
+    const name = (args.name as string | undefined)?.trim();
+    if (!name) throw new Error("A name is required.");
+    const teamIds = await resolveTeamIds(args.departmentNames);
+    const project = await db.project.create({
+      data: {
+        name,
+        description: (args.description as string | undefined) ?? "",
+        color: (args.color as string | undefined) ?? "#6366f1",
+        teamIds,
+      },
+    });
+    return { id: project.id, name: project.name };
+  },
+};
+
+const updateProject: ToolDef = {
+  name: "update_project",
+  requires: ["projects"],
+  description: "Update an existing project by id (find the id with list_projects first). Only the fields provided are changed.",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      name: { type: "string" },
+      description: { type: "string" },
+      color: { type: "string" },
+      departmentNames: { type: "array", items: { type: "string" }, description: "Replaces the full department list." },
+    },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.project.findUnique({ where: { id } });
+    if (!existing) throw new Error("Project not found.");
+    const data: Prisma.ProjectUpdateInput = {};
+    if (typeof args.name === "string" && args.name.trim()) data.name = args.name.trim();
+    if (typeof args.description === "string") data.description = args.description;
+    if (typeof args.color === "string" && args.color.trim()) data.color = args.color.trim();
+    if (args.departmentNames !== undefined) data.teamIds = await resolveTeamIds(args.departmentNames);
+    const project = await db.project.update({ where: { id }, data });
+    return { id: project.id, name: project.name };
+  },
+};
+
+const deleteProject: ToolDef = {
+  name: "delete_project",
+  requires: ["projects"],
+  description: "Permanently delete a project by id (find the id with list_projects first). Its tasks are kept but unlinked from the project. This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: { id: { type: "string" } },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.project.findUnique({ where: { id } });
+    if (!existing) throw new Error("Project not found.");
+    await db.project.delete({ where: { id } });
+    return { deletedId: id };
+  },
+};
+
+const listDepartments: ToolDef = {
+  name: "list_departments",
+  requires: ["teams"],
+  description: "List all departments with their member names.",
+  parameters: { type: "object", properties: {} },
+  execute: async () => {
+    const [teams, users] = await Promise.all([db.team.findMany(), db.user.findMany()]);
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
+    return teams.map((t) => ({ id: t.id, name: t.name, members: t.memberIds.map((id) => nameById.get(id) ?? id) }));
+  },
+};
+
+const createDepartment: ToolDef = {
+  name: "create_department",
+  requires: ["teams"],
+  description: "Create a new department.",
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      color: { type: "string", description: "Optional hex color, e.g. \"#6366f1\". A random one is used if omitted." },
+      memberNames: { type: "array", items: { type: "string" }, description: "Optional member names (matched case-insensitively)." },
+    },
+    required: ["name"],
+  },
+  execute: async (args) => {
+    const name = (args.name as string | undefined)?.trim();
+    if (!name) throw new Error("A name is required.");
+    const memberIds = await resolveUserIds(args.memberNames);
+    const team = await db.team.create({ data: { name, color: (args.color as string | undefined) ?? "#6366f1", memberIds } });
+    return { id: team.id, name: team.name };
+  },
+};
+
+const updateDepartment: ToolDef = {
+  name: "update_department",
+  requires: ["teams"],
+  description: "Rename or recolor an existing department by id (find the id with list_departments first). Use add_department_member / remove_department_member to change membership.",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      name: { type: "string" },
+      color: { type: "string" },
+    },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.team.findUnique({ where: { id } });
+    if (!existing) throw new Error("Department not found.");
+    const data: Prisma.TeamUpdateInput = {};
+    if (typeof args.name === "string" && args.name.trim()) data.name = args.name.trim();
+    if (typeof args.color === "string" && args.color.trim()) data.color = args.color.trim();
+    const team = await db.team.update({ where: { id }, data });
+    return { id: team.id, name: team.name };
+  },
+};
+
+const addDepartmentMember: ToolDef = {
+  name: "add_department_member",
+  requires: ["teams"],
+  description: "Add one or more users to a department by id (find the id with list_departments first).",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      userNames: { type: "array", items: { type: "string" }, description: "Names of users to add (matched case-insensitively)." },
+    },
+    required: ["id", "userNames"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.team.findUnique({ where: { id } });
+    if (!existing) throw new Error("Department not found.");
+    const toAdd = await resolveUserIds(args.userNames);
+    const memberIds = Array.from(new Set([...existing.memberIds, ...toAdd]));
+    await db.team.update({ where: { id }, data: { memberIds } });
+    return { id, memberCount: memberIds.length };
+  },
+};
+
+const removeDepartmentMember: ToolDef = {
+  name: "remove_department_member",
+  requires: ["teams"],
+  description: "Remove one or more users from a department by id (find the id with list_departments first).",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      userNames: { type: "array", items: { type: "string" }, description: "Names of users to remove (matched case-insensitively)." },
+    },
+    required: ["id", "userNames"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.team.findUnique({ where: { id } });
+    if (!existing) throw new Error("Department not found.");
+    const toRemove = new Set(await resolveUserIds(args.userNames));
+    const memberIds = existing.memberIds.filter((memberId) => !toRemove.has(memberId));
+    await db.team.update({ where: { id }, data: { memberIds } });
+    return { id, memberCount: memberIds.length };
+  },
+};
+
+const deleteDepartment: ToolDef = {
+  name: "delete_department",
+  requires: ["teams"],
+  description: "Permanently delete a department by id (find the id with list_departments first). This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: { id: { type: "string" } },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.team.findUnique({ where: { id } });
+    if (!existing) throw new Error("Department not found.");
+    await db.team.delete({ where: { id } });
+    return { deletedId: id };
+  },
+};
+
+const createLibraryDoc: ToolDef = {
+  name: "create_library_doc",
+  requires: ["library"],
+  description: "Create a new library document (company rule/policy/reference page).",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      content: { type: "string", description: "Markdown content." },
+    },
+    required: ["title"],
+  },
+  execute: async (args) => {
+    const title = (args.title as string | undefined)?.trim();
+    if (!title) throw new Error("A title is required.");
+    const order = await db.libraryDoc.count();
+    const doc = await db.libraryDoc.create({ data: { title, content: (args.content as string | undefined) ?? "", order } });
+    return { id: doc.id, title: doc.title };
+  },
+};
+
+const updateLibraryDoc: ToolDef = {
+  name: "update_library_doc",
+  requires: ["library"],
+  description: "Update an existing library document's title or content by id (find the id via read_library first).",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      content: { type: "string" },
+    },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.libraryDoc.findUnique({ where: { id } });
+    if (!existing) throw new Error("Library document not found.");
+    const data: Prisma.LibraryDocUpdateInput = {};
+    if (typeof args.title === "string" && args.title.trim()) data.title = args.title.trim();
+    if (typeof args.content === "string") data.content = args.content;
+    const doc = await db.libraryDoc.update({ where: { id }, data });
+    return { id: doc.id, title: doc.title };
+  },
+};
+
+const deleteLibraryDoc: ToolDef = {
+  name: "delete_library_doc",
+  requires: ["library"],
+  description: "Permanently delete a library document by id (find the id via read_library first). This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: { id: { type: "string" } },
+    required: ["id"],
+  },
+  execute: async (args) => {
+    const id = args.id as string;
+    const existing = await db.libraryDoc.findUnique({ where: { id } });
+    if (!existing) throw new Error("Library document not found.");
+    await db.libraryDoc.delete({ where: { id } });
+    // Matches src/app/api/library/[id]/route.ts: keep remaining docs' order contiguous.
+    const remaining = await db.libraryDoc.findMany({ orderBy: { order: "asc" } });
+    await Promise.all(remaining.map((doc, index) => (doc.order === index ? null : db.libraryDoc.update({ where: { id: doc.id }, data: { order: index } }))));
+    return { deletedId: id };
+  },
+};
+
 export const AGENT_TOOL_DEFS: ToolDef[] = [
   listOverdueItems,
   getStats,
   sendReminder,
   createTask,
+  listTasks,
+  updateTask,
+  deleteTask,
   readLibrary,
+  createLibraryDoc,
+  updateLibraryDoc,
+  deleteLibraryDoc,
   listPurchaseItems,
   createPurchaseItem,
   updatePurchaseItem,
+  deletePurchaseItem,
+  listProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  listDepartments,
+  createDepartment,
+  updateDepartment,
+  addDepartmentMember,
+  removeDepartmentMember,
+  deleteDepartment,
 ];
