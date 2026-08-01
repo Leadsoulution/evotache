@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { AlertTriangleIcon } from "@/components/ui/icons";
+import { LOGO_VERSION } from "@/config/logoVersion";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
@@ -36,9 +37,9 @@ export function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-dark.png" alt="EvoTask" className="mx-auto h-auto w-64 dark:hidden" />
+          <img src={`/logo-dark.png?v=${LOGO_VERSION}`} alt="EvoTask" className="mx-auto h-auto w-64 dark:hidden" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-light.png" alt="EvoTask" className="mx-auto hidden h-auto w-64 dark:block" />
+          <img src={`/logo-light.png?v=${LOGO_VERSION}`} alt="EvoTask" className="mx-auto hidden h-auto w-64 dark:block" />
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
