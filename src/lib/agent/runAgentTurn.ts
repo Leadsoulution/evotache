@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { sendMessageAsUser } from "@/lib/chatSend";
+import { getOpenAIKey } from "@/lib/apiKeyStore";
 import { AGENT_TOOL_DEFS, logAgentAction } from "@/lib/agent/tools";
 import type { ToolContext } from "@/lib/agent/tools";
 import type { AgentTool } from "@/types/agent";
@@ -26,7 +27,7 @@ interface RunAgentTurnInput {
  * notifyUser/emailUser's fail-open pattern) if OpenAI isn't configured or
  * errors — a broken agent should never break the human's message send. */
 export async function runAgentTurn({ agentId, conversationId }: RunAgentTurnInput): Promise<void> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = await getOpenAIKey();
   if (!apiKey) return;
 
   const agentUser = await db.user.findUnique({ where: { id: agentId }, include: { agentConfig: true } });
