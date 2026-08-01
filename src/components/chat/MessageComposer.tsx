@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
-import { FileIcon, PaperclipIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { FileIcon, PaperclipIcon, PencilIcon, SendIcon, XIcon } from "@/components/ui/icons";
 import { MAX_CHAT_FILE_BYTES } from "@/services/chatApi";
 import { useToast } from "@/components/ui/Toast";
 import { formatBytes } from "@/lib/attachmentUtils";
 import { cn } from "@/lib/cn";
 import { uploadFile } from "@/services/uploadApi";
+import type { Message } from "@/types/chat";
 
 interface PendingFile {
   id: string;
@@ -24,14 +25,21 @@ interface OutgoingAttachment {
 
 interface MessageComposerProps {
   onSend: (text: string, attachments: OutgoingAttachment[]) => Promise<boolean>;
+  editingMessage?: Message | null;
+  onCancelEdit?: () => void;
 }
 
-export function MessageComposer({ onSend }: MessageComposerProps) {
+export function MessageComposer({ onSend, editingMessage, onCancelEdit }: MessageComposerProps) {
   const [text, setText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (editingMessage) setText(editingMessage.text);
+  }, [editingMessage]);
 
   function handleFilesPicked(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -55,6 +63,14 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
 
   async function handleSend() {
     if (sending) return;
+    if (editingMessage) {
+      if (!text.trim()) return;
+      setSending(true);
+      const success = await onSend(text, []);
+      setSending(false);
+      if (success) setText("");
+      return;
+    }
     if (!text.trim() && pendingFiles.length === 0) return;
     setSending(true);
     let attachments: OutgoingAttachment[];
@@ -90,7 +106,22 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
 
   return (
     <div className="border-t border-slate-200 px-3 py-2.5 dark:border-slate-800">
-      {pendingFiles.length > 0 && (
+      {editingMessage && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 dark:bg-slate-800">
+          <PencilIcon className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+          <span className="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-400">Editing message</span>
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+            aria-label="Cancel editing"
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {!editingMessage && pendingFiles.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {pendingFiles.map((pending) => (
             <div key={pending.id} className="relative flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 py-1 pl-1 pr-2 dark:border-slate-700 dark:bg-slate-800">
@@ -117,14 +148,16 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
       )}
 
       <div className="flex items-end gap-2">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-          aria-label="Attach a file"
-        >
-          <PaperclipIcon className="h-4.5 w-4.5" />
-        </button>
+        {!editingMessage && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            aria-label="Attach a file"
+          >
+            <PaperclipIcon className="h-4.5 w-4.5" />
+          </button>
+        )}
         <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip" onChange={handleFilesPicked} className="sr-only" />
 
         <textarea

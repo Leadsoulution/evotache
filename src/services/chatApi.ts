@@ -74,6 +74,29 @@ export async function sendMessage(input: SendMessageInput): Promise<Message> {
   return response.json();
 }
 
+export async function editMessage(messageId: string, text: string): Promise<Message> {
+  const response = await fetch(`/api/chat/messages/${messageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}
+
+export async function deleteMessage(messageId: string): Promise<Message> {
+  const response = await fetch(`/api/chat/messages/${messageId}`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}
+
+export async function fetchTypingAgentIds(conversationId: string): Promise<string[]> {
+  const response = await fetch(`/api/chat/conversations/${conversationId}/typing`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.typingAgentIds ?? [];
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for call-site compatibility; the server derives the current user from the session
 export async function fetchUnreadCounts(userId: string): Promise<Record<string, number>> {
   const response = await fetch("/api/chat/unread");

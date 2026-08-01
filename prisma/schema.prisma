@@ -197,6 +197,9 @@ model Conversation {
   lastMessageAt       DateTime         @default(now())
   lastMessagePreview  String?
   lastReadAt          Json             @default("{}")
+  // Ids of agent participants currently composing a reply (fire-and-forget
+  // OpenAI round-trip) — polled by the client to show a "typing…" bubble.
+  typingAgentIds      String[]         @default([])
 
   messages Message[]
 
@@ -211,6 +214,10 @@ model Message {
   text           String       @default("")
   attachments    Json         @default("[]")
   createdAt      DateTime     @default(now())
+  editedAt       DateTime?
+  // Soft-delete: the row stays (so the thread doesn't reflow) with text/
+  // attachments cleared and this timestamp set as a tombstone marker.
+  deletedAt      DateTime?
 
   @@map("messages")
 }

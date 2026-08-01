@@ -24,5 +24,7 @@ export function toPublicMessage(message: DbMessage): Message {
     text: message.text,
     attachments: (message.attachments as unknown as MessageAttachment[]) ?? [],
     createdAt: message.createdAt.toISOString(),
+    editedAt: message.editedAt ? message.editedAt.toISOString() : null,
+    deletedAt: message.deletedAt ? message.deletedAt.toISOString() : null,
   };
 }

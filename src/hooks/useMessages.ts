@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchMessages, markConversationRead, sendMessage } from "@/services/chatApi";
+import { deleteMessage, editMessage, fetchMessages, fetchTypingAgentIds, markConversationRead, sendMessage } from "@/services/chatApi";
 import { useToast } from "@/components/ui/Toast";
 
 const POLL_MS = 4_000;
@@ -29,6 +29,12 @@ export function useMessages(conversationId: string | null) {
   const messages = useMemo(() => data ?? [], [data]);
   const loadState: LoadState = error ? "error" : isLoading ? "loading" : "success";
 
+  const { data: typingAgentIds } = useSWR(
+    conversationId ? ["chat-typing", conversationId] : null,
+    () => fetchTypingAgentIds(conversationId as string),
+    { refreshInterval: POLL_MS }
+  );
+
   // Mark the thread read whenever it's open and has messages — covers both
   // the initial open and any message that arrives while it stays open.
   useEffect(() => {
@@ -51,5 +57,43 @@ export function useMessages(conversationId: string | null) {
     [conversationId, user, messages, mutate, toast]
   );
 
-  return { messages, loadState, send };
+  const edit = useCallback(
+    async (messageId: string, text: string) => {
+      const previous = messages;
+      await mutate(
+        messages.map((m) => (m.id === messageId ? { ...m, text, editedAt: new Date().toISOString() } : m)),
+        { revalidate: false }
+      );
+      try {
+        await editMessage(messageId, text);
+        return true;
+      } catch (err) {
+        await mutate(previous, { revalidate: false });
+        toast.error(err instanceof Error ? err.message : "Failed to edit the message.");
+        return false;
+      }
+    },
+    [messages, mutate, toast]
+  );
+
+  const remove = useCallback(
+    async (messageId: string) => {
+      const previous = messages;
+      await mutate(
+        messages.map((m) => (m.id === messageId ? { ...m, text: "", attachments: [], deletedAt: new Date().toISOString() } : m)),
+        { revalidate: false }
+      );
+      try {
+        await deleteMessage(messageId);
+        return true;
+      } catch (err) {
+        await mutate(previous, { revalidate: false });
+        toast.error(err instanceof Error ? err.message : "Failed to delete the message.");
+        return false;
+      }
+    },
+    [messages, mutate, toast]
+  );
+
+  return { messages, loadState, send, edit, remove, typingAgentIds: typingAgentIds ?? [] };
 }

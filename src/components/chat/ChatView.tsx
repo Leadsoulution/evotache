@@ -11,12 +11,13 @@ import { MessageThread } from "./MessageThread";
 import { MessageComposer } from "./MessageComposer";
 import { GroupInfoPanel } from "./GroupInfoPanel";
 import { Avatar } from "@/components/ui/Avatar";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { ArrowLeftIcon, DotsHorizontalIcon, UsersIcon } from "@/components/ui/icons";
 import { getConversationDisplay } from "@/lib/chatDisplay";
 import { addParticipants, removeParticipant, renameGroup, updateGroupAvatar } from "@/services/chatApi";
 import { cn } from "@/lib/cn";
-import type { Conversation } from "@/types/chat";
+import type { Conversation, Message } from "@/types/chat";
 
 export function ChatView() {
   const { user } = useAuth();
@@ -27,14 +28,28 @@ export function ChatView() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [showListOnMobile, setShowListOnMobile] = useState(true);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState<Message | null>(null);
 
   const liveSelected = selectedConversation ? (conversations.find((c) => c.id === selectedConversation.id) ?? selectedConversation) : null;
-  const { messages, send } = useMessages(liveSelected?.id ?? null);
+  const { messages, send, edit, remove, typingAgentIds } = useMessages(liveSelected?.id ?? null);
+  const typingUsers = typingAgentIds.map((id) => users.find((u) => u.id === id)).filter((u): u is (typeof users)[number] => Boolean(u));
 
   async function handleSend(text: string, attachments: Parameters<typeof send>[1]) {
+    if (editingMessage) {
+      const ok = await edit(editingMessage.id, text);
+      if (ok) setEditingMessage(null);
+      return ok;
+    }
     const ok = await send(text, attachments);
     if (ok) refetch();
     return ok;
+  }
+
+  async function handleConfirmDelete() {
+    if (!deletingMessage) return;
+    await remove(deletingMessage.id);
+    setDeletingMessage(null);
   }
 
   if (!user) return null;
@@ -43,6 +58,8 @@ export function ChatView() {
   function selectConversation(conversation: Conversation) {
     setSelectedConversation(conversation);
     setShowListOnMobile(false);
+    setEditingMessage(null);
+    setDeletingMessage(null);
   }
 
   async function handleRename(name: string) {
@@ -133,8 +150,16 @@ export function ChatView() {
               )}
             </header>
 
-            <MessageThread messages={messages} users={users} currentUserId={currentUserId} conversationType={liveSelected.type} />
-            <MessageComposer onSend={handleSend} />
+            <MessageThread
+              messages={messages}
+              users={users}
+              currentUserId={currentUserId}
+              conversationType={liveSelected.type}
+              typingUsers={typingUsers}
+              onEdit={setEditingMessage}
+              onDelete={setDeletingMessage}
+            />
+            <MessageComposer onSend={handleSend} editingMessage={editingMessage} onCancelEdit={() => setEditingMessage(null)} />
           </>
         )}
       </div>
@@ -160,6 +185,15 @@ export function ChatView() {
         onAddMembers={handleAddMembers}
         onRemoveMember={handleRemoveMember}
         onLeave={handleLeave}
+      />
+
+      <ConfirmDialog
+        open={deletingMessage !== null}
+        title="Delete this message?"
+        description="This can't be undone."
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingMessage(null)}
       />
     </div>
   );

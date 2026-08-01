@@ -33,4 +33,7 @@ export interface Message {
   text: string;
   attachments: MessageAttachment[];
   createdAt: string;
+  editedAt: string | null;
+  /** Soft-delete tombstone — when set, text/attachments are already cleared; render a placeholder instead. */
+  deletedAt: string | null;
 }
