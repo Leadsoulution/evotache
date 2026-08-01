@@ -95,6 +95,11 @@ export function TaskRow({
   function handleDragOver(event: ReactDragEvent<HTMLTableRowElement>) {
     if (!dragEnabled) return;
     event.preventDefault();
+    // Must match the dragstart's effectAllowed ("move"), or some
+    // browsers (notably Windows Chrome/Edge) silently refuse the drop —
+    // showing a "not allowed" cursor and never firing the drop event —
+    // even though preventDefault() was called here.
+    event.dataTransfer.dropEffect = "move";
     setDragHover(computeEdge(event));
   }
 
