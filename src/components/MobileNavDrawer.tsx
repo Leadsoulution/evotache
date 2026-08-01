@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { getNavItems } from "@/config/navigation";
+import { LOGO_VERSION } from "@/config/logoVersion";
 import { NavBadge } from "@/components/NavBadge";
 import { MenuIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -42,9 +43,9 @@ export function MobileNavDrawer({ navBadgeCounts }: MobileNavDrawerProps) {
             <aside className="relative flex h-full w-64 max-w-[80vw] animate-slide-up flex-col overflow-y-auto border-r border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/app-logo-light.png" alt="EvoTask" className="h-11 w-auto rounded-md dark:hidden" />
+                <img src={`/app-logo-light.png?v=${LOGO_VERSION}`} alt="EvoTask" className="h-11 w-auto rounded-md dark:hidden" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/app-logo-dark.png" alt="EvoTask" className="hidden h-11 w-auto rounded-md dark:block" />
+                <img src={`/app-logo-dark.png?v=${LOGO_VERSION}`} alt="EvoTask" className="hidden h-11 w-auto rounded-md dark:block" />
                 <button
                   type="button"
                   onClick={() => setOpen(false)}

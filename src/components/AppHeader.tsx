@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Menu } from "@/components/ui/Menu";
 import { DownloadIcon } from "@/components/ui/icons";
 import { getAccountMenuOptions, handleAccountMenuChange } from "@/config/accountMenu";
+import { LOGO_VERSION } from "@/config/logoVersion";
 import type { NavBadgeCounts } from "@/hooks/useNavBadgeCounts";
 
 interface AppHeaderProps {
@@ -28,9 +29,9 @@ export function AppHeader({ navBadgeCounts }: AppHeaderProps) {
     <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-slate-200 bg-white/80 px-3 py-2.5 backdrop-blur md:hidden dark:border-slate-800 dark:bg-slate-950/80">
       <MobileNavDrawer navBadgeCounts={navBadgeCounts} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/app-logo-light.png" alt="EvoTask" className="h-11 w-auto rounded-md dark:hidden" />
+      <img src={`/app-logo-light.png?v=${LOGO_VERSION}`} alt="EvoTask" className="h-11 w-auto rounded-md dark:hidden" />
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/app-logo-dark.png" alt="EvoTask" className="hidden h-11 w-auto rounded-md dark:block" />
+      <img src={`/app-logo-dark.png?v=${LOGO_VERSION}`} alt="EvoTask" className="hidden h-11 w-auto rounded-md dark:block" />
       <div className="ml-auto flex items-center gap-2">
         {canInstall && (
           <button
