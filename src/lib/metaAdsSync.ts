@@ -6,9 +6,10 @@ import { listCampaignsWithInsights } from "@/lib/metaApi";
  * keyed by [projectId, externalId] so re-running just refreshes existing
  * rows instead of duplicating. Meant to be called only from the cron
  * route — safe to call repeatedly. */
-export async function syncMetaAdProjects(): Promise<{ syncedProjects: number; syncedCampaigns: number }> {
+export async function syncMetaAdProjects(): Promise<{ syncedProjects: number; syncedCampaigns: number; errors: { projectId: string; projectName: string; message: string }[] }> {
   const projects = await db.adProject.findMany({ where: { metaAdAccountId: { not: null } } });
   let syncedCampaigns = 0;
+  const errors: { projectId: string; projectName: string; message: string }[] = [];
 
   for (const project of projects) {
     if (!project.metaAdAccountId) continue;
@@ -49,10 +50,13 @@ export async function syncMetaAdProjects(): Promise<{ syncedProjects: number; sy
         syncedCampaigns++;
       }
     } catch (err) {
-      // One project's sync failure (e.g. a revoked ad account) shouldn't block the others.
+      // One project's sync failure (e.g. a revoked ad account) shouldn't block the others —
+      // but the failure is still reported back so it doesn't look identical to "no campaigns".
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`Meta ads sync failed for project ${project.id}:`, err);
+      errors.push({ projectId: project.id, projectName: project.name, message });
     }
   }
 
-  return { syncedProjects: projects.length, syncedCampaigns };
+  return { syncedProjects: projects.length, syncedCampaigns, errors };
 }

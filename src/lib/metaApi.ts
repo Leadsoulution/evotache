@@ -100,7 +100,8 @@ export async function listCampaignsWithInsights(adAccountId: string): Promise<Me
   const insightsData = (await metaFetch(`/${adAccountId}/insights`, {
     level: "campaign",
     fields: "campaign_id,spend,clicks,impressions,reach,actions",
-    date_preset: "lifetime",
+    // Meta renamed the all-time preset from "lifetime" to "maximum".
+    date_preset: "maximum",
     limit: "200",
   })) as { data: MetaInsightRaw[] };
 
