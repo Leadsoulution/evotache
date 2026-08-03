@@ -442,3 +442,16 @@ model ArchivedItem {
 
   @@map("archived_items")
 }
+
+// Links the app to a Google Sheet used as an off-site backup for
+// Tasks/Litiges/Achats (single row — same singleton pattern as
+// GoogleConnection/MetaConnection).
+model BackupSheetConfig {
+  id               String    @id @default(cuid())
+  spreadsheetId    String
+  spreadsheetTitle String?
+  lastBackupAt     DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  @@map("backup_sheet_config")
+}

@@ -1,10 +1,15 @@
 import { db } from "@/lib/db";
+import { SHEETS_SCOPE } from "@/config/googleScopes";
 
 const REDIRECT_URI = "https://evotasks.app/api/integrations/google/callback";
+// The Sheets scope was added after some connections already existed —
+// anyone connected before that needs to reconnect once (the "Connect" link
+// uses prompt=consent, so clicking it again just adds the scope).
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
+  SHEETS_SCOPE,
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
