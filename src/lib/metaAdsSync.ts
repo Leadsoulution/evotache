@@ -1,16 +1,16 @@
 import { db } from "@/lib/db";
 import { listCampaignsWithInsights } from "@/lib/metaApi";
 import { DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
-import type { MetaDatePreset } from "@/config/metaAds";
+import type { MetaDateRangeParam } from "@/config/metaAds";
 import type { AdProject, Prisma } from "@/generated/prisma/client";
 
 /** Pulls one project's linked ad account's campaigns + insights for the
  * given date range and upserts them into AdCampaign (source: "meta"),
  * keyed by [projectId, externalId] so re-running just refreshes existing
  * rows instead of duplicating. */
-export async function syncProject(project: AdProject, datePreset: MetaDatePreset = DEFAULT_META_DATE_PRESET): Promise<number> {
+export async function syncProject(project: AdProject, dateRange: MetaDateRangeParam = DEFAULT_META_DATE_PRESET): Promise<number> {
   if (!project.metaAdAccountId) return 0;
-  const campaigns = await listCampaignsWithInsights(project.metaAdAccountId, datePreset);
+  const campaigns = await listCampaignsWithInsights(project.metaAdAccountId, dateRange);
   for (const campaign of campaigns) {
     await db.adCampaign.upsert({
       where: { projectId_externalId: { projectId: project.id, externalId: campaign.externalId } },

@@ -1,6 +1,6 @@
 import { getValidAccessToken } from "@/lib/metaAuth";
-import { DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
-import type { MetaDatePreset } from "@/config/metaAds";
+import { DEFAULT_META_DATE_PRESET, isCustomDateRange } from "@/config/metaAds";
+import type { MetaDateRangeParam } from "@/config/metaAds";
 import type { CampaignObjective, CampaignStatus, MetaCampaignInsights } from "@/types/socialMedia";
 
 const GRAPH_VERSION = "v21.0";
@@ -114,15 +114,16 @@ function actionValue(actions: MetaActionValue[] | undefined, actionType: string)
   return match ? Number(match.value) || 0 : null;
 }
 
-export async function listCampaignsWithInsights(adAccountId: string, datePreset: MetaDatePreset = DEFAULT_META_DATE_PRESET): Promise<MetaCampaignSummary[]> {
+export async function listCampaignsWithInsights(adAccountId: string, dateRange: MetaDateRangeParam = DEFAULT_META_DATE_PRESET): Promise<MetaCampaignSummary[]> {
   const campaignsData = (await metaFetch(`/${adAccountId}/campaigns`, { fields: "id,name,objective,status,effective_status", limit: "200" })) as {
     data: MetaCampaignRaw[];
   };
+  const dateParams: Record<string, string> = isCustomDateRange(dateRange) ? { time_range: JSON.stringify(dateRange) } : { date_preset: dateRange };
   const insightsData = (await metaFetch(`/${adAccountId}/insights`, {
     level: "campaign",
     fields:
       "campaign_id,spend,clicks,impressions,reach,actions,cpc,cpm,ctr,frequency,outbound_clicks,outbound_clicks_ctr,cost_per_outbound_click",
-    date_preset: datePreset,
+    ...dateParams,
     limit: "200",
   })) as { data: MetaInsightRaw[] };
 

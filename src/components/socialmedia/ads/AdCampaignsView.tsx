@@ -17,7 +17,7 @@ import { computeCampaignMetrics, formatCurrency, formatNumber, formatPercent, fo
 import { formatDueDate, formatRelativeTime } from "@/lib/date";
 import { syncAdProject } from "@/services/adProjectApi";
 import { META_DATE_PRESET_OPTIONS, DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
-import type { MetaDatePreset } from "@/config/metaAds";
+import type { MetaDatePreset, MetaDateRangeParam } from "@/config/metaAds";
 import {
   PLATFORM_META,
   PLATFORM_ORDER,
@@ -54,6 +54,8 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: "roas", label: "ROAS" },
 ];
 
+const DATE_MENU_OPTIONS = [...META_DATE_PRESET_OPTIONS, { value: "custom", label: "Custom range" }];
+
 export function AdCampaignsView({ projectId }: { projectId: string }) {
   const { user } = useAuth();
   const canManage = user ? canManageWorkflow(user.role) : false;
@@ -64,14 +66,17 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
   const project = projects.find((p) => p.id === projectId) ?? null;
 
   const [datePreset, setDatePreset] = useState<MetaDatePreset>(DEFAULT_META_DATE_PRESET);
+  const [isCustomRange, setIsCustomRange] = useState(false);
+  const [customSince, setCustomSince] = useState("");
+  const [customUntil, setCustomUntil] = useState("");
   const [syncing, setSyncing] = useState(false);
 
-  async function handleSync(nextPreset?: MetaDatePreset) {
+  async function handleSync(range?: MetaDateRangeParam) {
     if (!project) return;
-    const preset = nextPreset ?? datePreset;
+    const dateRange: MetaDateRangeParam = range ?? (isCustomRange && customSince && customUntil ? { since: customSince, until: customUntil } : datePreset);
     setSyncing(true);
     try {
-      const result = await syncAdProject(project.id, preset);
+      const result = await syncAdProject(project.id, dateRange);
       refetch();
       toast.success(`Synced ${result.syncedCampaigns} campaign(s) from Meta.`);
     } catch (err) {
@@ -145,17 +150,23 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
             {canManage && project?.metaAdAccountId && (
               <>
                 <Menu
-                  options={META_DATE_PRESET_OPTIONS}
-                  value={[datePreset]}
+                  options={DATE_MENU_OPTIONS}
+                  value={[isCustomRange ? "custom" : datePreset]}
                   onChange={(next) => {
-                    const preset = next[0] as MetaDatePreset;
+                    const value = next[0];
+                    if (value === "custom") {
+                      setIsCustomRange(true);
+                      return;
+                    }
+                    const preset = value as MetaDatePreset;
+                    setIsCustomRange(false);
                     setDatePreset(preset);
                     handleSync(preset);
                   }}
                   ariaLabel="Stats date range"
                   renderTrigger={() => (
                     <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                      {META_DATE_PRESET_OPTIONS.find((o) => o.value === datePreset)?.label}
+                      {isCustomRange ? "Custom range" : META_DATE_PRESET_OPTIONS.find((o) => o.value === datePreset)?.label}
                       <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
                     </span>
                   )}
@@ -186,6 +197,37 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
             )}
           </div>
         </header>
+
+        {isCustomRange && project?.metaAdAccountId && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              From
+              <input
+                type="date"
+                value={customSince}
+                onChange={(event) => setCustomSince(event.target.value)}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              To
+              <input
+                type="date"
+                value={customUntil}
+                onChange={(event) => setCustomUntil(event.target.value)}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => customSince && customUntil && handleSync({ since: customSince, until: customUntil })}
+              disabled={syncing || !customSince || !customUntil}
+              className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Apply
+            </button>
+          </div>
+        )}
       </div>
 
       {isLoading && <TaskListSkeleton />}

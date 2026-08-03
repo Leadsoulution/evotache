@@ -1,4 +1,6 @@
 import type { AdProject, AdProjectStatus, AdPlatform } from "@/types/socialMedia";
+import { isCustomDateRange } from "@/config/metaAds";
+import type { MetaDateRangeParam } from "@/config/metaAds";
 
 export class ApiError extends Error {}
 
@@ -54,11 +56,12 @@ export async function deleteAdProject(id: string): Promise<void> {
   if (!response.ok) return parseErrorOrThrow(response);
 }
 
-export async function syncAdProject(id: string, datePreset: string): Promise<{ syncedCampaigns: number }> {
+export async function syncAdProject(id: string, dateRange: MetaDateRangeParam): Promise<{ syncedCampaigns: number }> {
+  const body = isCustomDateRange(dateRange) ? { since: dateRange.since, until: dateRange.until } : { datePreset: dateRange };
   const response = await fetch(`/api/social/ad-projects/${id}/sync`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ datePreset }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) return parseErrorOrThrow(response);
   return response.json();
