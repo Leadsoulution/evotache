@@ -94,7 +94,7 @@ export interface MetaCampaignSummary {
   name: string;
   objective: CampaignObjective;
   status: CampaignStatus;
-  dailyBudget: number;
+  dailyBudget: number | null;
   amountSpent: number;
   clicks: number;
   impressions: number;
@@ -172,18 +172,27 @@ function extractResults(insight: MetaInsightRaw | undefined, optimizationGoal: s
   return 0;
 }
 
-/** optimization_goal often only lives on the ad sets, not the campaign
- * itself (e.g. non-CBO campaigns) — one batched call for the whole account
- * instead of one extra call per campaign missing it. */
-async function getAdSetOptimizationGoals(adAccountId: string): Promise<Map<string, string>> {
-  const data = (await metaFetch(`/${adAccountId}/adsets`, { fields: "campaign_id,optimization_goal", limit: "500" })) as {
-    data: { campaign_id: string; optimization_goal?: string }[];
+/** optimization_goal and daily_budget often only live on the ad sets, not
+ * the campaign itself — non-CBO campaigns (budget set per ad set rather
+ * than "Advantage campaign budget") leave both fields empty at the
+ * campaign level. One batched call for the whole account covers every
+ * campaign instead of one extra call per campaign missing it. Budgets are
+ * summed across a campaign's ad sets — the campaign's real daily spend
+ * cap is the sum of what each of its ad sets can spend per day. */
+async function getAdSetDetails(adAccountId: string): Promise<{ goals: Map<string, string>; budgets: Map<string, number> }> {
+  const data = (await metaFetch(`/${adAccountId}/adsets`, { fields: "campaign_id,optimization_goal,daily_budget", limit: "500" })) as {
+    data: { campaign_id: string; optimization_goal?: string; daily_budget?: string }[];
   };
-  const map = new Map<string, string>();
+  const goals = new Map<string, string>();
+  const budgets = new Map<string, number>();
   for (const adSet of data.data ?? []) {
-    if (adSet.optimization_goal && !map.has(adSet.campaign_id)) map.set(adSet.campaign_id, adSet.optimization_goal);
+    if (adSet.optimization_goal && !goals.has(adSet.campaign_id)) goals.set(adSet.campaign_id, adSet.optimization_goal);
+    if (adSet.daily_budget) {
+      // Meta returns budgets in the account currency's minor unit (e.g. cents).
+      budgets.set(adSet.campaign_id, (budgets.get(adSet.campaign_id) ?? 0) + Number(adSet.daily_budget) / 100);
+    }
   }
-  return map;
+  return { goals, budgets };
 }
 
 export async function listCampaignsWithInsights(adAccountId: string, dateRange: MetaDateRangeParam = DEFAULT_META_DATE_PRESET): Promise<MetaCampaignSummary[]> {
@@ -201,21 +210,26 @@ export async function listCampaignsWithInsights(adAccountId: string, dateRange: 
   })) as { data: MetaInsightRaw[] };
 
   const insightsByCampaignId = new Map(insightsData.data?.map((i) => [i.campaign_id, i]) ?? []);
-  const needsAdSetGoal = (campaignsData.data ?? []).some((c) => !c.optimization_goal);
-  const adSetGoals = needsAdSetGoal ? await getAdSetOptimizationGoals(adAccountId) : new Map<string, string>();
+  const needsAdSetDetails = (campaignsData.data ?? []).some((c) => !c.optimization_goal || !c.daily_budget);
+  const adSetDetails = needsAdSetDetails ? await getAdSetDetails(adAccountId) : { goals: new Map<string, string>(), budgets: new Map<string, number>() };
 
   return (campaignsData.data ?? []).map((campaign) => {
     const insight = insightsByCampaignId.get(campaign.id);
     const impressions = Number(insight?.impressions) || 0;
     const reach = Number(insight?.reach) || 0;
-    const optimizationGoal = campaign.optimization_goal ?? adSetGoals.get(campaign.id);
+    const optimizationGoal = campaign.optimization_goal ?? adSetDetails.goals.get(campaign.id);
+    // Falls back to the sum of the campaign's ad-set-level budgets when
+    // there's no campaign-level ("Advantage campaign budget") one — null
+    // (not 0) if neither is set, so the UI can show "—" instead of a
+    // misleading "$0.00" for a campaign that does have a real budget,
+    // just not one this app can see at the campaign level.
+    const dailyBudget = campaign.daily_budget !== undefined ? Number(campaign.daily_budget) / 100 : (adSetDetails.budgets.get(campaign.id) ?? null);
     return {
       externalId: campaign.id,
       name: campaign.name,
       objective: mapObjective(campaign.objective),
       status: mapStatus(campaign.status),
-      // Meta returns budgets in the account currency's minor unit (e.g. cents).
-      dailyBudget: campaign.daily_budget !== undefined ? Number(campaign.daily_budget) / 100 : 0,
+      dailyBudget,
       amountSpent: Number(insight?.spend) || 0,
       clicks: Number(insight?.clicks) || 0,
       impressions,
@@ -223,6 +237,7 @@ export async function listCampaignsWithInsights(adAccountId: string, dateRange: 
       results: extractResults(insight, optimizationGoal, reach, impressions),
       insights: {
         deliveryStatus: campaign.effective_status ?? null,
+        dailyBudget,
         cpc: insight?.cpc !== undefined ? Number(insight.cpc) : null,
         cpm: insight?.cpm !== undefined ? Number(insight.cpm) : null,
         ctr: insight?.ctr !== undefined ? Number(insight.ctr) : null,

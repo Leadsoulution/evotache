@@ -46,6 +46,8 @@ export interface AdCampaign {
 
 export interface MetaCampaignInsights {
   deliveryStatus: string | null;
+  /** null when Meta doesn't expose a budget at either the campaign or ad-set level for this campaign — distinct from a real $0 budget. */
+  dailyBudget: number | null;
   cpc: number | null;
   cpm: number | null;
   ctr: number | null;

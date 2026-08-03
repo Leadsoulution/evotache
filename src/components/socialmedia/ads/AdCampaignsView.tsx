@@ -314,6 +314,16 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                     const ctr = insights?.ctr ?? metrics.ctr;
                     const cpc = insights?.cpc ?? metrics.cpc;
                     const cpm = insights?.cpm ?? metrics.cpm;
+                    // Manual campaigns always have a real typed-in budget. Synced
+                    // ones may genuinely have no budget visible at the campaign
+                    // level (set per ad set instead) — show "—" rather than the
+                    // misleading "$0.00" that campaign.budget falls back to.
+                    const dailyBudgetDisplay =
+                      campaign.source === "meta"
+                        ? insights?.dailyBudget !== null && insights?.dailyBudget !== undefined
+                          ? formatCurrency(insights.dailyBudget)
+                          : "—"
+                        : formatCurrency(campaign.budget);
                     return (
                       <tr key={campaign.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
                         <td className="max-w-[220px] px-3 py-2 font-medium text-slate-800 dark:text-slate-100">
@@ -334,7 +344,7 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                             {objective.label}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(campaign.budget)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{dailyBudgetDisplay}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">{insights?.deliveryStatus ?? "—"}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.results)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(metrics.costPerResult)}</td>
