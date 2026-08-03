@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatRelativeTime } from "@/lib/date";
-import { CheckIcon, DownloadIcon, LinkIcon, RefreshIcon, SheetIcon, TrashIcon } from "@/components/ui/icons";
+import { CheckIcon, DownloadIcon, RefreshIcon, SheetIcon, TrashIcon } from "@/components/ui/icons";
 import { SHEETS_SCOPE } from "@/config/googleScopes";
 import type { GoogleConnectionStatus } from "@/lib/googleAuth";
 import type { BackupSheetStatus } from "@/app/api/admin/backup-sheet/route";
@@ -116,27 +116,9 @@ export function GoogleSheetBackupSection() {
         {!googleStatus || !sheetStatus ? (
           <p className="text-sm text-slate-400">Chargement…</p>
         ) : !googleStatus.connected ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Le compte Google partagé n&apos;est pas connecté.</p>
-            <a
-              href="/api/integrations/google/connect"
-              className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-            >
-              <LinkIcon className="h-3.5 w-3.5" />
-              Connecter le compte Google
-            </a>
-          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Connecte d&apos;abord le compte Google ci-dessus.</p>
         ) : !hasSheetsScope ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-amber-600 dark:text-amber-400">Le compte Google connecté n&apos;a pas encore l&apos;accès Sheets — reconnectez-le pour l&apos;ajouter.</p>
-            <a
-              href="/api/integrations/google/connect"
-              className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-            >
-              <LinkIcon className="h-3.5 w-3.5" />
-              Reconnecter Google
-            </a>
-          </div>
+          <p className="text-sm text-amber-600 dark:text-amber-400">Le compte Google connecté n&apos;a pas encore l&apos;accès Sheets — reconnecte-le ci-dessus pour l&apos;ajouter.</p>
         ) : !sheetStatus.linked ? (
           <div className="flex items-center gap-2">
             <input

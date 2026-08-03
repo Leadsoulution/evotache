@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatRelativeTime, formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
+import { GoogleConnectionCard } from "@/components/admin/GoogleConnectionCard";
 import { GoogleSheetBackupSection } from "@/components/admin/GoogleSheetBackupSection";
 import type { ArchiveFilters, ArchiveModule } from "@/types/archive";
 
@@ -125,6 +126,8 @@ export function BackupView() {
           </>
         )}
       </section>
+
+      <GoogleConnectionCard />
 
       <GoogleSheetBackupSection />
 

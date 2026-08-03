@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const oauthError = request.nextUrl.searchParams.get("error");
   if (oauthError || !code) {
-    return NextResponse.redirect(new URL(`/assistant?google=error&message=${encodeURIComponent(oauthError ?? "No authorization code returned.")}`, request.url));
+    return NextResponse.redirect(new URL(`/admin/backup?google=error&message=${encodeURIComponent(oauthError ?? "No authorization code returned.")}`, request.url));
   }
 
   try {
     await exchangeCodeForTokens(code);
-    return NextResponse.redirect(new URL("/assistant?google=connected", request.url));
+    return NextResponse.redirect(new URL("/admin/backup?google=connected", request.url));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to connect Google.";
-    return NextResponse.redirect(new URL(`/assistant?google=error&message=${encodeURIComponent(message)}`, request.url));
+    return NextResponse.redirect(new URL(`/admin/backup?google=error&message=${encodeURIComponent(message)}`, request.url));
   }
 }
