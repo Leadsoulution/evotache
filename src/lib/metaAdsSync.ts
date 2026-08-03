@@ -11,6 +11,17 @@ import type { AdProject, Prisma } from "@/generated/prisma/client";
 export async function syncProject(project: AdProject, dateRange: MetaDateRangeParam = DEFAULT_META_DATE_PRESET): Promise<number> {
   if (!project.metaAdAccountId) return 0;
   const campaigns = await listCampaignsWithInsights(project.metaAdAccountId, dateRange);
+  // listCampaignsWithInsights only returns campaigns that delivered during
+  // dateRange, so a narrower range than the previous sync (e.g. switching
+  // from "All time" to "Last month") must also drop the now-stale rows a
+  // wider sync left behind — otherwise they'd keep showing forever.
+  await db.adCampaign.deleteMany({
+    where: {
+      projectId: project.id,
+      source: "meta",
+      externalId: { notIn: campaigns.map((c) => c.externalId) },
+    },
+  });
   for (const campaign of campaigns) {
     await db.adCampaign.upsert({
       where: { projectId_externalId: { projectId: project.id, externalId: campaign.externalId } },

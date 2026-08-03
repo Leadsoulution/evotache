@@ -213,7 +213,14 @@ export async function listCampaignsWithInsights(adAccountId: string, dateRange: 
   const needsAdSetDetails = (campaignsData.data ?? []).some((c) => !c.optimization_goal || !c.daily_budget);
   const adSetDetails = needsAdSetDetails ? await getAdSetDetails(adAccountId) : { goals: new Map<string, string>(), budgets: new Map<string, number>() };
 
-  return (campaignsData.data ?? []).map((campaign) => {
+  // The campaign list endpoint isn't date-scoped — it always returns every
+  // campaign the account has ever had. Meta Ads Manager's date filter only
+  // shows campaigns that actually delivered during the selected range, so
+  // drop any campaign the insights call didn't return a row for (matches
+  // Ads Manager's behavior instead of always showing the whole account).
+  const campaignsWithActivity = (campaignsData.data ?? []).filter((campaign) => insightsByCampaignId.has(campaign.id));
+
+  return campaignsWithActivity.map((campaign) => {
     const insight = insightsByCampaignId.get(campaign.id);
     const impressions = Number(insight?.impressions) || 0;
     const reach = Number(insight?.reach) || 0;
