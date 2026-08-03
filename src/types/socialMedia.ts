@@ -39,7 +39,20 @@ export interface AdCampaign {
   source: "manual" | "meta";
   externalId: string | null;
   lastSyncedAt: string | null;
+  /** Extra Meta-reported KPIs beyond this app's own fixed fields (cpc, cpm, ctr, link clicks, delivery status, ...) — only set for source="meta" rows. */
+  metaInsights: MetaCampaignInsights | null;
   createdAt: string;
+}
+
+export interface MetaCampaignInsights {
+  deliveryStatus: string | null;
+  cpc: number | null;
+  cpm: number | null;
+  ctr: number | null;
+  frequency: number | null;
+  linkClicks: number | null;
+  linkClicksCtr: number | null;
+  costPerLinkClick: number | null;
 }
 
 /** Ratios derived from an AdCampaign's raw counters — never stored, always recomputed so they can't drift out of sync. */

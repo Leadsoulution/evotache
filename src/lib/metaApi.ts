@@ -1,7 +1,7 @@
 import { getValidAccessToken } from "@/lib/metaAuth";
 import { DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
 import type { MetaDatePreset } from "@/config/metaAds";
-import type { CampaignObjective, CampaignStatus } from "@/types/socialMedia";
+import type { CampaignObjective, CampaignStatus, MetaCampaignInsights } from "@/types/socialMedia";
 
 const GRAPH_VERSION = "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -77,6 +77,7 @@ export interface MetaCampaignSummary {
   impressions: number;
   reach: number;
   results: number;
+  insights: MetaCampaignInsights;
 }
 
 interface MetaCampaignRaw {
@@ -84,6 +85,12 @@ interface MetaCampaignRaw {
   name: string;
   objective?: string;
   status?: string;
+  effective_status?: string;
+}
+
+interface MetaActionValue {
+  action_type: string;
+  value: string;
 }
 
 interface MetaInsightRaw {
@@ -92,16 +99,29 @@ interface MetaInsightRaw {
   clicks?: string;
   impressions?: string;
   reach?: string;
-  actions?: { action_type: string; value: string }[];
+  actions?: MetaActionValue[];
+  cpc?: string;
+  cpm?: string;
+  ctr?: string;
+  frequency?: string;
+  outbound_clicks?: MetaActionValue[];
+  outbound_clicks_ctr?: MetaActionValue[];
+  cost_per_outbound_click?: MetaActionValue[];
+}
+
+function actionValue(actions: MetaActionValue[] | undefined, actionType: string): number | null {
+  const match = actions?.find((a) => a.action_type === actionType);
+  return match ? Number(match.value) || 0 : null;
 }
 
 export async function listCampaignsWithInsights(adAccountId: string, datePreset: MetaDatePreset = DEFAULT_META_DATE_PRESET): Promise<MetaCampaignSummary[]> {
-  const campaignsData = (await metaFetch(`/${adAccountId}/campaigns`, { fields: "id,name,objective,status", limit: "200" })) as {
+  const campaignsData = (await metaFetch(`/${adAccountId}/campaigns`, { fields: "id,name,objective,status,effective_status", limit: "200" })) as {
     data: MetaCampaignRaw[];
   };
   const insightsData = (await metaFetch(`/${adAccountId}/insights`, {
     level: "campaign",
-    fields: "campaign_id,spend,clicks,impressions,reach,actions",
+    fields:
+      "campaign_id,spend,clicks,impressions,reach,actions,cpc,cpm,ctr,frequency,outbound_clicks,outbound_clicks_ctr,cost_per_outbound_click",
     date_preset: datePreset,
     limit: "200",
   })) as { data: MetaInsightRaw[] };
@@ -121,6 +141,16 @@ export async function listCampaignsWithInsights(adAccountId: string, datePreset:
       impressions: Number(insight?.impressions) || 0,
       reach: Number(insight?.reach) || 0,
       results: resultActions,
+      insights: {
+        deliveryStatus: campaign.effective_status ?? null,
+        cpc: insight?.cpc !== undefined ? Number(insight.cpc) : null,
+        cpm: insight?.cpm !== undefined ? Number(insight.cpm) : null,
+        ctr: insight?.ctr !== undefined ? Number(insight.ctr) : null,
+        frequency: insight?.frequency !== undefined ? Number(insight.frequency) : null,
+        linkClicks: actionValue(insight?.outbound_clicks, "outbound_click"),
+        linkClicksCtr: actionValue(insight?.outbound_clicks_ctr, "outbound_click"),
+        costPerLinkClick: actionValue(insight?.cost_per_outbound_click, "outbound_click"),
+      },
     };
   });
 }

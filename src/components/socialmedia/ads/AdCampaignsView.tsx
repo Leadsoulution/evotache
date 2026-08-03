@@ -274,6 +274,7 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                       "Platform",
                       "Objective",
                       "Status",
+                      "Delivery",
                       "Budget",
                       "Spent",
                       "Cost/Result",
@@ -281,9 +282,13 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                       "Reach",
                       "Impressions",
                       "Clicks",
-                      "CTR",
-                      "CPC",
+                      "CTR (all)",
+                      "CPC (all)",
                       "CPM",
+                      "Link clicks",
+                      "Outbound CTR",
+                      "Cost/Link click",
+                      "Frequency",
                       "ROAS",
                       "Conv. Rate",
                       "Created",
@@ -300,6 +305,14 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                     const platform = PLATFORM_META[campaign.platform];
                     const objective = CAMPAIGN_OBJECTIVE_META[campaign.objective];
                     const status = CAMPAIGN_STATUS_META[campaign.status];
+                    // Meta already computes these itself (more accurate than
+                    // our spend/clicks/impressions-derived formula) — prefer
+                    // its numbers for synced campaigns, fall back to the
+                    // computed ones for manual entries.
+                    const insights = campaign.metaInsights;
+                    const ctr = insights?.ctr ?? metrics.ctr;
+                    const cpc = insights?.cpc ?? metrics.cpc;
+                    const cpm = insights?.cpm ?? metrics.cpm;
                     return (
                       <tr key={campaign.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
                         <td className="max-w-[220px] px-3 py-2 font-medium text-slate-800 dark:text-slate-100">
@@ -325,6 +338,7 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                             {status.label}
                           </span>
                         </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">{insights?.deliveryStatus ?? "—"}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(campaign.budget)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(campaign.amountSpent)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(metrics.costPerResult)}</td>
@@ -332,9 +346,13 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.reach)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.impressions)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.clicks)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(metrics.ctr)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(metrics.cpc)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(metrics.cpm)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(ctr)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(cpc)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(cpm)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{insights?.linkClicks !== null && insights?.linkClicks !== undefined ? formatNumber(insights.linkClicks) : "—"}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(insights?.linkClicksCtr ?? null)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(insights?.costPerLinkClick ?? null)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{insights?.frequency !== null && insights?.frequency !== undefined ? insights.frequency.toFixed(2) : "—"}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums font-semibold text-slate-700 dark:text-slate-200">{formatRatio(metrics.roas)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(metrics.conversionRate)}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-slate-400">{formatDueDate(campaign.createdAt)}</td>

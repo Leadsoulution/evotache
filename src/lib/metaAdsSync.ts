@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { listCampaignsWithInsights } from "@/lib/metaApi";
 import { DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
 import type { MetaDatePreset } from "@/config/metaAds";
-import type { AdProject } from "@/generated/prisma/client";
+import type { AdProject, Prisma } from "@/generated/prisma/client";
 
 /** Pulls one project's linked ad account's campaigns + insights for the
  * given date range and upserts them into AdCampaign (source: "meta"),
@@ -30,6 +30,7 @@ export async function syncProject(project: AdProject, datePreset: MetaDatePreset
         source: "meta",
         externalId: campaign.externalId,
         lastSyncedAt: new Date(),
+        metaInsights: campaign.insights as unknown as Prisma.InputJsonValue,
       },
       update: {
         name: campaign.name,
@@ -41,6 +42,7 @@ export async function syncProject(project: AdProject, datePreset: MetaDatePreset
         impressions: campaign.impressions,
         clicks: campaign.clicks,
         lastSyncedAt: new Date(),
+        metaInsights: campaign.insights as unknown as Prisma.InputJsonValue,
       },
     });
   }

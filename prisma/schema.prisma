@@ -352,6 +352,10 @@ model AdCampaign {
   source       String    @default("manual")
   externalId   String?
   lastSyncedAt DateTime?
+  // Flexible bag of extra Meta-reported KPIs (cpc, cpm, ctr, linkClicks,
+  // deliveryStatus, etc.) — a JSON blob rather than one column per metric
+  // so new Meta KPIs can be added by extending the fetch list, not a migration.
+  metaInsights Json?
   createdAt    DateTime  @default(now())
 
   @@unique([projectId, externalId])
