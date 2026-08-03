@@ -13,7 +13,7 @@ import { Menu } from "@/components/ui/Menu";
 import { StatTile } from "@/components/stats/StatTile";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { computeCampaignMetrics, formatCurrency, formatNumber, formatPercent, formatRatio } from "@/lib/adMetrics";
-import { formatDueDate } from "@/lib/date";
+import { formatDueDate, formatRelativeTime } from "@/lib/date";
 import {
   PLATFORM_META,
   PLATFORM_ORDER,
@@ -247,7 +247,14 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                     const status = CAMPAIGN_STATUS_META[campaign.status];
                     return (
                       <tr key={campaign.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
-                        <td className="max-w-[220px] truncate px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{campaign.name}</td>
+                        <td className="max-w-[220px] px-3 py-2 font-medium text-slate-800 dark:text-slate-100">
+                          <span className="block truncate">{campaign.name}</span>
+                          {campaign.source === "meta" && (
+                            <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
+                              Synced from Meta{campaign.lastSyncedAt ? ` · ${formatRelativeTime(campaign.lastSyncedAt)}` : ""}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-2">
                           <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: `${platform.color}22`, color: platform.color }}>
                             {platform.label}
@@ -277,7 +284,7 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(metrics.conversionRate)}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-slate-400">{formatDueDate(campaign.createdAt)}</td>
                         <td className="px-3 py-2 text-right">
-                          {canManage && (
+                          {canManage && campaign.source === "manual" && (
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100">
                               <button
                                 type="button"

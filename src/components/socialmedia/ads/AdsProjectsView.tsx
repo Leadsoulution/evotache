@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdProjects } from "@/hooks/useAdProjects";
 import { canManageWorkflow } from "@/config/roleMeta";
 import { AdProjectDialog } from "./AdProjectDialog";
+import { MigrateLocalAdsDataBanner } from "./MigrateLocalAdsDataBanner";
+import { MetaConnectionCard } from "./MetaConnectionCard";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { formatCurrency } from "@/lib/adMetrics";
@@ -29,6 +31,9 @@ export function AdsProjectsView() {
 
   return (
     <div className="mx-auto flex w-full max-w-[95%] flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
+      <MigrateLocalAdsDataBanner />
+      <MetaConnectionCard />
+
       <header className="flex items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Ads</h1>

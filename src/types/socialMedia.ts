@@ -12,6 +12,8 @@ export interface AdProject {
   startDate: string | null;
   endDate: string | null;
   totalBudget: number;
+  /** Meta ad account id ("act_...") this project auto-syncs campaigns from, if linked. */
+  metaAdAccountId: string | null;
   createdAt: string;
 }
 
@@ -33,6 +35,10 @@ export interface AdCampaign {
   reach: number;
   impressions: number;
   clicks: number;
+  /** "manual" (entered by hand) or "meta" (auto-synced — read-only, overwritten on each sync). */
+  source: "manual" | "meta";
+  externalId: string | null;
+  lastSyncedAt: string | null;
   createdAt: string;
 }
 

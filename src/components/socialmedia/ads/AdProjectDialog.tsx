@@ -17,6 +17,12 @@ export interface AdProjectFormValues {
   startDate: string | null;
   endDate: string | null;
   totalBudget: number;
+  metaAdAccountId?: string | null;
+}
+
+interface MetaAdAccountOption {
+  id: string;
+  name: string;
 }
 
 interface AdProjectDialogProps {
@@ -37,6 +43,8 @@ export function AdProjectDialog({ open, project, onClose, onSubmit }: AdProjectD
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [totalBudget, setTotalBudget] = useState("");
+  const [metaAdAccountId, setMetaAdAccountId] = useState<string | null>(null);
+  const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccountOption[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -51,8 +59,22 @@ export function AdProjectDialog({ open, project, onClose, onSubmit }: AdProjectD
       setStartDate(toDateInputValue(project?.startDate ?? null));
       setEndDate(toDateInputValue(project?.endDate ?? null));
       setTotalBudget(project ? String(project.totalBudget) : "");
+      setMetaAdAccountId(project?.metaAdAccountId ?? null);
     }
   }
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/integrations/meta/status")
+      .then((res) => res.json())
+      .then((status: { connected: boolean }) => {
+        if (!status.connected) return;
+        return fetch("/api/integrations/meta/ad-accounts")
+          .then((res) => res.json())
+          .then((accounts: MetaAdAccountOption[]) => setMetaAdAccounts(Array.isArray(accounts) ? accounts : []));
+      })
+      .catch(() => {});
+  }, [open]);
 
   useEffect(() => {
     if (open) nameRef.current?.focus();
@@ -80,6 +102,7 @@ export function AdProjectDialog({ open, project, onClose, onSubmit }: AdProjectD
       startDate: fromDateInputValue(startDate),
       endDate: fromDateInputValue(endDate),
       totalBudget: Number(totalBudget) || 0,
+      metaAdAccountId,
     });
     setSubmitting(false);
     if (success) onClose();
@@ -167,6 +190,21 @@ export function AdProjectDialog({ open, project, onClose, onSubmit }: AdProjectD
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Total budget ($)</span>
             <input type="number" min="0" step="0.01" value={totalBudget} onChange={(event) => setTotalBudget(event.target.value)} placeholder="0.00" className={inputClass} />
           </label>
+
+          {metaAdAccounts && metaAdAccounts.length > 0 && (
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Linked Meta ad account</span>
+              <select value={metaAdAccountId ?? ""} onChange={(event) => setMetaAdAccountId(event.target.value || null)} className={inputClass}>
+                <option value="">None — manual campaign entry</option>
+                {metaAdAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-slate-400">When linked, this project&apos;s campaigns sync automatically from Meta instead of being entered by hand.</span>
+            </label>
+          )}
 
           <div className="mt-2 flex justify-end gap-2">
             <button

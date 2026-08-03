@@ -317,6 +317,59 @@ model GoogleConnection {
   @@map("google_connections")
 }
 
+model AdProject {
+  id              String    @id @default(cuid())
+  name            String
+  client          String
+  platform        String
+  status          String
+  archived        Boolean   @default(false)
+  startDate       DateTime?
+  endDate         DateTime?
+  totalBudget     Float
+  // Set once an admin links this project to a Meta ad account (act_...), enabling auto-sync.
+  metaAdAccountId String?
+  createdAt       DateTime  @default(now())
+
+  @@map("ad_projects")
+}
+
+model AdCampaign {
+  id           String    @id @default(cuid())
+  projectId    String
+  name         String
+  platform     String
+  objective    String
+  status       String
+  budget       Float
+  amountSpent  Float
+  results      Int
+  revenue      Float
+  reach        Int
+  impressions  Int
+  clicks       Int
+  // "manual" | "meta" — synced rows are read-only in the UI and overwritten on each sync.
+  source       String    @default("manual")
+  externalId   String?
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([projectId, externalId])
+  @@map("ad_campaigns")
+}
+
+model MetaConnection {
+  id          String   @id @default(cuid())
+  accountName String
+  accessToken String
+  expiresAt   DateTime
+  connectedBy String
+  connectedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("meta_connections")
+}
+
 model AgentActionLog {
   id        String   @id @default(cuid())
   agentId   String

@@ -1,93 +1,21 @@
-import { generateId } from "@/lib/id";
 import type { AdProject, AdProjectStatus, AdPlatform } from "@/types/socialMedia";
-
-const STORAGE_KEY = "evotasks.adProjects.v1";
-const NETWORK_DELAY_MS = 300;
 
 export class ApiError extends Error {}
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function daysFromToday(offset: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return d.toISOString();
-}
-
-function createSeedProjects(): AdProject[] {
-  const now = new Date().toISOString();
-  const rows: Omit<AdProject, "createdAt">[] = [
-    {
-      id: "adproj-lpr",
-      name: "LPR MAROC",
-      client: "LPR MAROC",
-      platform: "facebook",
-      status: "active",
-      archived: false,
-      startDate: daysFromToday(-20),
-      endDate: daysFromToday(40),
-      totalBudget: 15000,
-    },
-    {
-      id: "adproj-atlas",
-      name: "MXSHOP",
-      client: "MXSHOP",
-      platform: "google",
-      status: "active",
-      archived: false,
-      startDate: daysFromToday(-10),
-      endDate: daysFromToday(20),
-      totalBudget: 8000,
-    },
-    {
-      id: "adproj-brand",
-      name: "EVOBIKE",
-      client: "EVOBIKE",
-      platform: "instagram",
-      status: "paused",
-      archived: false,
-      startDate: daysFromToday(-60),
-      endDate: daysFromToday(-5),
-      totalBudget: 5000,
-    },
-  ];
-  return rows.map((row) => ({ ...row, createdAt: now }));
-}
-
-function readStore(): AdProject[] {
-  if (typeof window === "undefined") return createSeedProjects();
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const seeded = createSeedProjects();
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-    return seeded;
-  }
-  try {
-    const parsed = JSON.parse(raw) as AdProject[];
-    if (!Array.isArray(parsed)) throw new Error("invalid shape");
-    return parsed;
-  } catch {
-    const seeded = createSeedProjects();
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-    return seeded;
-  }
-}
-
-function writeStore(projects: AdProject[]): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+async function parseErrorOrThrow(response: Response): Promise<never> {
+  const body = await response.json().catch(() => null);
+  throw new ApiError(body?.error ?? "Something went wrong.");
 }
 
 export async function fetchAdProjects(): Promise<AdProject[]> {
-  await delay(NETWORK_DELAY_MS);
-  return readStore();
+  const response = await fetch("/api/social/ad-projects");
+  if (!response.ok) return [];
+  return response.json();
 }
 
 export async function fetchAdProjectById(id: string): Promise<AdProject | null> {
-  await delay(150);
-  return readStore().find((p) => p.id === id) ?? null;
+  const projects = await fetchAdProjects();
+  return projects.find((p) => p.id === id) ?? null;
 }
 
 interface CreateAdProjectInput {
@@ -98,40 +26,30 @@ interface CreateAdProjectInput {
   startDate: string | null;
   endDate: string | null;
   totalBudget: number;
+  metaAdAccountId?: string | null;
 }
 
 export async function createAdProject(input: CreateAdProjectInput): Promise<AdProject> {
-  await delay(NETWORK_DELAY_MS);
-  if (!input.name.trim()) throw new ApiError("Project name is required.");
-  const project: AdProject = {
-    id: generateId("adproj"),
-    name: input.name.trim(),
-    client: input.client.trim(),
-    platform: input.platform,
-    status: input.status,
-    archived: false,
-    startDate: input.startDate,
-    endDate: input.endDate,
-    totalBudget: input.totalBudget,
-    createdAt: new Date().toISOString(),
-  };
-  writeStore([...readStore(), project]);
-  return project;
+  const response = await fetch("/api/social/ad-projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
 }
 
 export async function updateAdProject(id: string, patch: Partial<Omit<AdProject, "id" | "createdAt">>): Promise<AdProject> {
-  await delay(NETWORK_DELAY_MS);
-  const projects = readStore();
-  const index = projects.findIndex((p) => p.id === id);
-  if (index === -1) throw new ApiError("Project not found.");
-  const updated = { ...projects[index], ...patch };
-  const next = [...projects];
-  next[index] = updated;
-  writeStore(next);
-  return updated;
+  const response = await fetch(`/api/social/ad-projects/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
 }
 
 export async function deleteAdProject(id: string): Promise<void> {
-  await delay(NETWORK_DELAY_MS);
-  writeStore(readStore().filter((p) => p.id !== id));
+  const response = await fetch(`/api/social/ad-projects/${id}`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
 }

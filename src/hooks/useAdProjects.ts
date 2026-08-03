@@ -16,6 +16,7 @@ interface AdProjectInput {
   startDate: string | null;
   endDate: string | null;
   totalBudget: number;
+  metaAdAccountId?: string | null;
 }
 
 export function useAdProjects() {
