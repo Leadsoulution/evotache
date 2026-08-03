@@ -439,7 +439,11 @@ model ArchivedItem {
   // Path to the full serialized payload in Supabase Storage — deliberately
   // not stored here, so archiving actually shrinks the database.
   storageKey String
+  // Groups every item created by one "Archive" click so the UI can show
+  // one row per archive run instead of one per task/conversation/item.
+  batchId    String
 
+  @@index([batchId])
   @@map("archived_items")
 }
 

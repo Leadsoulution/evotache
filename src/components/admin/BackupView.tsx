@@ -10,6 +10,7 @@ import { formatRelativeTime, formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
 import { GoogleConnectionCard } from "@/components/admin/GoogleConnectionCard";
 import { GoogleSheetBackupSection } from "@/components/admin/GoogleSheetBackupSection";
+import { TrashIcon } from "@/components/ui/icons";
 import type { ArchiveFilters, ArchiveModule } from "@/types/archive";
 
 const MODULE_LABELS: Record<ArchiveModule, string> = {
@@ -31,7 +32,7 @@ function formatMb(bytes: number): string {
 
 export function BackupView() {
   const { dbSize, loading: dbSizeLoading, refetch: refetchDbSize } = useDbSize();
-  const { items, loading: itemsLoading, archive, restore } = useArchivedItems();
+  const { batches, loading: itemsLoading, archive, restoreBatch, deleteBatch } = useArchivedItems();
   const { statuses } = useTaskMeta();
   const { users } = useUsers();
   const toast = useToast();
@@ -44,7 +45,9 @@ export function BackupView() {
   const [archiving, setArchiving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [listFilter, setListFilter] = useState<ArchiveModule | "all">("all");
-  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [restoringBatchId, setRestoringBatchId] = useState<string | null>(null);
+  const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
+  const [deleteConfirmBatchId, setDeleteConfirmBatchId] = useState<string | null>(null);
 
   const filters: ArchiveFilters = useMemo(
     () => ({ module, statusId: module === "task" || module === "dispute" ? statusId || undefined : undefined, beforeDate: beforeDate || undefined }),
@@ -81,17 +84,28 @@ export function BackupView() {
     }
   }
 
-  async function handleRestore(id: string) {
-    setRestoringId(id);
-    const success = await restore(id);
-    setRestoringId(null);
+  async function handleRestore(batchId: string) {
+    setRestoringBatchId(batchId);
+    const success = await restoreBatch(batchId);
+    setRestoringBatchId(null);
     if (success) {
       toast.success("Restored.");
       void refetchDbSize();
     }
   }
 
-  const visibleItems = listFilter === "all" ? items : items.filter((item) => item.module === listFilter);
+  async function handleDelete(batchId: string) {
+    setDeletingBatchId(batchId);
+    const success = await deleteBatch(batchId);
+    setDeletingBatchId(null);
+    setDeleteConfirmBatchId(null);
+    if (success) {
+      toast.success("Deleted permanently.");
+      void refetchDbSize();
+    }
+  }
+
+  const visibleBatches = listFilter === "all" ? batches : batches.filter((batch) => batch.module === listFilter);
   const levelStyle = dbSize ? LEVEL_STYLES[dbSize.level] : LEVEL_STYLES.ok;
 
   return (
@@ -224,26 +238,37 @@ export function BackupView() {
 
         <div className="mt-3 flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
           {itemsLoading && <p className="py-4 text-sm text-slate-400">Loading…</p>}
-          {!itemsLoading && visibleItems.length === 0 && <p className="py-4 text-sm text-slate-400">Nothing archived yet.</p>}
-          {visibleItems.map((item) => {
-            const archivedByUser = users.find((u) => u.id === item.archivedBy);
+          {!itemsLoading && visibleBatches.length === 0 && <p className="py-4 text-sm text-slate-400">Nothing archived yet.</p>}
+          {visibleBatches.map((batch) => {
+            const archivedByUser = users.find((u) => u.id === batch.archivedBy);
             return (
-              <div key={item.id} className="flex items-center gap-3 py-2.5">
+              <div key={batch.batchId} className="flex items-center gap-3 py-2.5">
                 <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                  {MODULE_LABELS[item.module]}
+                  {MODULE_LABELS[batch.module]}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-slate-100">{item.title}</span>
-                <span className="shrink-0 text-xs text-slate-400" title={formatDueDate(item.archivedAt)}>
-                  {formatRelativeTime(item.archivedAt)}
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-slate-100">
+                  {batch.count} item{batch.count === 1 ? "" : "s"}
+                </span>
+                <span className="shrink-0 text-xs text-slate-400" title={formatDueDate(batch.archivedAt)}>
+                  {formatRelativeTime(batch.archivedAt)}
                   {archivedByUser ? ` · ${archivedByUser.name}` : ""}
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleRestore(item.id)}
-                  disabled={restoringId === item.id}
+                  onClick={() => handleRestore(batch.batchId)}
+                  disabled={restoringBatchId === batch.batchId || deletingBatchId === batch.batchId}
                   className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
-                  {restoringId === item.id ? "Restoring…" : "Restore"}
+                  {restoringBatchId === batch.batchId ? "Restoring…" : "Restore"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmBatchId(batch.batchId)}
+                  disabled={restoringBatchId === batch.batchId || deletingBatchId === batch.batchId}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                >
+                  <TrashIcon className="h-3 w-3" />
+                  {deletingBatchId === batch.batchId ? "Deleting…" : "Delete"}
                 </button>
               </div>
             );
@@ -258,6 +283,16 @@ export function BackupView() {
         confirmLabel={archiving ? "Archiving…" : "Archive"}
         onConfirm={handleArchive}
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmBatchId !== null}
+        title="Delete this archive permanently?"
+        description="This can't be undone — the archived data will be permanently removed and can no longer be restored."
+        confirmLabel={deletingBatchId ? "Deleting…" : "Delete permanently"}
+        destructive
+        onConfirm={() => deleteConfirmBatchId && handleDelete(deleteConfirmBatchId)}
+        onCancel={() => setDeleteConfirmBatchId(null)}
       />
     </div>
   );

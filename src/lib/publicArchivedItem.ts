@@ -9,5 +9,6 @@ export function toPublicArchivedItem(item: DbArchivedItem): ArchivedItem {
     title: item.title,
     archivedAt: item.archivedAt.toISOString(),
     archivedBy: item.archivedBy,
+    batchId: item.batchId,
   };
 }

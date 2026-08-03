@@ -1,9 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
-import { createArchive, fetchArchivedItems, fetchArchivePreview, fetchDbSize, restoreArchivedItem } from "@/services/archiveApi";
+import { createArchive, deleteArchiveBatch, fetchArchivedItems, fetchArchivePreview, fetchDbSize, restoreArchiveBatch } from "@/services/archiveApi";
 import { useToast } from "@/components/ui/Toast";
-import type { ArchiveFilters, ArchivedItem, ArchiveModule, DbSizeInfo } from "@/types/archive";
+import type { ArchiveBatch, ArchiveFilters, ArchivedItem, ArchiveModule, DbSizeInfo } from "@/types/archive";
 
 const DB_SIZE_KEY = "db-size";
 const ARCHIVED_ITEMS_KEY = "archived-items";
@@ -27,10 +28,29 @@ export function useDbSize() {
   return { dbSize: data ?? null, loading: isLoading, error: Boolean(error), refetch: mutate };
 }
 
+function groupIntoBatches(items: ArchivedItem[]): ArchiveBatch[] {
+  const byBatch = new Map<string, ArchivedItem[]>();
+  for (const item of items) {
+    const group = byBatch.get(item.batchId);
+    if (group) group.push(item);
+    else byBatch.set(item.batchId, [item]);
+  }
+  const batches: ArchiveBatch[] = Array.from(byBatch.entries()).map(([batchId, groupItems]) => ({
+    batchId,
+    module: groupItems[0].module,
+    archivedAt: groupItems[0].archivedAt,
+    archivedBy: groupItems[0].archivedBy,
+    count: groupItems.length,
+  }));
+  batches.sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
+  return batches;
+}
+
 export function useArchivedItems() {
   const toast = useToast();
   const { data, error, isLoading, mutate } = useSWR<ArchivedItem[]>(ARCHIVED_ITEMS_KEY, () => fetchArchivedItems());
   const items = data ?? [];
+  const batches = useMemo(() => groupIntoBatches(data ?? []), [data]);
 
   async function archive(filters: ArchiveFilters): Promise<number | null> {
     try {
@@ -44,12 +64,15 @@ export function useArchivedItems() {
     }
   }
 
-  async function restore(id: string): Promise<boolean> {
+  async function restoreBatch(batchId: string): Promise<boolean> {
     const previous = items;
-    const restoredModule = previous.find((item) => item.id === id)?.module;
-    await mutate(previous.filter((item) => item.id !== id), { revalidate: false });
+    const restoredModule = previous.find((item) => item.batchId === batchId)?.module;
+    await mutate(
+      previous.filter((item) => item.batchId !== batchId),
+      { revalidate: false }
+    );
     try {
-      await restoreArchivedItem(id);
+      await restoreArchiveBatch(batchId);
       if (restoredModule) invalidateModuleCaches(restoredModule);
       return true;
     } catch (err) {
@@ -59,7 +82,23 @@ export function useArchivedItems() {
     }
   }
 
-  return { items, loading: isLoading, error: Boolean(error), archive, restore };
+  async function deleteBatch(batchId: string): Promise<boolean> {
+    const previous = items;
+    await mutate(
+      previous.filter((item) => item.batchId !== batchId),
+      { revalidate: false }
+    );
+    try {
+      await deleteArchiveBatch(batchId);
+      return true;
+    } catch (err) {
+      await mutate(previous, { revalidate: false });
+      toast.error(err instanceof Error ? err.message : "Failed to delete.");
+      return false;
+    }
+  }
+
+  return { batches, loading: isLoading, error: Boolean(error), archive, restoreBatch, deleteBatch };
 }
 
 export async function previewArchive(filters: ArchiveFilters): Promise<number> {

@@ -40,7 +40,12 @@ export async function createArchive(filters: ArchiveFilters): Promise<number> {
   return archivedCount;
 }
 
-export async function restoreArchivedItem(id: string): Promise<void> {
-  const response = await fetch(`/api/admin/archive/${id}/restore`, { method: "POST" });
+export async function restoreArchiveBatch(batchId: string): Promise<void> {
+  const response = await fetch(`/api/admin/archive/batch/${batchId}/restore`, { method: "POST" });
+  if (!response.ok) return parseErrorOrThrow(response);
+}
+
+export async function deleteArchiveBatch(batchId: string): Promise<void> {
+  const response = await fetch(`/api/admin/archive/batch/${batchId}`, { method: "DELETE" });
   if (!response.ok) return parseErrorOrThrow(response);
 }

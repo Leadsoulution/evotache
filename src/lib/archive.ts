@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
-import { uploadFile } from "@/lib/storage";
+import { deleteFile, uploadFile } from "@/lib/storage";
 import { toPublicTask } from "@/lib/publicTask";
 import { getDescendantIds } from "@/lib/taskTree";
+import { generateId } from "@/lib/id";
+import type { ArchivedItem } from "@/generated/prisma/client";
 import type { ArchiveFilters, DbSizeInfo } from "@/types/archive";
 
 const DB_SIZE_LIMIT_BYTES = 500 * 1024 * 1024; // Supabase free-tier Postgres limit
@@ -49,7 +51,7 @@ async function findTaskArchiveRoots(filters: ArchiveFilters): Promise<string[]> 
   return matched.filter((t) => !hasMatchedAncestor(t)).map((t) => t.id);
 }
 
-async function archiveTaskRoot(rootId: string, module: "task" | "dispute", archivedBy: string): Promise<void> {
+async function archiveTaskRoot(rootId: string, module: "task" | "dispute", archivedBy: string, batchId: string): Promise<void> {
   const allDbTasks = await db.task.findMany({ where: { module } });
   const allTasks = allDbTasks.map(toPublicTask);
   const idSet = new Set([rootId, ...getDescendantIds(allTasks, rootId)]);
@@ -64,7 +66,7 @@ async function archiveTaskRoot(rootId: string, module: "task" | "dispute", archi
   await db.task.delete({ where: { id: rootId } }); // cascades the rest of the subtree
 
   await db.archivedItem.create({
-    data: { module, originalId: rootId, title: root.title, archivedBy, storageKey },
+    data: { module, originalId: rootId, title: root.title, archivedBy, storageKey, batchId },
   });
 }
 
@@ -74,7 +76,7 @@ async function findConversationCandidates(filters: ArchiveFilters) {
   });
 }
 
-async function archiveConversation(conversationId: string, archivedBy: string): Promise<void> {
+async function archiveConversation(conversationId: string, archivedBy: string, batchId: string): Promise<void> {
   const conversation = await db.conversation.findUnique({ where: { id: conversationId } });
   if (!conversation) return;
   const messages = await db.message.findMany({ where: { conversationId } });
@@ -84,7 +86,7 @@ async function archiveConversation(conversationId: string, archivedBy: string): 
 
   const title = conversation.name ?? (conversation.type === "direct" ? "Direct message" : "Group chat");
   await db.archivedItem.create({
-    data: { module: "conversation", originalId: conversationId, title, archivedBy, storageKey },
+    data: { module: "conversation", originalId: conversationId, title, archivedBy, storageKey, batchId },
   });
 }
 
@@ -103,7 +105,7 @@ async function purchaseItemTitle(values: Record<string, unknown>): Promise<strin
   return "Purchase item";
 }
 
-async function archivePurchaseItem(itemId: string, archivedBy: string): Promise<void> {
+async function archivePurchaseItem(itemId: string, archivedBy: string, batchId: string): Promise<void> {
   const item = await db.purchaseItem.findUnique({ where: { id: itemId } });
   if (!item) return;
   const storageKey = await uploadJson({ item });
@@ -111,7 +113,7 @@ async function archivePurchaseItem(itemId: string, archivedBy: string): Promise<
 
   const title = await purchaseItemTitle(item.values as Record<string, unknown>);
   await db.archivedItem.create({
-    data: { module: "achat", originalId: itemId, title, archivedBy, storageKey },
+    data: { module: "achat", originalId: itemId, title, archivedBy, storageKey, batchId },
   });
 }
 
@@ -129,25 +131,26 @@ export async function previewArchiveCount(filters: ArchiveFilters): Promise<numb
 }
 
 export async function runArchive(filters: ArchiveFilters, archivedBy: string): Promise<number> {
+  const batchId = generateId("batch");
   if (filters.module === "task" || filters.module === "dispute") {
     const roots = await findTaskArchiveRoots(filters);
-    for (const rootId of roots) await archiveTaskRoot(rootId, filters.module, archivedBy);
+    for (const rootId of roots) await archiveTaskRoot(rootId, filters.module, archivedBy, batchId);
     return roots.length;
   }
   if (filters.module === "conversation") {
     const rows = await findConversationCandidates(filters);
-    for (const row of rows) await archiveConversation(row.id, archivedBy);
+    for (const row of rows) await archiveConversation(row.id, archivedBy, batchId);
     return rows.length;
   }
   const rows = await findPurchaseItemCandidates(filters);
-  for (const row of rows) await archivePurchaseItem(row.id, archivedBy);
+  for (const row of rows) await archivePurchaseItem(row.id, archivedBy, batchId);
   return rows.length;
 }
 
-export async function restoreArchivedItem(id: string): Promise<boolean> {
-  const archived = await db.archivedItem.findUnique({ where: { id } });
-  if (!archived) return false;
-
+/** Restores one archived row's original record(s) from its storage payload.
+ * Doesn't delete the ArchivedItem row itself — callers do that once they
+ * know the restore actually succeeded. */
+async function restoreOne(archived: ArchivedItem): Promise<boolean> {
   const response = await fetch(archived.storageKey);
   if (!response.ok) return false;
   const payload = await response.json();
@@ -177,7 +180,30 @@ export async function restoreArchivedItem(id: string): Promise<boolean> {
     const item = payload.item as Record<string, unknown>;
     await db.purchaseItem.create({ data: item as never });
   }
-
-  await db.archivedItem.delete({ where: { id } });
   return true;
+}
+
+/** Restores every item in a batch (best-effort — one item's storage payload
+ * being missing doesn't block the others). Returns how many were restored;
+ * only successfully-restored rows are removed from archived_items, so a
+ * partially-failed restore can be retried. */
+export async function restoreArchivedBatch(batchId: string): Promise<number> {
+  const items = await db.archivedItem.findMany({ where: { batchId } });
+  let restoredCount = 0;
+  for (const item of items) {
+    if (await restoreOne(item)) {
+      await db.archivedItem.delete({ where: { id: item.id } });
+      restoredCount++;
+    }
+  }
+  return restoredCount;
+}
+
+/** Permanently deletes a whole archive batch — removes every item's stored
+ * payload from Supabase Storage and its archived_items row. Irreversible. */
+export async function deleteArchivedBatch(batchId: string): Promise<number> {
+  const items = await db.archivedItem.findMany({ where: { batchId } });
+  for (const item of items) await deleteFile(item.storageKey);
+  const { count } = await db.archivedItem.deleteMany({ where: { batchId } });
+  return count;
 }
