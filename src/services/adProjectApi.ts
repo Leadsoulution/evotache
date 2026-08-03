@@ -53,3 +53,13 @@ export async function deleteAdProject(id: string): Promise<void> {
   const response = await fetch(`/api/social/ad-projects/${id}`, { method: "DELETE" });
   if (!response.ok) return parseErrorOrThrow(response);
 }
+
+export async function syncAdProject(id: string, datePreset: string): Promise<{ syncedCampaigns: number }> {
+  const response = await fetch(`/api/social/ad-projects/${id}/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ datePreset }),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}

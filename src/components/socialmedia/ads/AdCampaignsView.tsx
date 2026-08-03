@@ -12,8 +12,12 @@ import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Menu } from "@/components/ui/Menu";
 import { StatTile } from "@/components/stats/StatTile";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
+import { useToast } from "@/components/ui/Toast";
 import { computeCampaignMetrics, formatCurrency, formatNumber, formatPercent, formatRatio } from "@/lib/adMetrics";
 import { formatDueDate, formatRelativeTime } from "@/lib/date";
+import { syncAdProject } from "@/services/adProjectApi";
+import { META_DATE_PRESET_OPTIONS, DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
+import type { MetaDatePreset } from "@/config/metaAds";
 import {
   PLATFORM_META,
   PLATFORM_ORDER,
@@ -31,6 +35,7 @@ import {
   MegaphoneIcon,
   PencilIcon,
   PlusIcon,
+  RefreshIcon,
   SearchIcon,
   SortIcon,
   TrashIcon,
@@ -53,9 +58,28 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
   const { user } = useAuth();
   const canManage = user ? canManageWorkflow(user.role) : false;
   const { projects, loadState: projectsLoadState } = useAdProjects();
-  const { campaigns, loadState, addCampaign, editCampaign, removeCampaign } = useAdCampaigns(projectId);
+  const { campaigns, loadState, addCampaign, editCampaign, removeCampaign, refetch } = useAdCampaigns(projectId);
+  const toast = useToast();
 
   const project = projects.find((p) => p.id === projectId) ?? null;
+
+  const [datePreset, setDatePreset] = useState<MetaDatePreset>(DEFAULT_META_DATE_PRESET);
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSync(nextPreset?: MetaDatePreset) {
+    if (!project) return;
+    const preset = nextPreset ?? datePreset;
+    setSyncing(true);
+    try {
+      const result = await syncAdProject(project.id, preset);
+      refetch();
+      toast.success(`Synced ${result.syncedCampaigns} campaign(s) from Meta.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string[]>([]);
@@ -117,19 +141,50 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">{project?.name ?? "Campaigns"}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">{project?.client ?? "Manage this project's advertising campaigns."}</p>
           </div>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditingCampaign(null);
-                setDialogOpen(true);
-              }}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-            >
-              <PlusIcon className="h-4 w-4" />
-              New campaign
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {canManage && project?.metaAdAccountId && (
+              <>
+                <Menu
+                  options={META_DATE_PRESET_OPTIONS}
+                  value={[datePreset]}
+                  onChange={(next) => {
+                    const preset = next[0] as MetaDatePreset;
+                    setDatePreset(preset);
+                    handleSync(preset);
+                  }}
+                  ariaLabel="Stats date range"
+                  renderTrigger={() => (
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                      {META_DATE_PRESET_OPTIONS.find((o) => o.value === datePreset)?.label}
+                      <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
+                    </span>
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSync()}
+                  disabled={syncing}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <RefreshIcon className={syncing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                  {syncing ? "Syncing…" : "Sync now"}
+                </button>
+              </>
+            )}
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingCampaign(null);
+                  setDialogOpen(true);
+                }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+              >
+                <PlusIcon className="h-4 w-4" />
+                New campaign
+              </button>
+            )}
+          </div>
         </header>
       </div>
 

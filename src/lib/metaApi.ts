@@ -1,4 +1,6 @@
 import { getValidAccessToken } from "@/lib/metaAuth";
+import { DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
+import type { MetaDatePreset } from "@/config/metaAds";
 import type { CampaignObjective, CampaignStatus } from "@/types/socialMedia";
 
 const GRAPH_VERSION = "v21.0";
@@ -93,15 +95,14 @@ interface MetaInsightRaw {
   actions?: { action_type: string; value: string }[];
 }
 
-export async function listCampaignsWithInsights(adAccountId: string): Promise<MetaCampaignSummary[]> {
+export async function listCampaignsWithInsights(adAccountId: string, datePreset: MetaDatePreset = DEFAULT_META_DATE_PRESET): Promise<MetaCampaignSummary[]> {
   const campaignsData = (await metaFetch(`/${adAccountId}/campaigns`, { fields: "id,name,objective,status", limit: "200" })) as {
     data: MetaCampaignRaw[];
   };
   const insightsData = (await metaFetch(`/${adAccountId}/insights`, {
     level: "campaign",
     fields: "campaign_id,spend,clicks,impressions,reach,actions",
-    // Meta renamed the all-time preset from "lifetime" to "maximum".
-    date_preset: "maximum",
+    date_preset: datePreset,
     limit: "200",
   })) as { data: MetaInsightRaw[] };
 

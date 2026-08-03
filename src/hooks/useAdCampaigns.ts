@@ -26,6 +26,12 @@ export function useAdCampaigns(projectId: string) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const toast = useToast();
 
+  const refetch = useCallback(() => {
+    fetchAdCampaigns(projectId)
+      .then((list) => setCampaigns(list))
+      .catch(() => {});
+  }, [projectId]);
+
   useEffect(() => {
     let cancelled = false;
     fetchAdCampaigns(projectId)
@@ -85,5 +91,5 @@ export function useAdCampaigns(projectId: string) {
     [campaigns, toast]
   );
 
-  return { campaigns, loadState, addCampaign, editCampaign, removeCampaign };
+  return { campaigns, loadState, addCampaign, editCampaign, removeCampaign, refetch };
 }
