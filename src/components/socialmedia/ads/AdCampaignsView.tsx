@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdProjects } from "@/hooks/useAdProjects";
 import { useAdCampaigns } from "@/hooks/useAdCampaigns";
+import { usePagination } from "@/hooks/usePagination";
 import { canManageWorkflow } from "@/config/roleMeta";
 import { AdCampaignDialog } from "./AdCampaignDialog";
 import { MetaDateRangePicker } from "./MetaDateRangePicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Menu } from "@/components/ui/Menu";
+import { Pagination } from "@/components/ui/Pagination";
 import { StatTile } from "@/components/stats/StatTile";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
@@ -78,11 +80,24 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string[]>([]);
   const [objectiveFilter, setObjectiveFilter] = useState<string[]>([]);
+  const [deliveryFilter, setDeliveryFilter] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<AdCampaign | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState<number | "all">(20);
+
+  // Built from whatever delivery statuses are actually present, rather than
+  // a hardcoded list — Meta's effective_status has more values than this
+  // app tracks (PENDING_REVIEW, WITH_ISSUES, ...) and this adapts automatically.
+  const deliveryOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const c of campaigns) if (c.metaInsights?.deliveryStatus) values.add(c.metaInsights.deliveryStatus);
+    return Array.from(values)
+      .sort()
+      .map((v) => ({ value: v, label: v }));
+  }, [campaigns]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -90,9 +105,10 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
       if (query && !c.name.toLowerCase().includes(query)) return false;
       if (platformFilter.length && !platformFilter.includes(c.platform)) return false;
       if (objectiveFilter.length && !objectiveFilter.includes(c.objective)) return false;
+      if (deliveryFilter.length && !deliveryFilter.includes(c.metaInsights?.deliveryStatus ?? "")) return false;
       return true;
     });
-  }, [campaigns, search, platformFilter, objectiveFilter]);
+  }, [campaigns, search, platformFilter, objectiveFilter, deliveryFilter]);
 
   const sorted = useMemo(() => {
     const withMetrics = filtered.map((c) => ({ campaign: c, metrics: computeCampaignMetrics(c) }));
@@ -105,6 +121,9 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
     });
     return withMetrics;
   }, [filtered, sortField, sortDirection]);
+
+  const { page, setPage, pageCount, start, end } = usePagination(sorted.length, pageSize);
+  const paged = useMemo(() => sorted.slice(start, end), [sorted, start, end]);
 
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, c) => sum + c.amountSpent, 0);
@@ -183,7 +202,7 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
 
       {!isLoading && (
         <>
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-5 dark:bg-slate-950">
             <StatTile label="Total spend" value={formatCurrency(kpis.totalSpend)} icon={<MegaphoneIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Total results" value={formatNumber(kpis.totalResults)} icon={<CheckIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Average CPC" value={formatCurrency(kpis.avgCpc)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
@@ -216,6 +235,9 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
               value={objectiveFilter}
               onChange={setObjectiveFilter}
             />
+            {deliveryOptions.length > 0 && (
+              <FilterMenu label="Delivery" count={deliveryFilter.length} options={deliveryOptions} value={deliveryFilter} onChange={setDeliveryFilter} />
+            )}
             <div className="ml-auto flex items-center gap-1">
               <Menu
                 options={SORT_OPTIONS}
@@ -281,7 +303,7 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map(({ campaign, metrics }) => {
+                  {paged.map(({ campaign, metrics }) => {
                     const platform = PLATFORM_META[campaign.platform];
                     const objective = CAMPAIGN_OBJECTIVE_META[campaign.objective];
                     // Meta already computes cpc/cpm/ctr itself (more accurate
@@ -358,6 +380,20 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {sorted.length > 0 && (
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              total={sorted.length}
+              rangeStart={start + 1}
+              rangeEnd={end}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[20, 50, 100, "all"]}
+            />
           )}
         </>
       )}

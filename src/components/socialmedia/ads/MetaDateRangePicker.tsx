@@ -195,7 +195,7 @@ export function MetaDateRangePicker({ open, onClose, onApply }: MetaDateRangePic
   function renderMonth(cursor: Date) {
     const weeks = monthMatrix(cursor);
     return (
-      <div className="flex-1">
+      <div className="min-w-[240px] flex-1">
         <p className="mb-2 text-center text-sm font-medium text-slate-700 dark:text-slate-200">
           {cursor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
         </p>
@@ -253,7 +253,7 @@ export function MetaDateRangePicker({ open, onClose, onApply }: MetaDateRangePic
       <div
         role="dialog"
         aria-modal="true"
-        className="flex max-h-[90vh] w-full max-w-2xl animate-scale-in overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="flex max-h-[90vh] w-full max-w-[52rem] animate-scale-in overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
       >
         <div className="w-48 shrink-0 overflow-y-auto border-r border-slate-100 p-2 dark:border-slate-800">
           {PRESET_LIST.map((preset) => (
@@ -283,7 +283,7 @@ export function MetaDateRangePicker({ open, onClose, onApply }: MetaDateRangePic
             >
               <ChevronLeftIcon className="h-4 w-4" />
             </button>
-            <div className="flex flex-1 gap-6">
+            <div className="flex flex-1 gap-4 overflow-x-auto">
               {renderMonth(leftCursor)}
               {renderMonth(rightCursor)}
             </div>

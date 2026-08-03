@@ -2,7 +2,7 @@
 
 import { ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from "@/components/ui/icons";
 
-const PAGE_SIZE_OPTIONS: (number | "all")[] = [5, 10, 25, 50, 100, "all"];
+const DEFAULT_PAGE_SIZE_OPTIONS: (number | "all")[] = [5, 10, 25, 50, 100, "all"];
 
 const navButtonClass =
   "flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-800 dark:hover:text-slate-300";
@@ -16,9 +16,20 @@ interface PaginationProps {
   rangeEnd: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number | "all") => void;
+  pageSizeOptions?: (number | "all")[];
 }
 
-export function Pagination({ page, pageCount, pageSize, total, rangeStart, rangeEnd, onPageChange, onPageSizeChange }: PaginationProps) {
+export function Pagination({
+  page,
+  pageCount,
+  pageSize,
+  total,
+  rangeStart,
+  rangeEnd,
+  onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
+}: PaginationProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
       <div className="flex items-center gap-3">
@@ -30,7 +41,7 @@ export function Pagination({ page, pageCount, pageSize, total, rangeStart, range
             aria-label="Rows per page"
             className="rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
           >
-            {PAGE_SIZE_OPTIONS.map((opt) => (
+            {pageSizeOptions.map((opt) => (
               <option key={opt} value={opt}>
                 {opt === "all" ? "Tous" : opt}
               </option>
