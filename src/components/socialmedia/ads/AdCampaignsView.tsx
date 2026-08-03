@@ -14,19 +14,12 @@ import { Menu } from "@/components/ui/Menu";
 import { StatTile } from "@/components/stats/StatTile";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
-import { computeCampaignMetrics, formatCurrency, formatNumber, formatPercent, formatRatio } from "@/lib/adMetrics";
+import { computeCampaignMetrics, formatCurrency, formatNumber, formatPercent } from "@/lib/adMetrics";
 import { formatDueDate, formatRelativeTime } from "@/lib/date";
 import { syncAdProject } from "@/services/adProjectApi";
 import { DEFAULT_META_DATE_PRESET } from "@/config/metaAds";
 import type { MetaDateRangeParam } from "@/config/metaAds";
-import {
-  PLATFORM_META,
-  PLATFORM_ORDER,
-  CAMPAIGN_OBJECTIVE_META,
-  CAMPAIGN_OBJECTIVE_ORDER,
-  CAMPAIGN_STATUS_META,
-  CAMPAIGN_STATUS_ORDER,
-} from "@/config/socialMeta";
+import { PLATFORM_META, PLATFORM_ORDER, CAMPAIGN_OBJECTIVE_META, CAMPAIGN_OBJECTIVE_ORDER } from "@/config/socialMeta";
 import {
   ArrowLeftIcon,
   ChartBarIcon,
@@ -44,15 +37,14 @@ import {
 } from "@/components/ui/icons";
 import type { AdCampaign } from "@/types/socialMedia";
 
-type SortField = "name" | "budget" | "amountSpent" | "results" | "roas" | "createdAt";
+type SortField = "name" | "budget" | "amountSpent" | "results" | "createdAt";
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: "createdAt", label: "Created date" },
   { value: "name", label: "Name" },
-  { value: "budget", label: "Budget" },
+  { value: "budget", label: "Daily budget" },
   { value: "amountSpent", label: "Amount spent" },
   { value: "results", label: "Results" },
-  { value: "roas", label: "ROAS" },
 ];
 
 export function AdCampaignsView({ projectId }: { projectId: string }) {
@@ -85,7 +77,6 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
 
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [objectiveFilter, setObjectiveFilter] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -98,18 +89,16 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
     return campaigns.filter((c) => {
       if (query && !c.name.toLowerCase().includes(query)) return false;
       if (platformFilter.length && !platformFilter.includes(c.platform)) return false;
-      if (statusFilter.length && !statusFilter.includes(c.status)) return false;
       if (objectiveFilter.length && !objectiveFilter.includes(c.objective)) return false;
       return true;
     });
-  }, [campaigns, search, platformFilter, statusFilter, objectiveFilter]);
+  }, [campaigns, search, platformFilter, objectiveFilter]);
 
   const sorted = useMemo(() => {
     const withMetrics = filtered.map((c) => ({ campaign: c, metrics: computeCampaignMetrics(c) }));
     withMetrics.sort((a, b) => {
       let cmp = 0;
       if (sortField === "name") cmp = a.campaign.name.localeCompare(b.campaign.name);
-      else if (sortField === "roas") cmp = (a.metrics.roas ?? -1) - (b.metrics.roas ?? -1);
       else if (sortField === "createdAt") cmp = a.campaign.createdAt.localeCompare(b.campaign.createdAt);
       else cmp = a.campaign[sortField] - b.campaign[sortField];
       return sortDirection === "asc" ? cmp : -cmp;
@@ -121,11 +110,10 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
     const totalSpend = filtered.reduce((sum, c) => sum + c.amountSpent, 0);
     const totalResults = filtered.reduce((sum, c) => sum + c.results, 0);
     const totalClicks = filtered.reduce((sum, c) => sum + c.clicks, 0);
-    const totalRevenue = filtered.reduce((sum, c) => sum + c.revenue, 0);
     const avgCpc = totalClicks > 0 ? totalSpend / totalClicks : null;
-    const avgRoas = totalSpend > 0 ? totalRevenue / totalSpend : null;
+    const avgCostPerResult = totalResults > 0 ? totalSpend / totalResults : null;
     const activeCount = filtered.filter((c) => c.status === "active").length;
-    return { totalSpend, totalResults, avgCpc, avgRoas, activeCount };
+    return { totalSpend, totalResults, avgCpc, avgCostPerResult, activeCount };
   }, [filtered]);
 
   const isLoading = loadState === "loading" || projectsLoadState === "loading";
@@ -199,7 +187,7 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
             <StatTile label="Total spend" value={formatCurrency(kpis.totalSpend)} icon={<MegaphoneIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Total results" value={formatNumber(kpis.totalResults)} icon={<CheckIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Average CPC" value={formatCurrency(kpis.avgCpc)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
-            <StatTile label="Average ROAS" value={formatRatio(kpis.avgRoas)} icon={<TrendingUpIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Average cost/result" value={formatCurrency(kpis.avgCostPerResult)} icon={<TrendingUpIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Active campaigns" value={kpis.activeCount} icon={<ChartBarIcon className="h-4.5 w-4.5" />} />
           </section>
 
@@ -220,13 +208,6 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
               options={PLATFORM_ORDER.map((p) => ({ value: p, label: PLATFORM_META[p].label }))}
               value={platformFilter}
               onChange={setPlatformFilter}
-            />
-            <FilterMenu
-              label="Status"
-              count={statusFilter.length}
-              options={CAMPAIGN_STATUS_ORDER.map((s) => ({ value: s, label: CAMPAIGN_STATUS_META[s].label }))}
-              value={statusFilter}
-              onChange={setStatusFilter}
             />
             <FilterMenu
               label="Objective"
@@ -276,24 +257,20 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                       "Campaign",
                       "Platform",
                       "Objective",
-                      "Status",
+                      "Daily budget",
                       "Delivery",
-                      "Budget",
-                      "Spent",
-                      "Cost/Result",
                       "Results",
-                      "Reach",
+                      "Cost/Result",
+                      "Amount spent",
                       "Impressions",
-                      "Clicks",
-                      "CTR (all)",
-                      "CPC (all)",
+                      "Reach",
                       "CPM",
+                      "CPC (all)",
+                      "CPC (link)",
+                      "CTR (link)",
+                      "CTR (all)",
                       "Link clicks",
-                      "Outbound CTR",
-                      "Cost/Link click",
                       "Frequency",
-                      "ROAS",
-                      "Conv. Rate",
                       "Created",
                     ].map((header) => (
                       <th key={header} scope="col" className="whitespace-nowrap px-3 py-2">
@@ -307,11 +284,10 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                   {sorted.map(({ campaign, metrics }) => {
                     const platform = PLATFORM_META[campaign.platform];
                     const objective = CAMPAIGN_OBJECTIVE_META[campaign.objective];
-                    const status = CAMPAIGN_STATUS_META[campaign.status];
-                    // Meta already computes these itself (more accurate than
-                    // our spend/clicks/impressions-derived formula) — prefer
-                    // its numbers for synced campaigns, fall back to the
-                    // computed ones for manual entries.
+                    // Meta already computes cpc/cpm/ctr itself (more accurate
+                    // than a spend/clicks/impressions-derived formula) —
+                    // prefer its numbers for synced campaigns, fall back to
+                    // the computed ones for manual entries.
                     const insights = campaign.metaInsights;
                     const ctr = insights?.ctr ?? metrics.ctr;
                     const cpc = insights?.cpc ?? metrics.cpc;
@@ -336,28 +312,20 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
                             {objective.label}
                           </span>
                         </td>
-                        <td className="px-3 py-2">
-                          <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: `${status.color}22`, color: status.color }}>
-                            {status.label}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">{insights?.deliveryStatus ?? "—"}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(campaign.budget)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(campaign.amountSpent)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(metrics.costPerResult)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">{insights?.deliveryStatus ?? "—"}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.results)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.reach)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(metrics.costPerResult)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(campaign.amountSpent)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.impressions)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.clicks)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(ctr)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(cpc)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatNumber(campaign.reach)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(cpm)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{insights?.linkClicks !== null && insights?.linkClicks !== undefined ? formatNumber(insights.linkClicks) : "—"}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(insights?.linkClicksCtr ?? null)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(cpc)}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(insights?.costPerLinkClick ?? null)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(insights?.linkClicksCtr ?? null)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(ctr)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{insights?.linkClicks !== null && insights?.linkClicks !== undefined ? formatNumber(insights.linkClicks) : "—"}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{insights?.frequency !== null && insights?.frequency !== undefined ? insights.frequency.toFixed(2) : "—"}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums font-semibold text-slate-700 dark:text-slate-200">{formatRatio(metrics.roas)}</td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatPercent(metrics.conversionRate)}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-slate-400">{formatDueDate(campaign.createdAt)}</td>
                         <td className="px-3 py-2 text-right">
                           {canManage && campaign.source === "manual" && (

@@ -67,11 +67,34 @@ function mapStatus(value: string | undefined): CampaignStatus {
   return (value && META_STATUS_MAP[value]) || "draft";
 }
 
+// Meta's "Results" column in Ads Manager isn't a single API field — it's
+// whichever action_type matches the campaign's optimization_goal. Naively
+// summing every action type (the previous approach) mixes unrelated counts
+// together and is why results looked wrong/zero. This maps the common
+// goals to their real action_type(s), checked in order; REACH/IMPRESSIONS
+// goals use those metrics directly instead of an action.
+const OPTIMIZATION_GOAL_ACTIONS: Record<string, string[]> = {
+  OFFSITE_CONVERSIONS: ["offsite_conversion.fb_pixel_purchase", "purchase", "offsite_conversion.fb_pixel_custom"],
+  VALUE: ["offsite_conversion.fb_pixel_purchase", "purchase"],
+  LINK_CLICKS: ["link_click"],
+  LANDING_PAGE_VIEWS: ["landing_page_view"],
+  POST_ENGAGEMENT: ["post_engagement"],
+  PAGE_LIKES: ["like"],
+  LEAD_GENERATION: ["lead", "onsite_conversion.lead_grouped"],
+  QUALITY_LEAD: ["onsite_conversion.lead_grouped", "lead"],
+  THRUPLAY: ["video_thruplay_watched"],
+  APP_INSTALLS: ["mobile_app_install", "omni_app_install"],
+  CONVERSATIONS: ["onsite_conversion.messaging_conversation_started_7d"],
+  MESSAGING_PURCHASE_CONVERSION: ["onsite_conversion.messaging_first_reply"],
+  VISIT_INSTAGRAM_PROFILE: ["onsite_conversion.total_messaging_connection"],
+};
+
 export interface MetaCampaignSummary {
   externalId: string;
   name: string;
   objective: CampaignObjective;
   status: CampaignStatus;
+  dailyBudget: number;
   amountSpent: number;
   clicks: number;
   impressions: number;
@@ -86,6 +109,8 @@ interface MetaCampaignRaw {
   objective?: string;
   status?: string;
   effective_status?: string;
+  optimization_goal?: string;
+  daily_budget?: string;
 }
 
 interface MetaActionValue {
@@ -114,10 +139,58 @@ function actionValue(actions: MetaActionValue[] | undefined, actionType: string)
   return match ? Number(match.value) || 0 : null;
 }
 
-export async function listCampaignsWithInsights(adAccountId: string, dateRange: MetaDateRangeParam = DEFAULT_META_DATE_PRESET): Promise<MetaCampaignSummary[]> {
-  const campaignsData = (await metaFetch(`/${adAccountId}/campaigns`, { fields: "id,name,objective,status,effective_status", limit: "200" })) as {
-    data: MetaCampaignRaw[];
+// If no optimization_goal is known at all (still possible even after the ad
+// set lookup below), check these conversion-oriented action types in
+// priority order — NEVER fall back to "the largest action count", since
+// that picks broad engagement/reach metrics (page_engagement, video_view...)
+// which are almost never what "Results" actually means.
+const SAFE_FALLBACK_ACTIONS = [
+  "offsite_conversion.fb_pixel_purchase",
+  "purchase",
+  "omni_purchase",
+  "onsite_conversion.lead_grouped",
+  "lead",
+  "link_click",
+  "landing_page_view",
+];
+
+function extractResults(insight: MetaInsightRaw | undefined, optimizationGoal: string | undefined, reach: number, impressions: number): number {
+  if (optimizationGoal === "REACH") return reach;
+  if (optimizationGoal === "IMPRESSIONS") return impressions;
+  const candidates = optimizationGoal ? OPTIMIZATION_GOAL_ACTIONS[optimizationGoal] : undefined;
+  if (candidates) {
+    for (const actionType of candidates) {
+      const value = actionValue(insight?.actions, actionType);
+      if (value !== null) return value;
+    }
+    return 0; // goal is mapped, that action just didn't happen this period — genuinely 0.
+  }
+  for (const actionType of SAFE_FALLBACK_ACTIONS) {
+    const value = actionValue(insight?.actions, actionType);
+    if (value !== null) return value;
+  }
+  return 0;
+}
+
+/** optimization_goal often only lives on the ad sets, not the campaign
+ * itself (e.g. non-CBO campaigns) — one batched call for the whole account
+ * instead of one extra call per campaign missing it. */
+async function getAdSetOptimizationGoals(adAccountId: string): Promise<Map<string, string>> {
+  const data = (await metaFetch(`/${adAccountId}/adsets`, { fields: "campaign_id,optimization_goal", limit: "500" })) as {
+    data: { campaign_id: string; optimization_goal?: string }[];
   };
+  const map = new Map<string, string>();
+  for (const adSet of data.data ?? []) {
+    if (adSet.optimization_goal && !map.has(adSet.campaign_id)) map.set(adSet.campaign_id, adSet.optimization_goal);
+  }
+  return map;
+}
+
+export async function listCampaignsWithInsights(adAccountId: string, dateRange: MetaDateRangeParam = DEFAULT_META_DATE_PRESET): Promise<MetaCampaignSummary[]> {
+  const campaignsData = (await metaFetch(`/${adAccountId}/campaigns`, {
+    fields: "id,name,objective,status,effective_status,optimization_goal,daily_budget",
+    limit: "200",
+  })) as { data: MetaCampaignRaw[] };
   const dateParams: Record<string, string> = isCustomDateRange(dateRange) ? { time_range: JSON.stringify(dateRange) } : { date_preset: dateRange };
   const insightsData = (await metaFetch(`/${adAccountId}/insights`, {
     level: "campaign",
@@ -128,20 +201,26 @@ export async function listCampaignsWithInsights(adAccountId: string, dateRange: 
   })) as { data: MetaInsightRaw[] };
 
   const insightsByCampaignId = new Map(insightsData.data?.map((i) => [i.campaign_id, i]) ?? []);
+  const needsAdSetGoal = (campaignsData.data ?? []).some((c) => !c.optimization_goal);
+  const adSetGoals = needsAdSetGoal ? await getAdSetOptimizationGoals(adAccountId) : new Map<string, string>();
 
   return (campaignsData.data ?? []).map((campaign) => {
     const insight = insightsByCampaignId.get(campaign.id);
-    const resultActions = insight?.actions?.reduce((sum, action) => sum + (Number(action.value) || 0), 0) ?? 0;
+    const impressions = Number(insight?.impressions) || 0;
+    const reach = Number(insight?.reach) || 0;
+    const optimizationGoal = campaign.optimization_goal ?? adSetGoals.get(campaign.id);
     return {
       externalId: campaign.id,
       name: campaign.name,
       objective: mapObjective(campaign.objective),
       status: mapStatus(campaign.status),
+      // Meta returns budgets in the account currency's minor unit (e.g. cents).
+      dailyBudget: campaign.daily_budget !== undefined ? Number(campaign.daily_budget) / 100 : 0,
       amountSpent: Number(insight?.spend) || 0,
       clicks: Number(insight?.clicks) || 0,
-      impressions: Number(insight?.impressions) || 0,
-      reach: Number(insight?.reach) || 0,
-      results: resultActions,
+      impressions,
+      reach,
+      results: extractResults(insight, optimizationGoal, reach, impressions),
       insights: {
         deliveryStatus: campaign.effective_status ?? null,
         cpc: insight?.cpc !== undefined ? Number(insight.cpc) : null,
