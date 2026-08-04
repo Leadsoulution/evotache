@@ -10,6 +10,9 @@ import { ColorSwatchPicker } from "./ColorSwatchPicker";
 import { ImageIcon, XIcon } from "@/components/ui/icons";
 import { AGENT_TOOLS } from "@/types/agent";
 import { uploadFile } from "@/services/uploadApi";
+import { generateTelegramLinkCode, unlinkTelegram } from "@/services/agentApi";
+import { useToast } from "@/components/ui/Toast";
+import { CheckIcon } from "@/components/ui/icons";
 import type { Agent, AgentKind, AgentTool } from "@/types/agent";
 
 const inputClass =
@@ -45,7 +48,13 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wasOpen, setWasOpen] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
+  const [telegramCode, setTelegramCode] = useState<string | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [unlinkingTelegram, setUnlinkingTelegram] = useState(false);
+  const [botUsername, setBotUsername] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   if (open !== wasOpen) {
     setWasOpen(open);
@@ -59,12 +68,49 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       setSystemPrompt(editingAgent?.systemPrompt ?? "");
       setEnabledTools(editingAgent?.enabledTools ?? ["tasks", "litiges"]);
       setError(null);
+      setTelegramChatId(editingAgent?.telegramChatId ?? null);
+      setTelegramCode(null);
     }
   }
 
   useEffect(() => {
     if (open) nameRef.current?.focus();
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/integrations/telegram/setup")
+      .then((res) => res.json())
+      .then((data: { botUsername: string | null }) => setBotUsername(data.botUsername))
+      .catch(() => {});
+  }, [open]);
+
+  async function handleGenerateTelegramCode() {
+    if (!editingAgent) return;
+    setGeneratingCode(true);
+    try {
+      setTelegramCode(await generateTelegramLinkCode(editingAgent.id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate a code.");
+    } finally {
+      setGeneratingCode(false);
+    }
+  }
+
+  async function handleUnlinkTelegram() {
+    if (!editingAgent) return;
+    setUnlinkingTelegram(true);
+    try {
+      await unlinkTelegram(editingAgent.id);
+      setTelegramChatId(null);
+      setTelegramCode(null);
+      toast.success("Telegram chat unlinked.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to unlink.");
+    } finally {
+      setUnlinkingTelegram(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -245,6 +291,54 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
               ))}
             </div>
           </fieldset>
+
+          {editingAgent && kind === "external" && enabledTools.includes("telegram") && (
+            <fieldset className="block text-sm">
+              <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Telegram</legend>
+              <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                {telegramChatId ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      <CheckIcon className="h-3.5 w-3.5" /> Chat linked
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleUnlinkTelegram}
+                      disabled={unlinkingTelegram}
+                      className="text-xs font-medium text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400"
+                    >
+                      {unlinkingTelegram ? "Unlinking…" : "Unlink"}
+                    </button>
+                  </div>
+                ) : telegramCode ? (
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Send <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-slate-800">/link {telegramCode}</code> to
+                    {botUsername ? (
+                      <>
+                        {" "}
+                        <span className="font-medium">@{botUsername}</span>
+                      </>
+                    ) : (
+                      " the bot"
+                    )}{" "}
+                    on Telegram to link this chat.
+                  </p>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Not linked to a Telegram chat yet.</span>
+                    <button
+                      type="button"
+                      onClick={handleGenerateTelegramCode}
+                      disabled={generatingCode}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      {generatingCode ? "Generating…" : "Generate link code"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </fieldset>
+          )}
 
           <div className="mt-2 flex justify-end gap-2">
             <button

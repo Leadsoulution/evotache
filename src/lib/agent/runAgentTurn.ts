@@ -25,6 +25,10 @@ interface ChatMessage {
 interface RunAgentTurnInput {
   agentId: string;
   conversationId: string;
+  /** Called with the final reply text right after it's persisted — lets an
+   * external channel (e.g. Telegram) mirror the reply out, without this
+   * function needing to know anything about where the turn came from. */
+  onReply?: (text: string) => Promise<void> | void;
 }
 
 /** Runs one agent "turn" in a chat conversation: builds context from the
@@ -32,7 +36,7 @@ interface RunAgentTurnInput {
  * reply as a normal Message from the agent. Fails silently (matching
  * notifyUser/emailUser's fail-open pattern) if OpenAI isn't configured or
  * errors — a broken agent should never break the human's message send. */
-export async function runAgentTurn({ agentId, conversationId }: RunAgentTurnInput): Promise<void> {
+export async function runAgentTurn({ agentId, conversationId, onReply }: RunAgentTurnInput): Promise<void> {
   const apiKey = await getOpenAIKey();
   if (!apiKey) return;
 
@@ -140,6 +144,7 @@ export async function runAgentTurn({ agentId, conversationId }: RunAgentTurnInpu
     if (!finalText.trim()) finalText = "I don't have a response right now.";
 
     await sendMessageAsUser({ conversation, senderId: agentId, senderName: agentUser.name, text: finalText });
+    await onReply?.(finalText);
   } finally {
     const current = await db.conversation.findUnique({ where: { id: conversationId }, select: { typingAgentIds: true } });
     if (current) {

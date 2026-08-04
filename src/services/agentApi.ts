@@ -57,3 +57,15 @@ export async function deleteAgentRequest(id: string): Promise<void> {
   const response = await fetch(`/api/agents/${id}`, { method: "DELETE" });
   if (!response.ok) return parseErrorOrThrow(response);
 }
+
+export async function generateTelegramLinkCode(agentId: string): Promise<string> {
+  const response = await fetch(`/api/agents/${agentId}/telegram-link-code`, { method: "POST" });
+  if (!response.ok) return parseErrorOrThrow(response);
+  const data: { code: string } = await response.json();
+  return data.code;
+}
+
+export async function unlinkTelegram(agentId: string): Promise<void> {
+  const response = await fetch(`/api/agents/${agentId}/telegram-link-code`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
+}

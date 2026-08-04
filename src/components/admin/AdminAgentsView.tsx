@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAgents } from "@/hooks/useAgents";
 import { canManageUsers } from "@/config/roleMeta";
 import { AgentFormDialog } from "./AgentFormDialog";
+import { TelegramBotStatusCard } from "./TelegramBotStatusCard";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { ErrorState } from "@/components/task-list/ErrorState";
@@ -58,6 +59,8 @@ export function AdminAgentsView() {
           Add agent
         </button>
       </header>
+
+      <TelegramBotStatusCard />
 
       {loadState === "loading" && <TaskListSkeleton />}
       {loadState === "error" && <ErrorState message={errorMessage ?? "Unknown error."} onRetry={refetch} />}
