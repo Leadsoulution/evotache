@@ -8,6 +8,7 @@ import { getDescendantIds } from "@/lib/taskTree";
 import { deleteFile } from "@/lib/storage";
 import { listDriveFiles, listRecentGmail, readDriveFile, sendGmail } from "@/lib/googleApi";
 import { searchWeb } from "@/lib/webSearch";
+import { triggerN8nWorkflow } from "@/lib/n8n";
 import type { AgentTool } from "@/types/agent";
 
 export interface ToolContext {
@@ -934,6 +935,23 @@ const webSearchTool: ToolDef = {
   },
 };
 
+const triggerN8n: ToolDef = {
+  name: "trigger_n8n_workflow",
+  requires: ["n8n"],
+  description: "Trigger the configured n8n workflow with a JSON payload. Fire-and-forget — this only confirms the workflow was triggered, it doesn't wait for or return the workflow's own result.",
+  parameters: {
+    type: "object",
+    properties: {
+      payload: { type: "object", description: "Data to send to the n8n workflow — shape depends on what that workflow expects." },
+    },
+    required: ["payload"],
+  },
+  execute: async (args) => {
+    const payload = (args.payload as Record<string, unknown>) ?? {};
+    return triggerN8nWorkflow(payload);
+  },
+};
+
 export const AGENT_TOOL_DEFS: ToolDef[] = [
   listOverdueItems,
   getStats,
@@ -969,4 +987,5 @@ export const AGENT_TOOL_DEFS: ToolDef[] = [
   listDriveFilesTool,
   readDriveFileTool,
   webSearchTool,
+  triggerN8n,
 ];
