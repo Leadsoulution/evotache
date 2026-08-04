@@ -26,7 +26,7 @@ import { ErrorState } from "./ErrorState";
 import { TaskDetailDrawer } from "./TaskDetailDrawer";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { groupTasks, sortTasks } from "@/lib/taskQuery";
-import { countDescendants, filterTopLevelTasks, flattenVisibleTree, getChildren, getDescendantIds } from "@/lib/taskTree";
+import { collectVisibleTasks, countDescendants, filterTopLevelTasks, flattenGroupTree, flattenVisibleTree, getChildren, getDescendantIds } from "@/lib/taskTree";
 import { fetchAttachmentCountsByTask } from "@/services/attachmentApi";
 import type { GroupField, SortDirection, SortField, Task, TaskFilters, TaskModule, TaskTypeFilter } from "@/types/task";
 
@@ -131,12 +131,21 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     const filteredTopLevel = filterTopLevelTasks(topLevel, tasks, filters, assigneeNameById);
     const statusOrder = statuses.map((s) => s.id);
     const priorityOrder = priorities.map((p) => p.id);
-    const sortedTopLevel = sortTasks(filteredTopLevel, sortField, sortDirection, statusOrder, priorityOrder);
-    const groupResults = groupTasks(sortedTopLevel, groupField, assignees, statuses, priorities);
+
+    if (groupField === "none") {
+      const sortedTopLevel = sortTasks(filteredTopLevel, sortField, sortDirection, statusOrder, priorityOrder);
+      return [{ key: "all", label: "All tasks", rows: flattenVisibleTree(sortedTopLevel, tasks, collapsedIds) }];
+    }
+
+    // Grouped views bucket every visible task (not just roots) by its own
+    // status/priority/assignee, so a subtask moves into its own group
+    // instead of staying stuck wherever its parent landed.
+    const visibleTasks = collectVisibleTasks(filteredTopLevel, tasks);
+    const groupResults = groupTasks(visibleTasks, groupField, assignees, statuses, priorities);
     return groupResults.map((group) => ({
       key: group.key,
       label: group.label,
-      rows: flattenVisibleTree(group.tasks, tasks, collapsedIds),
+      rows: flattenGroupTree(sortTasks(group.tasks, sortField, sortDirection, statusOrder, priorityOrder), collapsedIds),
     }));
   }, [
     tasks,

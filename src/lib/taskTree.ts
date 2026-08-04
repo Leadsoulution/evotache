@@ -85,3 +85,41 @@ export function flattenVisibleTree(topLevelTasksInOrder: Task[], allTasks: Task[
   for (const task of topLevelTasksInOrder) walk(task, 0);
   return rows;
 }
+
+/** Every visible task (top-level roots that passed the filter, plus their
+ * full descendant subtree — matching filterTopLevelTasks' "no partial
+ * pruning" policy) as one flat list, for grouping modes that bucket by each
+ * task's own field rather than its root's. */
+export function collectVisibleTasks(filteredTopLevel: Task[], allTasks: Task[]): Task[] {
+  const idSet = new Set<string>();
+  for (const root of filteredTopLevel) {
+    idSet.add(root.id);
+    for (const id of getDescendantIds(allTasks, root.id)) idSet.add(id);
+  }
+  return allTasks.filter((t) => idSet.has(t.id));
+}
+
+/**
+ * Renders one status/priority/assignee group as a tree, but only nests a
+ * task under its parent when the parent is ALSO in this same group — a
+ * subtask whose own status differs from its parent's (e.g. parent "To do",
+ * subtask "Done") renders at depth 0 in its own group instead of staying
+ * stuck under the parent's group.
+ */
+export function flattenGroupTree(groupTasksInOrder: Task[], collapsedIds: Set<string>): FlatTreeRow[] {
+  const idsInGroup = new Set(groupTasksInOrder.map((t) => t.id));
+  const childrenMap = buildChildrenMap(groupTasksInOrder);
+  const roots = groupTasksInOrder.filter((t) => !t.parentId || !idsInGroup.has(t.parentId));
+
+  const rows: FlatTreeRow[] = [];
+  function walk(task: Task, depth: number) {
+    const children = childrenMap.get(task.id) ?? [];
+    rows.push({ task, depth, hasChildren: children.length > 0, childCount: children.length });
+    if (children.length > 0 && !collapsedIds.has(task.id)) {
+      for (const child of children) walk(child, depth + 1);
+    }
+  }
+
+  for (const task of roots) walk(task, 0);
+  return rows;
+}
