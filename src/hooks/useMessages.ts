@@ -44,6 +44,25 @@ export function useMessages(conversationId: string | null) {
     { refreshInterval: TYPING_POLL_MS }
   );
 
+  // The app disables SWR's revalidateOnFocus globally (avoids refetch storms
+  // elsewhere), but that means coming back to a backgrounded tab/PWA after a
+  // push notification otherwise waits for the next poll tick — which can be
+  // way more than POLL_MS if the browser throttled timers while hidden.
+  // Force an immediate refresh the moment the chat is actually looked at.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      void mutate();
+      void mutateTyping();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [mutate, mutateTyping]);
+
   // Tracks when each agentId first appeared in rawTypingAgentIds, so
   // typingAgentIds below can hide it past MAX_TYPING_DISPLAY_MS regardless
   // of what the server still reports. Naturally resets on conversation
