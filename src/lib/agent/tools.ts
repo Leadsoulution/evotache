@@ -7,6 +7,7 @@ import { toPublicTask } from "@/lib/publicTask";
 import { getDescendantIds } from "@/lib/taskTree";
 import { deleteFile } from "@/lib/storage";
 import { listDriveFiles, listRecentGmail, readDriveFile, sendGmail } from "@/lib/googleApi";
+import { searchWeb } from "@/lib/webSearch";
 import type { AgentTool } from "@/types/agent";
 
 export interface ToolContext {
@@ -913,6 +914,26 @@ const readDriveFileTool: ToolDef = {
   },
 };
 
+const webSearchTool: ToolDef = {
+  name: "web_search",
+  requires: ["websearch"],
+  description: "Search the web for current information (news, prices, facts not known from training data). Returns a list of results with title, url, and a snippet.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string" },
+      maxResults: { type: "number", description: "1-10, defaults to 5." },
+    },
+    required: ["query"],
+  },
+  execute: async (args) => {
+    const query = args.query as string;
+    const maxResults = typeof args.maxResults === "number" ? args.maxResults : 5;
+    const results = await searchWeb(query, maxResults);
+    return { results };
+  },
+};
+
 export const AGENT_TOOL_DEFS: ToolDef[] = [
   listOverdueItems,
   getStats,
@@ -947,4 +968,5 @@ export const AGENT_TOOL_DEFS: ToolDef[] = [
   listRecentEmails,
   listDriveFilesTool,
   readDriveFileTool,
+  webSearchTool,
 ];
