@@ -47,15 +47,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex h-screen flex-col overflow-hidden md:flex-row">
       <OverdueAlertPopup />
       <AppSidebar navBadgeCounts={navBadgeCounts} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppHeader navBadgeCounts={navBadgeCounts} />
         <div className="hidden justify-end border-b border-slate-200 px-4 py-2 md:flex dark:border-slate-800">
           <NotificationBell align="end" />
         </div>
-        <main className="min-w-0 flex-1">{children}</main>
+        {/* Fixed-height shell, scrollable here: a normal page just renders
+            taller-than-viewport content and this scrolls it, while a page
+            like Chat that manages its own internal scrolling (h-full
+            overflow-hidden) fits exactly and never triggers this scrollbar —
+            either way, the sidebar/header stay pinned instead of scrolling
+            away with page content. */}
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

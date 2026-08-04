@@ -34,7 +34,7 @@ export function AppSidebar({ navBadgeCounts }: AppSidebarProps) {
   const navItems = getNavItems(user);
 
   return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex dark:border-slate-800 dark:bg-slate-950">
+    <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex dark:border-slate-800 dark:bg-slate-950">
       <div className="px-4 py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/app-logo-light.png?v=${LOGO_VERSION}`} alt="EvoTask" className="h-14 w-auto rounded-md dark:hidden" />
