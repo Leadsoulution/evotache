@@ -17,6 +17,7 @@ export const fr: Record<TranslationKey, string> = {
   "nav.library": "Bibliothèque",
   "nav.aiAssistant": "Assistant IA",
   "nav.statistics": "Statistiques",
+  "nav.calls": "Appels",
   "nav.admin": "Admin",
 
   // Common

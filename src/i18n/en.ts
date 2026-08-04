@@ -16,6 +16,7 @@ export const en = {
   "nav.library": "Library",
   "nav.aiAssistant": "AI Assistant",
   "nav.statistics": "Statistics",
+  "nav.calls": "Calls",
   "nav.admin": "Admin",
 
   // Common

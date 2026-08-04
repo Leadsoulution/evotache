@@ -8,8 +8,9 @@ import { useTaskMeta } from "@/hooks/useTaskMeta";
 import { useConversations } from "@/hooks/useConversations";
 import { fetchTasks } from "@/services/taskApi";
 import { fetchPurchaseItems } from "@/services/purchaseApi";
+import { fetchCalls } from "@/services/callApi";
 import { getLastViewed, markViewed } from "@/services/notificationPrefsApi";
-import { canManageUsers } from "@/config/roleMeta";
+import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import type { Task } from "@/types/task";
 import type { PurchaseItem } from "@/types/purchase";
 
@@ -20,6 +21,7 @@ const PATH_MODULE: Record<string, string> = {
   "/tasks": "tasks",
   "/disputes": "disputes",
   "/achats": "achats",
+  "/calls": "calls",
 };
 
 export interface NavBadgeCounts {
@@ -27,9 +29,10 @@ export interface NavBadgeCounts {
   "/disputes": number;
   "/achats": number;
   "/chat": number;
+  "/calls": number;
 }
 
-const EMPTY_COUNTS: NavBadgeCounts = { "/tasks": 0, "/disputes": 0, "/achats": 0, "/chat": 0 };
+const EMPTY_COUNTS: NavBadgeCounts = { "/tasks": 0, "/disputes": 0, "/achats": 0, "/chat": 0, "/calls": 0 };
 
 /** WhatsApp-style unread badges for the nav: tasks/litiges/achats assigned to
  * you and changed since you last opened that section, plus the chat unread total.
@@ -45,6 +48,7 @@ export function useNavBadgeCounts(): NavBadgeCounts {
   const pathname = usePathname();
   const [lastViewed, setLastViewed] = useState<Record<string, string>>({});
   const isAdmin = user ? canManageUsers(user.role) : false;
+  const canSeeCalls = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
 
   const tasksSWR = useSWR<Task[]>(
     user ? ["tasks", "task"] : null,
@@ -61,6 +65,7 @@ export function useNavBadgeCounts(): NavBadgeCounts {
     () => fetchPurchaseItems({ userId: user!.id, isAdmin }),
     { refreshInterval: POLL_MS }
   );
+  const callsSWR = useSWR(canSeeCalls ? "phone-calls" : null, fetchCalls, { refreshInterval: POLL_MS });
 
   useEffect(() => {
     if (!user) return;
@@ -76,6 +81,7 @@ export function useNavBadgeCounts(): NavBadgeCounts {
     void tasksSWR.mutate();
     void disputesSWR.mutate();
     void purchasesSWR.mutate();
+    void callsSWR.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, user?.id]);
 
@@ -100,13 +106,16 @@ export function useNavBadgeCounts(): NavBadgeCounts {
     const tasks = tasksSWR.data ?? [];
     const disputes = disputesSWR.data ?? [];
     const purchases = purchasesSWR.data ?? [];
+    const calls = callsSWR.data ?? [];
     const tasksSince = lastViewed.tasks ?? EPOCH;
     const disputesSince = lastViewed.disputes ?? EPOCH;
     const achatsSince = lastViewed.achats ?? EPOCH;
+    const callsSince = lastViewed.calls ?? EPOCH;
     const tasksCount = tasks.filter((t) => t.assigneeIds.includes(user.id) && t.status !== doneStatusId && t.updatedAt > tasksSince).length;
     const disputesCount = disputes.filter((t) => t.assigneeIds.includes(user.id) && t.status !== doneStatusId && t.updatedAt > disputesSince).length;
     const achatsCount = purchases.filter((p) => p.assigneeIds.includes(user.id) && p.updatedAt > achatsSince).length;
     const chatCount = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
-    return { "/tasks": tasksCount, "/disputes": disputesCount, "/achats": achatsCount, "/chat": chatCount };
-  }, [tasksSWR.data, disputesSWR.data, purchasesSWR.data, lastViewed, unreadCounts, user, doneStatusId]);
+    const callsCount = calls.filter((c) => c.callType === "Missed" && c.createdAt > callsSince).length;
+    return { "/tasks": tasksCount, "/disputes": disputesCount, "/achats": achatsCount, "/chat": chatCount, "/calls": callsCount };
+  }, [tasksSWR.data, disputesSWR.data, purchasesSWR.data, callsSWR.data, lastViewed, unreadCounts, user, doneStatusId]);
 }

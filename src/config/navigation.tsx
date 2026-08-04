@@ -8,6 +8,7 @@ import {
   HomeIcon,
   ListChecksIcon,
   MegaphoneIcon,
+  PhoneIcon,
   ScaleIcon,
   ShieldIcon,
   ShoppingBagIcon,
@@ -43,6 +44,7 @@ export const BASE_NAV_ITEMS: NavItem[] = [
 export function getNavItems(user: AppUser): NavItem[] {
   const items = [...BASE_NAV_ITEMS];
   if (canManageUsers(user.role) || canManageWorkflow(user.role)) {
+    items.push({ href: "/calls", label: "nav.calls", icon: PhoneIcon });
     items.push({ href: "/admin", label: "nav.admin", icon: ShieldIcon });
   }
   if (!user.visibleSectionHrefs) return items;

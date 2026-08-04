@@ -459,3 +459,24 @@ model BackupSheetConfig {
 
   @@map("backup_sheet_config")
 }
+
+// Written directly by 3CX's own "Call Journaling" database integration via
+// a raw SQL INSERT (not through this app/Prisma) — id must be a
+// database-generated default (Postgres SERIAL), unlike this schema's usual
+// cuid(), since 3CX's INSERT never supplies one.
+model PhoneCall {
+  id             Int      @id @default(autoincrement())
+  contactNumber  String   @map("contactnumber") // 3CX @Number
+  agentExtension String   @map("agentextension") // 3CX @Agent
+  callType       String   @map("calltype") // 3CX @CallType — "Inbound" | "Outbound" | "Missed" | "Unanswered"
+  startTime      DateTime @map("starttime") // 3CX @CallStartTimeUTC
+  duration       Int      @default(0) // seconds, 3CX @Duration
+  createdAt      DateTime @default(now()) @map("createdat") // when the row actually landed — drives the notification/badge watermark
+
+  // Explicit lowercase column names (no @map default camelCase) so the SQL
+  // handed to 3CX's Call Journaling config can use plain unquoted
+  // identifiers, matching 3CX's own example statements — Postgres folds
+  // unquoted identifiers to lowercase, so camelCase columns would otherwise
+  // require fragile double-quoting in that config.
+  @@map("phone_calls")
+}
