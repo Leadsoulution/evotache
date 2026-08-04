@@ -18,7 +18,18 @@ async function telegramFetch(method: string, body?: Record<string, unknown>): Pr
 }
 
 export async function sendTelegramMessage(chatId: string, text: string): Promise<void> {
-  await telegramFetch("sendMessage", { chat_id: chatId, text });
+  try {
+    // Agent replies are markdown (bold/lists/links/code) — Telegram's legacy
+    // "Markdown" mode renders that without needing MarkdownV2's strict
+    // character-escaping (tables aren't supported by either and just show
+    // as plain text, which is a Telegram limitation, not an error).
+    await telegramFetch("sendMessage", { chat_id: chatId, text, parse_mode: "Markdown" });
+  } catch {
+    // Unbalanced markdown entities make Telegram reject the whole message —
+    // retry as plain text so a formatting hiccup never means the reply
+    // silently never arrives.
+    await telegramFetch("sendMessage", { chat_id: chatId, text });
+  }
 }
 
 export interface TelegramBotInfo {

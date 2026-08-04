@@ -4,6 +4,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { DownloadIcon, FileIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
 import { formatBytes } from "@/lib/attachmentUtils";
 import { cn } from "@/lib/cn";
+import { MarkdownMessage } from "./MarkdownMessage";
 import type { Message, MessageAttachment } from "@/types/chat";
 import type { AppUser } from "@/types/user";
 
@@ -117,11 +118,11 @@ export function MessageBubble({ message, sender, isOwn, showSenderName, onOpenAt
         {message.text && (
           <div
             className={cn(
-              "whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm",
+              "rounded-2xl px-3 py-2",
               isOwn ? "rounded-br-sm bg-indigo-600 text-white" : "rounded-bl-sm bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
             )}
           >
-            {message.text}
+            <MarkdownMessage text={message.text} isOwn={isOwn} />
           </div>
         )}
 
