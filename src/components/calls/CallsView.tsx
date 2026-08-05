@@ -62,6 +62,18 @@ function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Local (browser) hour:minute:second — locale-independent, always 24h, so
+// it can double as both the display string and the filter comparison key.
+function formatCallTime(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+}
+
+function callHourMinute(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export function CallsView() {
   const { user } = useAuth();
   const router = useRouter();
@@ -76,6 +88,8 @@ export function CallsView() {
   const [directionFilter, setDirectionFilter] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
   const [pageSize, setPageSize] = useState<number | "all">(20);
   const [sortField, setSortField] = useState<SortField>("startTime");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -150,9 +164,14 @@ export function CallsView() {
       if (directionFilter.length && !directionFilter.includes(c.direction)) return false;
       if (dateFrom && c.startTime < dateFrom) return false;
       if (dateTo && c.startTime > `${dateTo}T23:59:59`) return false;
+      if (timeFrom || timeTo) {
+        const hm = callHourMinute(c.startTime);
+        if (timeFrom && hm < timeFrom) return false;
+        if (timeTo && hm > timeTo) return false;
+      }
       return true;
     });
-  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, effectiveSelectedDn]);
+  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, timeFrom, timeTo, effectiveSelectedDn]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -277,6 +296,24 @@ export function CallsView() {
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               />
             </label>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              Heure ≥
+              <input
+                type="time"
+                value={timeFrom}
+                onChange={(event) => setTimeFrom(event.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              Heure ≤
+              <input
+                type="time"
+                value={timeTo}
+                onChange={(event) => setTimeTo(event.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              />
+            </label>
           </div>
 
           {sorted.length === 0 && (
@@ -320,7 +357,10 @@ export function CallsView() {
                           {statusOptions.find((o) => o.value === call.status)?.label ?? call.status}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDueDate(call.startTime)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
+                        <div>{formatDueDate(call.startTime)}</div>
+                        <div className="text-xs text-slate-400 dark:text-slate-500">{formatCallTime(call.startTime)}</div>
+                      </td>
                       <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.ringSeconds)}</td>
                       <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.talkSeconds)}</td>
                     </tr>
