@@ -14,8 +14,39 @@ import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
-import { CheckIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon } from "@/components/ui/icons";
+import { CheckIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon } from "@/components/ui/icons";
 import type { PhoneCall } from "@/types/call";
+
+type SortField = "source" | "dest" | "direction" | "status" | "startTime" | "ringSeconds" | "talkSeconds";
+
+const COLUMN_SORT_FIELD: { label: string; field: SortField }[] = [
+  { label: "Appelant", field: "source" },
+  { label: "Appelé", field: "dest" },
+  { label: "Direction", field: "direction" },
+  { label: "Statut", field: "status" },
+  { label: "Date", field: "startTime" },
+  { label: "Sonnerie", field: "ringSeconds" },
+  { label: "Parole", field: "talkSeconds" },
+];
+
+function sortValue(call: PhoneCall, field: SortField): string | number {
+  switch (field) {
+    case "source":
+      return call.sourceName || call.sourceNumber;
+    case "dest":
+      return call.destName || call.destNumber;
+    case "direction":
+      return call.direction;
+    case "status":
+      return call.status;
+    case "startTime":
+      return call.startTime;
+    case "ringSeconds":
+      return call.ringSeconds;
+    case "talkSeconds":
+      return call.talkSeconds;
+  }
+}
 
 // 3CX's real status vocabulary (confirmed live against actual synced
 // data) — "Unanswered" is what this app calls "missed", not "Missed".
@@ -58,6 +89,16 @@ export function CallsView() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [pageSize, setPageSize] = useState<number | "all">(20);
+  const [sortField, setSortField] = useState<SortField>("startTime");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  function handleSort(field: SortField) {
+    if (field === sortField) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  }
 
   async function handleSync() {
     setSyncing(true);
@@ -104,15 +145,30 @@ export function CallsView() {
     });
   }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo]);
 
-  const kpis = useMemo(() => {
-    const answered = calls.filter((c) => c.answered);
-    const missed = calls.filter((c) => c.status === "Unanswered");
-    const avgTalk = answered.length ? Math.round(answered.reduce((sum, c) => sum + c.talkSeconds, 0) / answered.length) : 0;
-    return { total: calls.length, answered: answered.length, missed: missed.length, avgTalk };
-  }, [calls]);
+  const sorted = useMemo(() => {
+    const copy = [...filtered];
+    copy.sort((a, b) => {
+      const av = sortValue(a, sortField);
+      const bv = sortValue(b, sortField);
+      const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [filtered, sortField, sortDirection]);
 
-  const { page, setPage, pageCount, start, end } = usePagination(filtered.length, pageSize);
-  const paged = filtered.slice(start, end);
+  // Reflects the currently filtered set, not the whole synced dataset —
+  // filtering by direction/status/date should visibly change these tiles.
+  const kpis = useMemo(() => {
+    const answered = filtered.filter((c) => c.answered);
+    const missed = filtered.filter((c) => c.status === "Unanswered");
+    const avgTalk = answered.length ? Math.round(answered.reduce((sum, c) => sum + c.talkSeconds, 0) / answered.length) : 0;
+    const answeredPct = filtered.length ? Math.round((answered.length / filtered.length) * 100) : 0;
+    const missedPct = filtered.length ? Math.round((missed.length / filtered.length) * 100) : 0;
+    return { total: filtered.length, answered: answered.length, missed: missed.length, avgTalk, answeredPct, missedPct };
+  }, [filtered]);
+
+  const { page, setPage, pageCount, start, end } = usePagination(sorted.length, pageSize);
+  const paged = sorted.slice(start, end);
 
   useEffect(() => {
     if (user && !allowed) router.replace("/");
@@ -146,8 +202,13 @@ export function CallsView() {
         <>
           <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
             <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />
-            <StatTile label="Répondus" value={kpis.answered} icon={<CheckIcon className="h-4.5 w-4.5" />} />
-            <StatTile label="Manqués" value={kpis.missed} icon={<PhoneMissedIcon className="h-4.5 w-4.5" />} tone={kpis.missed > 0 ? "warning" : "default"} />
+            <StatTile label="Répondus" value={`${kpis.answered} (${kpis.answeredPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
+            <StatTile
+              label="Manqués"
+              value={`${kpis.missed} (${kpis.missedPct}%)`}
+              icon={<PhoneMissedIcon className="h-4.5 w-4.5" />}
+              tone={kpis.missed > 0 ? "warning" : "default"}
+            />
             <StatTile label="Durée moyenne (parlé)" value={formatDuration(kpis.avgTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
           </section>
 
@@ -188,7 +249,7 @@ export function CallsView() {
             </label>
           </div>
 
-          {filtered.length === 0 && (
+          {sorted.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <PhoneIcon className="h-10 w-10 text-slate-300 dark:text-slate-700" />
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -197,14 +258,23 @@ export function CallsView() {
             </div>
           )}
 
-          {filtered.length > 0 && (
+          {sorted.length > 0 && (
             <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <table className="w-full min-w-[860px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                    {["Appelant", "Appelé", "Direction", "Statut", "Date", "Sonnerie", "Parole"].map((header) => (
-                      <th key={header} scope="col" className="whitespace-nowrap px-3 py-2">
-                        {header}
+                    {COLUMN_SORT_FIELD.map(({ label, field }) => (
+                      <th key={field} scope="col" className="whitespace-nowrap px-3 py-2">
+                        <button type="button" onClick={() => handleSort(field)} className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">
+                          {label}
+                          <SortIcon
+                            className={cn(
+                              "h-3 w-3 transition-transform",
+                              sortField === field ? "opacity-100" : "opacity-30",
+                              sortField === field && sortDirection === "asc" && "rotate-180"
+                            )}
+                          />
+                        </button>
                       </th>
                     ))}
                   </tr>
@@ -230,12 +300,12 @@ export function CallsView() {
             </div>
           )}
 
-          {filtered.length > 0 && (
+          {sorted.length > 0 && (
             <Pagination
               page={page}
               pageCount={pageCount}
               pageSize={pageSize}
-              total={filtered.length}
+              total={sorted.length}
               rangeStart={start + 1}
               rangeEnd={end}
               onPageChange={setPage}
