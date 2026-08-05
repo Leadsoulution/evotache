@@ -486,17 +486,21 @@ model PhoneCall {
 }
 
 // Single shared 3CX connection (like GoogleConnection/MetaConnection).
-// 3CX's XAPI client_credentials grant uses a real user's own
-// username/password as client_id/client_secret (confirmed against 3CX's
-// own xapi-tutorial example) — not a revocable app secret — so setup
-// recommends a dedicated low-privilege "Reports"-only 3CX user instead
-// of a personal admin login.
+// Confirmed live (captured the real 3CX web client's own token request via
+// DevTools) that 3CX's XAPI actually uses grant_type=password with the
+// fixed public client_id "Webclient" for login, then grant_type=refresh_token
+// (also client_id=Webclient) to renew — not client_credentials as an
+// earlier community example suggested. Username/password are still stored
+// so a lost/invalid refresh token can re-login without the admin
+// re-entering credentials — setup recommends a dedicated low-privilege
+// 3CX user instead of a personal admin login regardless.
 model ThreeCxConnection {
   id             String    @id @default(cuid())
   pbxUrl         String
   username       String
   password       String
   accessToken    String?
+  refreshToken   String?
   tokenExpiresAt DateTime?
   connectedBy    String
   connectedAt    DateTime  @default(now())
