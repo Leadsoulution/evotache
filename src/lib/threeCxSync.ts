@@ -30,6 +30,6 @@ export async function syncCalls(): Promise<{ synced: number; missed: number }> {
     });
   }
 
-  const missed = entries.filter((e) => e.status === "Missed").length;
+  const missed = entries.filter((e) => e.status === "Unanswered").length;
   return { synced: entries.length, missed };
 }

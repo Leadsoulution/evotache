@@ -115,7 +115,7 @@ export function useNavBadgeCounts(): NavBadgeCounts {
     const disputesCount = disputes.filter((t) => t.assigneeIds.includes(user.id) && t.status !== doneStatusId && t.updatedAt > disputesSince).length;
     const achatsCount = purchases.filter((p) => p.assigneeIds.includes(user.id) && p.updatedAt > achatsSince).length;
     const chatCount = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
-    const callsCount = calls.filter((c) => c.status === "Missed" && c.createdAt > callsSince).length;
+    const callsCount = calls.filter((c) => c.status === "Unanswered" && c.createdAt > callsSince).length;
     return { "/tasks": tasksCount, "/disputes": disputesCount, "/achats": achatsCount, "/chat": chatCount, "/calls": callsCount };
   }, [tasksSWR.data, disputesSWR.data, purchasesSWR.data, callsSWR.data, lastViewed, unreadCounts, user, doneStatusId]);
 }

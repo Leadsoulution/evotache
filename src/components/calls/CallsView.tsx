@@ -17,9 +17,20 @@ import { cn } from "@/lib/cn";
 import { CheckIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon } from "@/components/ui/icons";
 import type { PhoneCall } from "@/types/call";
 
+// 3CX's real status vocabulary (confirmed live against actual synced
+// data) — "Unanswered" is what this app calls "missed", not "Missed".
 const STATUS_BADGE: Record<string, string> = {
   Answered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  Missed: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+  Unanswered: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+  Waiting: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  Redirected: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  Answered: "Répondu",
+  Unanswered: "Manqué",
+  Waiting: "En attente",
+  Redirected: "Redirigé",
 };
 
 const DIRECTION_LABEL: Record<string, string> = {
@@ -63,15 +74,15 @@ export function CallsView() {
     }
   }
 
-  // Built from whatever status/direction values are actually present in the
-  // synced data, rather than a hardcoded list — 3CX's full status vocabulary
-  // beyond Answered/Missed isn't fully known, and this adapts automatically.
+  // Built from whatever status values are actually present in the synced
+  // data, rather than a hardcoded list — adapts automatically if 3CX ever
+  // returns a status beyond the ones already mapped in STATUS_LABEL.
   const statusOptions = useMemo(() => {
     const values = new Set<string>();
     for (const c of calls) values.add(c.status);
     return Array.from(values)
       .sort()
-      .map((v) => ({ value: v, label: v === "Answered" ? "Répondu" : v === "Missed" ? "Manqué" : v }));
+      .map((v) => ({ value: v, label: STATUS_LABEL[v] ?? v }));
   }, [calls]);
   const directionOptions = useMemo(() => {
     const values = new Set<string>();
@@ -95,7 +106,7 @@ export function CallsView() {
 
   const kpis = useMemo(() => {
     const answered = calls.filter((c) => c.answered);
-    const missed = calls.filter((c) => c.status === "Missed");
+    const missed = calls.filter((c) => c.status === "Unanswered");
     const avgTalk = answered.length ? Math.round(answered.reduce((sum, c) => sum + c.talkSeconds, 0) / answered.length) : 0;
     return { total: calls.length, answered: answered.length, missed: missed.length, avgTalk };
   }, [calls]);
