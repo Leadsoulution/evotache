@@ -1,11 +1,17 @@
-export type CallType = "Inbound" | "Outbound" | "Missed" | "Unanswered";
-
 export interface PhoneCall {
   id: number;
-  contactNumber: string;
-  agentExtension: string;
-  callType: string;
+  externalId: string;
   startTime: string;
-  duration: number;
+  sourceNumber: string;
+  sourceName: string | null;
+  destNumber: string;
+  destName: string | null;
+  direction: string;
+  status: string;
+  answered: boolean;
+  ringSeconds: number;
+  talkSeconds: number;
+  cost: number;
+  reason: string | null;
   createdAt: string;
 }

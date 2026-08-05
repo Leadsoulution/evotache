@@ -460,23 +460,47 @@ model BackupSheetConfig {
   @@map("backup_sheet_config")
 }
 
-// Written directly by 3CX's own "Call Journaling" database integration via
-// a raw SQL INSERT (not through this app/Prisma) — id must be a
-// database-generated default (Postgres SERIAL), unlike this schema's usual
-// cuid(), since 3CX's INSERT never supplies one.
+// Pulled on demand from 3CX's XAPI (Pbx.GetCallLogData) via a manual
+// "Synchroniser" sync — not written directly by 3CX like the earlier
+// Call Journaling approach (which never fired in practice, blocked by an
+// expired 3CX license). externalId is 3CX's own CdrId, used as the
+// upsert key so repeated syncs update rather than duplicate.
 model PhoneCall {
-  id             Int      @id @default(autoincrement())
-  contactNumber  String   @map("contactnumber") // 3CX @Number
-  agentExtension String   @map("agentextension") // 3CX @Agent
-  callType       String   @map("calltype") // 3CX @CallType — "Inbound" | "Outbound" | "Missed" | "Unanswered"
-  startTime      DateTime @map("starttime") // 3CX @CallStartTimeUTC
-  duration       Int      @default(0) // seconds, 3CX @Duration
-  createdAt      DateTime @default(now()) @map("createdat") // when the row actually landed — drives the notification/badge watermark
+  id           Int      @id @default(autoincrement())
+  externalId   String   @unique // 3CX CdrId
+  startTime    DateTime
+  sourceNumber String // SourceCallerId
+  sourceName   String? // SourceDisplayName
+  destNumber   String // DestinationCallerId
+  destName     String? // DestinationDisplayName
+  direction    String // Inbound | Outbound | Internal
+  status       String // Answered | Missed | ... (whatever 3CX returns)
+  answered     Boolean
+  ringSeconds  Int      @default(0) // parsed from RingingDuration ("PT7.8S")
+  talkSeconds  Int      @default(0) // parsed from TalkingDuration
+  cost         Float    @default(0)
+  reason       String?
+  createdAt    DateTime @default(now())
 
-  // Explicit lowercase column names (no @map default camelCase) so the SQL
-  // handed to 3CX's Call Journaling config can use plain unquoted
-  // identifiers, matching 3CX's own example statements — Postgres folds
-  // unquoted identifiers to lowercase, so camelCase columns would otherwise
-  // require fragile double-quoting in that config.
   @@map("phone_calls")
+}
+
+// Single shared 3CX connection (like GoogleConnection/MetaConnection).
+// 3CX's XAPI client_credentials grant uses a real user's own
+// username/password as client_id/client_secret (confirmed against 3CX's
+// own xapi-tutorial example) — not a revocable app secret — so setup
+// recommends a dedicated low-privilege "Reports"-only 3CX user instead
+// of a personal admin login.
+model ThreeCxConnection {
+  id             String    @id @default(cuid())
+  pbxUrl         String
+  username       String
+  password       String
+  accessToken    String?
+  tokenExpiresAt DateTime?
+  connectedBy    String
+  connectedAt    DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("threecx_connections")
 }

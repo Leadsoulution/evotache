@@ -7,6 +7,6 @@ import type { PhoneCall } from "@/types/call";
 const POLL_MS = 30_000;
 
 export function useCalls() {
-  const { data, error, isLoading } = useSWR<PhoneCall[]>("phone-calls", fetchCalls, { refreshInterval: POLL_MS });
-  return { calls: data ?? [], loading: isLoading, error: Boolean(error) };
+  const { data, error, isLoading, mutate } = useSWR<PhoneCall[]>("phone-calls", fetchCalls, { refreshInterval: POLL_MS });
+  return { calls: data ?? [], loading: isLoading, error: Boolean(error), refetch: () => mutate() };
 }

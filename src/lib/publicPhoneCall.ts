@@ -4,11 +4,19 @@ import type { PhoneCall } from "@/types/call";
 export function toPublicPhoneCall(call: DbPhoneCall): PhoneCall {
   return {
     id: call.id,
-    contactNumber: call.contactNumber,
-    agentExtension: call.agentExtension,
-    callType: call.callType,
+    externalId: call.externalId,
     startTime: call.startTime.toISOString(),
-    duration: call.duration,
+    sourceNumber: call.sourceNumber,
+    sourceName: call.sourceName,
+    destNumber: call.destNumber,
+    destName: call.destName,
+    direction: call.direction,
+    status: call.status,
+    answered: call.answered,
+    ringSeconds: call.ringSeconds,
+    talkSeconds: call.talkSeconds,
+    cost: call.cost,
+    reason: call.reason,
     createdAt: call.createdAt.toISOString(),
   };
 }

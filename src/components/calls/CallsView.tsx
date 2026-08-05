@@ -6,27 +6,26 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCalls } from "@/hooks/useCalls";
 import { usePagination } from "@/hooks/usePagination";
 import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { ThreeCxConnectionCard } from "./ThreeCxConnectionCard";
 import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatTile } from "@/components/stats/StatTile";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
+import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
-import { CheckIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, SearchIcon } from "@/components/ui/icons";
+import { CheckIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon } from "@/components/ui/icons";
 import type { PhoneCall } from "@/types/call";
 
-const CALL_TYPE_OPTIONS = [
-  { value: "Inbound", label: "Entrant" },
-  { value: "Outbound", label: "Sortant" },
-  { value: "Missed", label: "Manqué" },
-  { value: "Unanswered", label: "Non abouti" },
-];
-
-const CALL_TYPE_BADGE: Record<string, string> = {
-  Inbound: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  Outbound: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+const STATUS_BADGE: Record<string, string> = {
+  Answered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   Missed: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
-  Unanswered: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+};
+
+const DIRECTION_LABEL: Record<string, string> = {
+  Inbound: "Entrant",
+  Outbound: "Sortant",
+  Internal: "Interne",
 };
 
 function formatDuration(seconds: number): string {
@@ -39,29 +38,66 @@ export function CallsView() {
   const { user } = useAuth();
   const router = useRouter();
   const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
-  const { calls, loading } = useCalls();
+  const { calls, loading, refetch } = useCalls();
+  const toast = useToast();
+  const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [directionFilter, setDirectionFilter] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [pageSize, setPageSize] = useState<number | "all">(20);
 
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/calls/sync", { method: "POST" });
+      const data = (await res.json()) as { synced: number; missed: number; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
+      toast.success(`Synchronisé : ${data.synced} appel(s), dont ${data.missed} manqué(s).`);
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  // Built from whatever status/direction values are actually present in the
+  // synced data, rather than a hardcoded list — 3CX's full status vocabulary
+  // beyond Answered/Missed isn't fully known, and this adapts automatically.
+  const statusOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const c of calls) values.add(c.status);
+    return Array.from(values)
+      .sort()
+      .map((v) => ({ value: v, label: v === "Answered" ? "Répondu" : v === "Missed" ? "Manqué" : v }));
+  }, [calls]);
+  const directionOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const c of calls) values.add(c.direction);
+    return Array.from(values)
+      .sort()
+      .map((v) => ({ value: v, label: DIRECTION_LABEL[v] ?? v }));
+  }, [calls]);
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     return calls.filter((c) => {
-      if (query && !c.contactNumber.toLowerCase().includes(query) && !c.agentExtension.toLowerCase().includes(query)) return false;
-      if (typeFilter.length && !typeFilter.includes(c.callType)) return false;
+      if (query && !c.sourceNumber.toLowerCase().includes(query) && !c.destNumber.toLowerCase().includes(query)) return false;
+      if (statusFilter.length && !statusFilter.includes(c.status)) return false;
+      if (directionFilter.length && !directionFilter.includes(c.direction)) return false;
       if (dateFrom && c.startTime < dateFrom) return false;
       if (dateTo && c.startTime > `${dateTo}T23:59:59`) return false;
       return true;
     });
-  }, [calls, search, typeFilter, dateFrom, dateTo]);
+  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo]);
 
   const kpis = useMemo(() => {
-    const answered = calls.filter((c) => c.callType === "Inbound" || c.callType === "Outbound");
-    const missed = calls.filter((c) => c.callType === "Missed");
-    const avgDuration = answered.length ? Math.round(answered.reduce((sum, c) => sum + c.duration, 0) / answered.length) : 0;
-    return { total: calls.length, answered: answered.length, missed: missed.length, avgDuration };
+    const answered = calls.filter((c) => c.answered);
+    const missed = calls.filter((c) => c.status === "Missed");
+    const avgTalk = answered.length ? Math.round(answered.reduce((sum, c) => sum + c.talkSeconds, 0) / answered.length) : 0;
+    return { total: calls.length, answered: answered.length, missed: missed.length, avgTalk };
   }, [calls]);
 
   const { page, setPage, pageCount, start, end } = usePagination(filtered.length, pageSize);
@@ -75,10 +111,23 @@ export function CallsView() {
 
   return (
     <div className="mx-auto flex w-full max-w-[95%] flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Appels</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Historique des appels synchronisés depuis 3CX.</p>
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Appels</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Historique des appels — synchronisé depuis 3CX à la demande.</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleSync}
+          disabled={syncing}
+          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshIcon className="h-4 w-4" />
+          {syncing ? "Synchronisation…" : "Synchroniser"}
+        </button>
       </header>
+
+      <ThreeCxConnectionCard />
 
       {loading && <TaskListSkeleton />}
 
@@ -88,7 +137,7 @@ export function CallsView() {
             <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Répondus" value={kpis.answered} icon={<CheckIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Manqués" value={kpis.missed} icon={<PhoneMissedIcon className="h-4.5 w-4.5" />} tone={kpis.missed > 0 ? "warning" : "default"} />
-            <StatTile label="Durée moyenne" value={formatDuration(kpis.avgDuration)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Durée moyenne (parlé)" value={formatDuration(kpis.avgTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
           </section>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -98,11 +147,16 @@ export function CallsView() {
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Rechercher un numéro ou un agent…"
+                placeholder="Rechercher un numéro…"
                 className="w-64 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
               />
             </label>
-            <FilterMenu label="Type" count={typeFilter.length} options={CALL_TYPE_OPTIONS} value={typeFilter} onChange={setTypeFilter} />
+            {statusOptions.length > 0 && (
+              <FilterMenu label="Statut" count={statusFilter.length} options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
+            )}
+            {directionOptions.length > 0 && (
+              <FilterMenu label="Direction" count={directionFilter.length} options={directionOptions} value={directionFilter} onChange={setDirectionFilter} />
+            )}
             <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
               Après
               <input
@@ -127,17 +181,17 @@ export function CallsView() {
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <PhoneIcon className="h-10 w-10 text-slate-300 dark:text-slate-700" />
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                {calls.length === 0 ? "Aucun appel synchronisé pour l'instant." : "Aucun appel ne correspond aux filtres."}
+                {calls.length === 0 ? "Aucun appel synchronisé pour l'instant — clique sur \"Synchroniser\"." : "Aucun appel ne correspond aux filtres."}
               </p>
             </div>
           )}
 
           {filtered.length > 0 && (
             <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
+              <table className="w-full min-w-[860px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                    {["Numéro", "Agent", "Type", "Date", "Durée"].map((header) => (
+                    {["Appelant", "Appelé", "Direction", "Statut", "Date", "Sonnerie", "Parole"].map((header) => (
                       <th key={header} scope="col" className="whitespace-nowrap px-3 py-2">
                         {header}
                       </th>
@@ -147,15 +201,17 @@ export function CallsView() {
                 <tbody>
                   {paged.map((call: PhoneCall) => (
                     <tr key={call.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
-                      <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{call.contactNumber}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{call.agentExtension}</td>
+                      <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{call.sourceName || call.sourceNumber}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{call.destName || call.destNumber}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{DIRECTION_LABEL[call.direction] ?? call.direction}</td>
                       <td className="whitespace-nowrap px-3 py-2">
-                        <span className={cn("rounded-md px-1.5 py-0.5 text-xs font-medium", CALL_TYPE_BADGE[call.callType] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}>
-                          {CALL_TYPE_OPTIONS.find((o) => o.value === call.callType)?.label ?? call.callType}
+                        <span className={cn("rounded-md px-1.5 py-0.5 text-xs font-medium", STATUS_BADGE[call.status] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}>
+                          {statusOptions.find((o) => o.value === call.status)?.label ?? call.status}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDueDate(call.startTime)}</td>
-                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.duration)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.ringSeconds)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.talkSeconds)}</td>
                     </tr>
                   ))}
                 </tbody>
