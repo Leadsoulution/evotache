@@ -31,15 +31,18 @@ export async function POST(_request: Request, { params }: RouteContext) {
   return NextResponse.json({ code });
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+// Unlinks one specific chat (?chatId=...), or every linked chat if omitted.
+export async function DELETE(request: Request, { params }: RouteContext) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canManageUsers(sessionUser.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
+  const chatId = new URL(request.url).searchParams.get("chatId");
   const agentConfig = await db.agentConfig.findUnique({ where: { userId: id } });
   if (!agentConfig) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
 
-  await db.agentConfig.update({ where: { userId: id }, data: { telegramChatId: null, telegramLinkCode: null } });
+  const telegramChatIds = chatId ? agentConfig.telegramChatIds.filter((c) => c !== chatId) : [];
+  await db.agentConfig.update({ where: { userId: id }, data: { telegramChatIds, telegramLinkCode: null } });
   return NextResponse.json({ ok: true });
 }

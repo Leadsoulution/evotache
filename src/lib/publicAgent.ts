@@ -11,7 +11,7 @@ export function toPublicAgent(user: DbUser, config: AgentConfig): Agent {
     kind: config.kind,
     systemPrompt: config.systemPrompt,
     enabledTools: config.enabledTools as AgentTool[],
-    telegramChatId: config.telegramChatId,
+    telegramChatIds: config.telegramChatIds,
     whatsappNumber: config.whatsappNumber,
     createdAt: user.createdAt.toISOString(),
   };

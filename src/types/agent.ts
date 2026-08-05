@@ -50,7 +50,7 @@ export interface Agent {
   kind: AgentKind;
   systemPrompt: string;
   enabledTools: AgentTool[];
-  telegramChatId: string | null;
+  telegramChatIds: string[];
   whatsappNumber: string | null;
   createdAt: string;
 }

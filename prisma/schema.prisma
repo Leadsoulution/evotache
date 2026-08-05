@@ -247,7 +247,9 @@ model AgentConfig {
   systemPrompt     String
   // "tasks","litiges","achats","email","telegram","whatsapp","websearch","gmail","drive","n8n"
   enabledTools     String[]  @default([])
-  telegramChatId   String?
+  // Every Telegram chat currently linked to this agent — multiple people can
+  // talk to the same agent (shared conversation/context), not just one.
+  telegramChatIds  String[]  @default([])
   telegramLinkCode String?
   whatsappNumber   String?
   createdAt        DateTime  @default(now())

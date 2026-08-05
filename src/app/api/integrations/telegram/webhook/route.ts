@@ -42,12 +42,14 @@ async function handleLinkCommand(chatId: number, code: string): Promise<void> {
     await sendTelegramMessage(String(chatId), "Code invalide ou expiré.");
     return;
   }
-  await db.agentConfig.update({ where: { id: config.id }, data: { telegramChatId: String(chatId), telegramLinkCode: null } });
-  await sendTelegramMessage(String(chatId), `✅ Ce chat est maintenant lié à l'agent "${config.user.name}".`);
+  const chatIdStr = String(chatId);
+  const telegramChatIds = config.telegramChatIds.includes(chatIdStr) ? config.telegramChatIds : [...config.telegramChatIds, chatIdStr];
+  await db.agentConfig.update({ where: { id: config.id }, data: { telegramChatIds, telegramLinkCode: null } });
+  await sendTelegramMessage(chatIdStr, `✅ Ce chat est maintenant lié à l'agent "${config.user.name}".`);
 }
 
 async function handleIncomingMessage(chatId: number, text: string): Promise<void> {
-  const config = await db.agentConfig.findFirst({ where: { telegramChatId: String(chatId) } });
+  const config = await db.agentConfig.findFirst({ where: { telegramChatIds: { has: String(chatId) } } });
   if (!config || !config.enabledTools.includes("telegram")) return;
 
   const conversation = await findOrCreateAgentTelegramConversation(config.userId);
