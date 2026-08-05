@@ -4,10 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalls } from "@/hooks/useCalls";
+import { useThreeCxUsers } from "@/hooks/useThreeCxUsers";
 import { usePagination } from "@/hooks/usePagination";
 import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { saveThreeCxUserOverride } from "@/services/threeCxUserApi";
 import { ThreeCxConnectionCard } from "./ThreeCxConnectionCard";
 import { ThreeCxUserSelectorBar } from "./ThreeCxUserSelectorBar";
+import { ThreeCxUserManager } from "./ThreeCxUserManager";
 import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatTile } from "@/components/stats/StatTile";
@@ -64,8 +67,10 @@ export function CallsView() {
   const router = useRouter();
   const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
   const { calls, loading, refetch } = useCalls();
+  const { overrides, refetch: refetchOverrides } = useThreeCxUsers();
   const toast = useToast();
   const [syncing, setSyncing] = useState(false);
+  const [managingUsers, setManagingUsers] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [directionFilter, setDirectionFilter] = useState<string[]>([]);
@@ -79,7 +84,21 @@ export function CallsView() {
   // Real 3CX users/extensions, derived from the synced call data itself —
   // shown as an avatar-row selector matching the Statistics page's
   // UserSelectorBar, not fetched via a separate "list users" API call.
-  const internalUsers = useMemo(() => deriveInternalUsers(calls), [calls]);
+  const internalUsers = useMemo(() => deriveInternalUsers(calls, overrides), [calls, overrides]);
+
+  // If the selected user gets hidden (this tab or another), stop filtering
+  // by a dn that's no longer selectable — derived at render time rather
+  // than via an effect + setState, which would trigger an extra render.
+  const effectiveSelectedDn = selectedUserDn && !internalUsers.find((u) => u.dn === selectedUserDn)?.hidden ? selectedUserDn : null;
+
+  async function handleSaveUserOverride(dn: string, patch: { name?: string; color?: string; hidden?: boolean }) {
+    try {
+      await saveThreeCxUserOverride(dn, patch);
+      refetchOverrides();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Échec de la mise à jour.");
+    }
+  }
 
   function handleSort(field: SortField) {
     if (field === sortField) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -124,7 +143,7 @@ export function CallsView() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const base = selectedUserDn ? callsForUser(calls, selectedUserDn) : calls;
+    const base = effectiveSelectedDn ? callsForUser(calls, effectiveSelectedDn) : calls;
     return base.filter((c) => {
       if (query && !c.sourceNumber.toLowerCase().includes(query) && !c.destNumber.toLowerCase().includes(query)) return false;
       if (statusFilter.length && !statusFilter.includes(c.status)) return false;
@@ -133,7 +152,7 @@ export function CallsView() {
       if (dateTo && c.startTime > `${dateTo}T23:59:59`) return false;
       return true;
     });
-  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, selectedUserDn]);
+  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, effectiveSelectedDn]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -196,7 +215,8 @@ export function CallsView() {
 
       {!loading && (
         <>
-          <ThreeCxUserSelectorBar users={internalUsers} selectedDn={selectedUserDn} onSelect={setSelectedUserDn} />
+          <ThreeCxUserSelectorBar users={internalUsers} selectedDn={effectiveSelectedDn} onSelect={setSelectedUserDn} onManage={() => setManagingUsers(true)} />
+          <ThreeCxUserManager open={managingUsers} users={internalUsers} onClose={() => setManagingUsers(false)} onSave={handleSaveUserOverride} />
 
           <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
             <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />

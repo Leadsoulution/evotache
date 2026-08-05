@@ -27,14 +27,29 @@ export const DIRECTION_LABEL: Record<string, string> = {
 export interface InternalUser {
   dn: string;
   name: string;
+  color: string;
+  hidden: boolean;
+}
+
+// Per-extension override stored via /api/calls/users — layered onto the
+// auto-derived name/color below, and the only way a user gets excluded
+// (hidden) from the picker/charts without touching call history.
+export interface ThreeCxUserOverride {
+  dn: string;
+  name: string | null;
+  color: string | null;
+  hidden: boolean;
 }
 
 /** Internal 3CX users/extensions, derived straight from the synced call
  * data rather than a separate "list users" API call — 3CX's display names
  * for a real named extension consistently end in " (DN)" (e.g. "Commercial
  * P2 (111)"), which distinguishes a real user from a trunk/gateway leg or a
- * raw external caller number (neither of which matches that pattern). */
-export function deriveInternalUsers(calls: PhoneCall[]): InternalUser[] {
+ * raw external caller number (neither of which matches that pattern).
+ * `overrides` layers on any admin-set display name/color/hidden flag —
+ * default color is assigned by dn order so it stays stable across
+ * re-filters/re-sorts instead of depending on call counts. */
+export function deriveInternalUsers(calls: PhoneCall[], overrides: ThreeCxUserOverride[] = []): InternalUser[] {
   const byDn = new Map<string, string>();
   const consider = (dn: string, name: string | null) => {
     if (!dn || !name) return;
@@ -46,9 +61,19 @@ export function deriveInternalUsers(calls: PhoneCall[]): InternalUser[] {
     consider(call.sourceDn, call.sourceName);
     consider(call.destDn, call.destName);
   }
+  const overrideByDn = new Map(overrides.map((o) => [o.dn, o]));
   return Array.from(byDn.entries())
-    .map(([dn, name]) => ({ dn, name }))
-    .sort((a, b) => a.dn.localeCompare(b.dn));
+    .map(([dn, autoName]) => ({ dn, autoName }))
+    .sort((a, b) => a.dn.localeCompare(b.dn))
+    .map(({ dn, autoName }, i) => {
+      const override = overrideByDn.get(dn);
+      return {
+        dn,
+        name: override?.name || autoName,
+        color: override?.color || COLOR_PALETTE[i % COLOR_PALETTE.length],
+        hidden: override?.hidden ?? false,
+      };
+    });
 }
 
 export function callsForUser(calls: PhoneCall[], dn: string): PhoneCall[] {
@@ -73,7 +98,8 @@ export function countByDirection(calls: PhoneCall[]): BarChartDatum[] {
 
 export function countByUser(calls: PhoneCall[], users: InternalUser[]): BarChartDatum[] {
   return users
-    .map((u, i) => ({ key: u.dn, label: u.name, value: callsForUser(calls, u.dn).length, color: COLOR_PALETTE[i % COLOR_PALETTE.length] }))
+    .filter((u) => !u.hidden)
+    .map((u) => ({ key: u.dn, label: u.name, value: callsForUser(calls, u.dn).length, color: u.color }))
     .filter((d) => d.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);

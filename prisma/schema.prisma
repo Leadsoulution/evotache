@@ -510,3 +510,19 @@ model ThreeCxConnection {
 
   @@map("threecx_connections")
 }
+
+// Per-extension overrides layered onto the internal users auto-derived
+// from synced call data (deriveInternalUsers in callStats.ts) — lets the
+// display name/color be customized and lets a stray/former extension be
+// hidden from the picker and charts without touching the underlying call
+// history. Keyed by 3CX's DN (extension), not a generated id, since the
+// "identity" here is the extension itself.
+model ThreeCxUser {
+  dn        String   @id
+  name      String?
+  color     String?
+  hidden    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("threecx_users")
+}
