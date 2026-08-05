@@ -4,8 +4,10 @@ export interface PhoneCall {
   startTime: string;
   sourceNumber: string;
   sourceName: string | null;
+  sourceDn: string;
   destNumber: string;
   destName: string | null;
+  destDn: string;
   direction: string;
   status: string;
   answered: boolean;

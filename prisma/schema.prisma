@@ -471,8 +471,10 @@ model PhoneCall {
   startTime    DateTime
   sourceNumber String // SourceCallerId
   sourceName   String? // SourceDisplayName
+  sourceDn     String   @default("") // SourceDn — the internal extension, if any (empty for a raw external caller)
   destNumber   String // DestinationCallerId
   destName     String? // DestinationDisplayName
+  destDn       String   @default("") // DestinationDn — often the real internal extension even when DestinationCallerId is blank (e.g. inbound external calls)
   direction    String // Inbound | Outbound | Internal
   status       String // Answered | Missed | ... (whatever 3CX returns)
   answered     Boolean

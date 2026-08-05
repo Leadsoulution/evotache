@@ -5,8 +5,10 @@ const PAGE_SIZE = 500;
 interface RawCallLogRow {
   CdrId: string;
   StartTime: string;
+  SourceDn: string | null;
   SourceCallerId: string;
   SourceDisplayName: string | null;
+  DestinationDn: string | null;
   DestinationCallerId: string;
   DestinationDisplayName: string | null;
   Direction: string;
@@ -23,8 +25,10 @@ export interface CallLogEntry {
   startTime: Date;
   sourceNumber: string;
   sourceName: string | null;
+  sourceDn: string;
   destNumber: string;
   destName: string | null;
+  destDn: string;
   direction: string;
   status: string;
   answered: boolean;
@@ -53,8 +57,10 @@ function toCallLogEntry(row: RawCallLogRow): CallLogEntry {
     startTime: new Date(row.StartTime),
     sourceNumber: row.SourceCallerId,
     sourceName: row.SourceDisplayName,
+    sourceDn: row.SourceDn ?? "",
     destNumber: row.DestinationCallerId,
     destName: row.DestinationDisplayName,
+    destDn: row.DestinationDn ?? "",
     direction: row.Direction,
     status: row.Status,
     answered: row.Answered,

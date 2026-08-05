@@ -7,13 +7,18 @@ import { useCalls } from "@/hooks/useCalls";
 import { usePagination } from "@/hooks/usePagination";
 import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { ThreeCxConnectionCard } from "./ThreeCxConnectionCard";
+import { ThreeCxUserSelectorBar } from "./ThreeCxUserSelectorBar";
 import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatTile } from "@/components/stats/StatTile";
+import { ChartCard } from "@/components/stats/ChartCard";
+import { BarChart } from "@/components/stats/BarChart";
+import { PieChart } from "@/components/stats/PieChart";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
+import { DIRECTION_LABEL, STATUS_BADGE, STATUS_LABEL, callsForUser, countByDirection, countByStatus, countByUser, deriveInternalUsers } from "@/lib/callStats";
 import { CheckIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon } from "@/components/ui/icons";
 import type { PhoneCall } from "@/types/call";
 
@@ -48,28 +53,6 @@ function sortValue(call: PhoneCall, field: SortField): string | number {
   }
 }
 
-// 3CX's real status vocabulary (confirmed live against actual synced
-// data) — "Unanswered" is what this app calls "missed", not "Missed".
-const STATUS_BADGE: Record<string, string> = {
-  Answered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  Unanswered: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
-  Waiting: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  Redirected: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  Answered: "Répondu",
-  Unanswered: "Manqué",
-  Waiting: "En attente",
-  Redirected: "Redirigé",
-};
-
-const DIRECTION_LABEL: Record<string, string> = {
-  Inbound: "Entrant",
-  Outbound: "Sortant",
-  Internal: "Interne",
-};
-
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -91,6 +74,12 @@ export function CallsView() {
   const [pageSize, setPageSize] = useState<number | "all">(20);
   const [sortField, setSortField] = useState<SortField>("startTime");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedUserDn, setSelectedUserDn] = useState<string | null>(null);
+
+  // Real 3CX users/extensions, derived from the synced call data itself —
+  // shown as an avatar-row selector matching the Statistics page's
+  // UserSelectorBar, not fetched via a separate "list users" API call.
+  const internalUsers = useMemo(() => deriveInternalUsers(calls), [calls]);
 
   function handleSort(field: SortField) {
     if (field === sortField) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -135,7 +124,8 @@ export function CallsView() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return calls.filter((c) => {
+    const base = selectedUserDn ? callsForUser(calls, selectedUserDn) : calls;
+    return base.filter((c) => {
       if (query && !c.sourceNumber.toLowerCase().includes(query) && !c.destNumber.toLowerCase().includes(query)) return false;
       if (statusFilter.length && !statusFilter.includes(c.status)) return false;
       if (directionFilter.length && !directionFilter.includes(c.direction)) return false;
@@ -143,7 +133,7 @@ export function CallsView() {
       if (dateTo && c.startTime > `${dateTo}T23:59:59`) return false;
       return true;
     });
-  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo]);
+  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, selectedUserDn]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -169,6 +159,12 @@ export function CallsView() {
 
   const { page, setPage, pageCount, start, end } = usePagination(sorted.length, pageSize);
   const paged = sorted.slice(start, end);
+
+  // Charts follow the same filtered set as the KPI tiles, so narrowing by
+  // user/status/direction/date visibly reshapes them too.
+  const statusChart = useMemo(() => countByStatus(filtered), [filtered]);
+  const directionChart = useMemo(() => countByDirection(filtered), [filtered]);
+  const userChart = useMemo(() => countByUser(filtered, internalUsers), [filtered, internalUsers]);
 
   useEffect(() => {
     if (user && !allowed) router.replace("/");
@@ -200,6 +196,8 @@ export function CallsView() {
 
       {!loading && (
         <>
+          <ThreeCxUserSelectorBar users={internalUsers} selectedDn={selectedUserDn} onSelect={setSelectedUserDn} />
+
           <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
             <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Répondus" value={`${kpis.answered} (${kpis.answeredPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
@@ -210,6 +208,18 @@ export function CallsView() {
               tone={kpis.missed > 0 ? "warning" : "default"}
             />
             <StatTile label="Durée moyenne (parlé)" value={formatDuration(kpis.avgTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <ChartCard title="Appels par statut">
+              <PieChart data={statusChart} />
+            </ChartCard>
+            <ChartCard title="Appels par direction">
+              <PieChart data={directionChart} />
+            </ChartCard>
+            <ChartCard title="Appels par utilisateur">
+              <BarChart data={userChart} />
+            </ChartCard>
           </section>
 
           <div className="flex flex-wrap items-center gap-2">
