@@ -1,7 +1,21 @@
 import type { PhoneCall } from "@/types/call";
 
-export async function fetchCalls(): Promise<PhoneCall[]> {
+export interface CallStats {
+  total: number;
+  answered: number;
+  missed: number;
+  avgTalk: number;
+}
+
+export interface CallsResponse {
+  calls: PhoneCall[];
+  stats: CallStats;
+}
+
+const EMPTY_STATS: CallStats = { total: 0, answered: 0, missed: 0, avgTalk: 0 };
+
+export async function fetchCalls(): Promise<CallsResponse> {
   const response = await fetch("/api/calls");
-  if (!response.ok) return [];
+  if (!response.ok) return { calls: [], stats: EMPTY_STATS };
   return response.json();
 }

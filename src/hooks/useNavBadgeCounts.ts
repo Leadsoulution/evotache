@@ -106,7 +106,7 @@ export function useNavBadgeCounts(): NavBadgeCounts {
     const tasks = tasksSWR.data ?? [];
     const disputes = disputesSWR.data ?? [];
     const purchases = purchasesSWR.data ?? [];
-    const calls = callsSWR.data ?? [];
+    const calls = callsSWR.data?.calls ?? [];
     const tasksSince = lastViewed.tasks ?? EPOCH;
     const disputesSince = lastViewed.disputes ?? EPOCH;
     const achatsSince = lastViewed.achats ?? EPOCH;

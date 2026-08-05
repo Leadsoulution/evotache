@@ -78,7 +78,7 @@ export function CallsView() {
   const { user } = useAuth();
   const router = useRouter();
   const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
-  const { calls, loading, refetch } = useCalls();
+  const { calls, stats, loading, refetch } = useCalls();
   const { overrides, refetch: refetchOverrides } = useThreeCxUsers();
   const toast = useToast();
   const [syncing, setSyncing] = useState(false);
@@ -184,16 +184,30 @@ export function CallsView() {
     return copy;
   }, [filtered, sortField, sortDirection]);
 
-  // Reflects the currently filtered set, not the whole synced dataset —
-  // filtering by direction/status/date should visibly change these tiles.
+  const hasActiveFilter = Boolean(
+    search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || effectiveSelectedDn
+  );
+
+  // With no filter active, the tiles use the real aggregate counts from the
+  // API (`stats`) rather than the fetched/capped `calls` list — otherwise
+  // "Total appels" freezes forever once the real count passes MAX_ROWS
+  // (the table only ever fetches the most recent 2000 rows). Once a filter
+  // narrows things down, there's no equivalent aggregate query per filter
+  // combination, so the tiles fall back to counting within that capped
+  // recent-history window, same as the table/charts below.
   const kpis = useMemo(() => {
+    if (!hasActiveFilter) {
+      const answeredPct = stats.total ? Math.round((stats.answered / stats.total) * 100) : 0;
+      const missedPct = stats.total ? Math.round((stats.missed / stats.total) * 100) : 0;
+      return { total: stats.total, answered: stats.answered, missed: stats.missed, avgTalk: stats.avgTalk, answeredPct, missedPct };
+    }
     const answered = filtered.filter((c) => c.answered);
     const missed = filtered.filter((c) => c.status === "Unanswered");
     const avgTalk = answered.length ? Math.round(answered.reduce((sum, c) => sum + c.talkSeconds, 0) / answered.length) : 0;
     const answeredPct = filtered.length ? Math.round((answered.length / filtered.length) * 100) : 0;
     const missedPct = filtered.length ? Math.round((missed.length / filtered.length) * 100) : 0;
     return { total: filtered.length, answered: answered.length, missed: missed.length, avgTalk, answeredPct, missedPct };
-  }, [filtered]);
+  }, [filtered, hasActiveFilter, stats]);
 
   const { page, setPage, pageCount, start, end } = usePagination(sorted.length, pageSize);
   const paged = sorted.slice(start, end);
