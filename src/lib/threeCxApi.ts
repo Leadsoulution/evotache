@@ -1,4 +1,4 @@
-import { getValidAccessToken } from "@/lib/threeCxAuth";
+import { fetchThreeCx, getValidAccessToken } from "@/lib/threeCxAuth";
 
 const PAGE_SIZE = 500;
 
@@ -95,7 +95,7 @@ export async function listCallLog(periodFrom: Date, periodTo: Date): Promise<Cal
       "hidePcalls=true",
     ].join(",");
     const url = `${pbxUrl}/xapi/v1/ReportCallLogData/Pbx.GetCallLogData(${params})?$top=${PAGE_SIZE}&$skip=${skip}`;
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
+    const response = await fetchThreeCx(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
     if (!response.ok) throw new Error(`3CX call log request failed (${response.status}): ${await response.text()}`);
     const data = (await response.json()) as { value: RawCallLogRow[] };
     const page = data.value ?? [];

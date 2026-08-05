@@ -14,6 +14,7 @@ export async function POST() {
     const result = await syncCalls();
     return NextResponse.json(result);
   } catch (err) {
+    console.error("3CX sync failed:", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Sync failed." }, { status: 500 });
   }
 }

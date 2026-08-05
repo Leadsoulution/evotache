@@ -5,6 +5,27 @@ import { db } from "@/lib/db";
 // /connect/token refresh request via DevTools.
 const CLIENT_ID = "Webclient";
 
+/** Node's fetch() throws a bare "TypeError: fetch failed" for any network-
+ * level failure (DNS, TLS, connection refused/timeout) — the actually
+ * useful detail lives in `err.cause`, which the default Error.message
+ * doesn't surface. Wrapping every 3CX call in this turns that into a
+ * message that names the host and the real cause, instead of a mystery
+ * "fetch failed" toast. */
+export async function fetchThreeCx(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : err instanceof Error ? err.message : String(err);
+    let host = url;
+    try {
+      host = new URL(url).host;
+    } catch {
+      // keep the raw url if it somehow isn't a valid URL
+    }
+    throw new Error(`Impossible de joindre le PBX 3CX (${host}) : ${cause}`);
+  }
+}
+
 interface TokenPayload {
   access_token: string;
   refresh_token: string | null;
@@ -21,7 +42,7 @@ interface LoginResponse {
  * capturing the real request the 3CX web client itself sends when
  * logging in with a username/password. */
 async function login(pbxUrl: string, username: string, password: string): Promise<TokenPayload> {
-  const response = await fetch(`${pbxUrl}/webclient/api/Login/GetAccessToken`, {
+  const response = await fetchThreeCx(`${pbxUrl}/webclient/api/Login/GetAccessToken`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ Username: username, Password: password, SecurityCode: "", ReCaptchaResponse: null }),
@@ -36,7 +57,7 @@ async function login(pbxUrl: string, username: string, password: string): Promis
  * /connect/token endpoint with grant_type=refresh_token — confirmed live
  * the same way. */
 async function refresh(pbxUrl: string, refreshToken: string): Promise<TokenPayload> {
-  const response = await fetch(`${pbxUrl}/connect/token`, {
+  const response = await fetchThreeCx(`${pbxUrl}/connect/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: CLIENT_ID, grant_type: "refresh_token", refresh_token: refreshToken }),
