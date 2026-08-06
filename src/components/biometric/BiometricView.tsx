@@ -1,0 +1,412 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useBiometricEvents } from "@/hooks/useBiometricEvents";
+import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
+import { usePagination } from "@/hooks/usePagination";
+import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
+import { BiometricConnectionCard } from "./BiometricConnectionCard";
+import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
+import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
+import { BiometricDateRangePicker } from "./BiometricDateRangePicker";
+import { BiometricTimeRangePicker } from "./BiometricTimeRangePicker";
+import { FilterMenu } from "@/components/ui/FilterMenu";
+import { Pagination } from "@/components/ui/Pagination";
+import { StatTile } from "@/components/stats/StatTile";
+import { ChartCard } from "@/components/stats/ChartCard";
+import { BarChart } from "@/components/stats/BarChart";
+import { PieChart } from "@/components/stats/PieChart";
+import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
+import { useToast } from "@/components/ui/Toast";
+import { formatDueDate } from "@/lib/date";
+import { cn } from "@/lib/cn";
+import { STATUS_BADGE, STATUS_LABEL, countByDepartment, countByEmployee, countByStatus, deriveEmployees, eventsForEmployee } from "@/lib/biometricStats";
+import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, FingerprintIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, UsersIcon } from "@/components/ui/icons";
+import type { BiometricEvent } from "@/types/biometric";
+
+const NO_DEPARTMENT_LABEL = "Sans département";
+
+type SortField = "employee" | "department" | "status" | "punchTime";
+
+const COLUMN_SORT_FIELD: { label: string; field: SortField }[] = [
+  { label: "Employé", field: "employee" },
+  { label: "Département", field: "department" },
+  { label: "Statut", field: "status" },
+  { label: "Date", field: "punchTime" },
+];
+
+function sortValue(event: BiometricEvent, field: SortField): string {
+  switch (field) {
+    case "employee":
+      return event.employeeName;
+    case "department":
+      return event.department || NO_DEPARTMENT_LABEL;
+    case "status":
+      return event.punchStateLabel;
+    case "punchTime":
+      return event.punchTime;
+  }
+}
+
+// Local (browser) hour:minute:second — locale-independent, always 24h, so
+// it can double as both the display string and the filter comparison key.
+function formatEventTime(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+}
+
+function eventHourMinute(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Real opening hours: 09:30–19:00 every day, except Friday which splits
+// around the midday break (09:30–13:00, then 15:00–19:00).
+function isWithinBusinessHours(iso: string): boolean {
+  const d = new Date(iso);
+  const hm = eventHourMinute(iso);
+  const windows = d.getDay() === 5 ? [["09:30", "13:00"], ["15:00", "19:00"]] : [["09:30", "19:00"]];
+  return windows.some(([from, to]) => hm >= from && hm <= to);
+}
+
+export function BiometricView() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
+  const { events, stats, loading, refetch } = useBiometricEvents();
+  const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
+  const toast = useToast();
+  const [syncing, setSyncing] = useState(false);
+  const [managingEmployees, setManagingEmployees] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [dateRangeLabel, setDateRangeLabel] = useState("Toutes les dates");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
+  const [businessHoursOnly, setBusinessHoursOnly] = useState(false);
+  const [timeRangeLabel, setTimeRangeLabel] = useState("Toute la journée");
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [pageSize, setPageSize] = useState<number | "all">(20);
+  const [sortField, setSortField] = useState<SortField>("punchTime");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedEmpCode, setSelectedEmpCode] = useState<string | null>(null);
+
+  // Employees, derived from the synced punch events themselves — shown as
+  // an avatar-row selector matching the Calls page's ThreeCxUserSelectorBar,
+  // not fetched via a separate "list employees" API call.
+  const employees = useMemo(() => deriveEmployees(events, overrides), [events, overrides]);
+
+  // If the selected employee gets hidden (this tab or another), stop
+  // filtering by a code that's no longer selectable — derived at render
+  // time rather than via an effect + setState, which would trigger an
+  // extra render.
+  const effectiveSelectedEmpCode = selectedEmpCode && !employees.find((e) => e.empCode === selectedEmpCode)?.hidden ? selectedEmpCode : null;
+
+  async function handleSaveEmployeeOverride(empCode: string, patch: { name?: string; color?: string; hidden?: boolean }) {
+    try {
+      await saveBiometricEmployeeOverride(empCode, patch);
+      refetchOverrides();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Échec de la mise à jour.");
+    }
+  }
+
+  function handleSort(field: SortField) {
+    if (field === sortField) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/biometric/sync", { method: "POST" });
+      const data = (await res.json()) as { synced: number; checkIns: number; checkOuts: number; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
+      toast.success(`Synchronisé : ${data.synced} pointage(s), dont ${data.checkIns} entrée(s) et ${data.checkOuts} sortie(s).`);
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  // Built from whatever values are actually present in the synced data,
+  // rather than a hardcoded list — adapts automatically if the device ever
+  // returns a status beyond the ones already mapped in STATUS_LABEL.
+  const statusOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const e of events) values.add(e.punchStateLabel);
+    return Array.from(values)
+      .sort()
+      .map((v) => ({ value: v, label: STATUS_LABEL[v] ?? v }));
+  }, [events]);
+  const departmentOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const e of events) values.add(e.department || NO_DEPARTMENT_LABEL);
+    return Array.from(values)
+      .sort()
+      .map((v) => ({ value: v, label: v }));
+  }, [events]);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const base = effectiveSelectedEmpCode ? eventsForEmployee(events, effectiveSelectedEmpCode) : events;
+    return base.filter((e) => {
+      if (query && !e.employeeName.toLowerCase().includes(query) && !e.empCode.toLowerCase().includes(query)) return false;
+      if (statusFilter.length && !statusFilter.includes(e.punchStateLabel)) return false;
+      if (departmentFilter.length && !departmentFilter.includes(e.department || NO_DEPARTMENT_LABEL)) return false;
+      if (dateFrom && e.punchTime < dateFrom) return false;
+      if (dateTo && e.punchTime > `${dateTo}T23:59:59`) return false;
+      if (businessHoursOnly) {
+        if (!isWithinBusinessHours(e.punchTime)) return false;
+      } else if (timeFrom || timeTo) {
+        const hm = eventHourMinute(e.punchTime);
+        if (timeFrom && hm < timeFrom) return false;
+        if (timeTo && hm > timeTo) return false;
+      }
+      return true;
+    });
+  }, [events, search, statusFilter, departmentFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedEmpCode]);
+
+  const sorted = useMemo(() => {
+    const copy = [...filtered];
+    copy.sort((a, b) => {
+      const cmp = sortValue(a, sortField).localeCompare(sortValue(b, sortField));
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [filtered, sortField, sortDirection]);
+
+  const hasActiveFilter = Boolean(
+    search.trim() || statusFilter.length || departmentFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedEmpCode
+  );
+
+  // With no filter active, the tiles use the real aggregate counts from the
+  // API (`stats`) rather than the fetched/capped `events` list — otherwise
+  // "Total pointages" would freeze once the real count passes MAX_ROWS (the
+  // /api/calls "Total appels" bug taught this lesson). Once a filter
+  // narrows things down, there's no equivalent aggregate query per filter
+  // combination, so the tiles fall back to counting within that capped
+  // recent-history window, same as the table/charts below.
+  const kpis = useMemo(() => {
+    if (!hasActiveFilter) {
+      const checkInPct = stats.total ? Math.round((stats.checkIns / stats.total) * 100) : 0;
+      const checkOutPct = stats.total ? Math.round((stats.checkOuts / stats.total) * 100) : 0;
+      return { total: stats.total, checkIns: stats.checkIns, checkOuts: stats.checkOuts, checkInPct, checkOutPct, uniqueEmployees: stats.uniqueEmployees };
+    }
+    const checkIns = filtered.filter((e) => e.punchStateLabel === "Check In");
+    const checkOuts = filtered.filter((e) => e.punchStateLabel === "Check Out");
+    const checkInPct = filtered.length ? Math.round((checkIns.length / filtered.length) * 100) : 0;
+    const checkOutPct = filtered.length ? Math.round((checkOuts.length / filtered.length) * 100) : 0;
+    const uniqueEmployees = new Set(filtered.map((e) => e.empCode)).size;
+    return { total: filtered.length, checkIns: checkIns.length, checkOuts: checkOuts.length, checkInPct, checkOutPct, uniqueEmployees };
+  }, [filtered, hasActiveFilter, stats]);
+
+  const { page, setPage, pageCount, start, end } = usePagination(sorted.length, pageSize);
+  const paged = sorted.slice(start, end);
+
+  // Charts follow the same filtered set as the KPI tiles, so narrowing by
+  // employee/status/department/date visibly reshapes them too.
+  const statusChart = useMemo(() => countByStatus(filtered), [filtered]);
+  const departmentChart = useMemo(() => countByDepartment(filtered), [filtered]);
+  const employeeChart = useMemo(() => countByEmployee(filtered, employees), [filtered, employees]);
+
+  useEffect(() => {
+    if (user && !allowed) router.replace("/");
+  }, [user, allowed, router]);
+
+  if (!allowed) return null;
+
+  return (
+    <div className="mx-auto flex w-full max-w-[95%] flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Biométrie</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Historique des pointages — synchronisé depuis la pointeuse biométrique à la demande.</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleSync}
+          disabled={syncing}
+          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshIcon className="h-4 w-4" />
+          {syncing ? "Synchronisation…" : "Synchroniser"}
+        </button>
+      </header>
+
+      <BiometricConnectionCard />
+
+      {loading && <TaskListSkeleton />}
+
+      {!loading && (
+        <>
+          <BiometricEmployeeSelectorBar
+            employees={employees}
+            selectedEmpCode={effectiveSelectedEmpCode}
+            onSelect={setSelectedEmpCode}
+            onManage={() => setManagingEmployees(true)}
+          />
+          <BiometricEmployeeManager open={managingEmployees} employees={employees} onClose={() => setManagingEmployees(false)} onSave={handleSaveEmployeeOverride} />
+
+          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
+            <StatTile label="Total pointages" value={kpis.total} icon={<FingerprintIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Entrées" value={`${kpis.checkIns} (${kpis.checkInPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Sorties" value={`${kpis.checkOuts} (${kpis.checkOutPct}%)`} icon={<PhoneMissedIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Employés" value={kpis.uniqueEmployees} icon={<UsersIcon className="h-4.5 w-4.5" />} />
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <ChartCard title="Pointages par statut">
+              <PieChart data={statusChart} />
+            </ChartCard>
+            <ChartCard title="Pointages par département">
+              <PieChart data={departmentChart} />
+            </ChartCard>
+            <ChartCard title="Pointages par employé">
+              <BarChart data={employeeChart} />
+            </ChartCard>
+          </section>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Rechercher un employé…"
+                className="w-64 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
+              />
+            </label>
+            {statusOptions.length > 0 && (
+              <FilterMenu label="Statut" count={statusFilter.length} options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
+            )}
+            {departmentOptions.length > 0 && (
+              <FilterMenu label="Département" count={departmentFilter.length} options={departmentOptions} value={departmentFilter} onChange={setDepartmentFilter} />
+            )}
+            <button
+              type="button"
+              onClick={() => setDatePickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <CalendarIcon className="h-3.5 w-3.5 opacity-60" />
+              {dateRangeLabel}
+              <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimePickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <ClockIcon className="h-3.5 w-3.5 opacity-60" />
+              {timeRangeLabel}
+              <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
+            </button>
+            <BiometricDateRangePicker
+              open={datePickerOpen}
+              onClose={() => setDatePickerOpen(false)}
+              onApply={(range, label) => {
+                setDateFrom(range.from ?? "");
+                setDateTo(range.to ?? "");
+                setDateRangeLabel(label);
+              }}
+            />
+            <BiometricTimeRangePicker
+              open={timePickerOpen}
+              onClose={() => setTimePickerOpen(false)}
+              onApply={(range, label, businessHours) => {
+                setBusinessHoursOnly(Boolean(businessHours));
+                setTimeFrom(businessHours ? "" : range.from);
+                setTimeTo(businessHours ? "" : range.to);
+                setTimeRangeLabel(label);
+              }}
+            />
+          </div>
+
+          {sorted.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <FingerprintIcon className="h-10 w-10 text-slate-300 dark:text-slate-700" />
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                {events.length === 0 ? "Aucun pointage synchronisé pour l'instant — clique sur \"Synchroniser\"." : "Aucun pointage ne correspond aux filtres."}
+              </p>
+            </div>
+          )}
+
+          {sorted.length > 0 && (
+            <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <table className="w-full min-w-[760px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    {COLUMN_SORT_FIELD.map(({ label, field }) => (
+                      <th key={field} scope="col" className="whitespace-nowrap px-3 py-2">
+                        <button type="button" onClick={() => handleSort(field)} className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">
+                          {label}
+                          <SortIcon
+                            className={cn(
+                              "h-3 w-3 transition-transform",
+                              sortField === field ? "opacity-100" : "opacity-30",
+                              sortField === field && sortDirection === "asc" && "rotate-180"
+                            )}
+                          />
+                        </button>
+                      </th>
+                    ))}
+                    <th scope="col" className="whitespace-nowrap px-3 py-2">
+                      Terminal
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.map((event: BiometricEvent) => (
+                    <tr key={event.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                      <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{event.employeeName}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{event.department || NO_DEPARTMENT_LABEL}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <span
+                          className={cn("rounded-md px-1.5 py-0.5 text-xs font-medium", STATUS_BADGE[event.punchStateLabel] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}
+                        >
+                          {STATUS_LABEL[event.punchStateLabel] ?? event.punchStateLabel}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
+                        <div>{formatDueDate(event.punchTime)}</div>
+                        <div className="text-xs text-slate-400 dark:text-slate-500">{formatEventTime(event.punchTime)}</div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{event.terminalAlias || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {sorted.length > 0 && (
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              total={sorted.length}
+              rangeStart={start + 1}
+              rangeEnd={end}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[20, 50, 100, "all"]}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}

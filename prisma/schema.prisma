@@ -528,3 +528,56 @@ model ThreeCxUser {
 
   @@map("threecx_users")
 }
+
+// Single shared connection to a ZKBio Time biometric (fingerprint) time
+// clock server — same singleton pattern as ThreeCxConnection. Auth is a
+// plain username/password login (POST /api-token-auth/) returning a token
+// used as `Authorization: JWT <token>`; the docs don't document a refresh
+// flow, so getValidBiometricToken() just re-logs-in on a 401 instead of
+// tracking an expiry.
+model BiometricConnection {
+  id          String   @id @default(cuid())
+  baseUrl     String
+  username    String
+  password    String
+  token       String?
+  connectedBy String
+  connectedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("biometric_connections")
+}
+
+// Pulled on demand from ZKBio Time's /iclock/api/transactions/ via a manual
+// "Synchroniser" sync, mirroring PhoneCall/3CX. externalId is the device's
+// own transaction id, used as the upsert key.
+model BiometricEvent {
+  id              Int      @id @default(autoincrement())
+  externalId      String   @unique
+  empCode         String
+  employeeName    String
+  department      String?
+  position        String?
+  punchTime       DateTime
+  punchState      String // raw code, e.g. "0"
+  punchStateLabel String // e.g. "Check In"
+  verifyType      String? // e.g. "Fingerprint"
+  terminalAlias   String?
+  createdAt       DateTime @default(now())
+
+  @@map("biometric_events")
+}
+
+// Per-employee overrides layered onto the employee list pulled from
+// /personnel/api/employees/ — mirrors ThreeCxUser's rename/recolor/hide
+// pattern for the Calls page. Keyed by emp_code (the device's own
+// employee identifier).
+model BiometricEmployeeOverride {
+  empCode   String   @id
+  name      String?
+  color     String?
+  hidden    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("biometric_employee_overrides")
+}
