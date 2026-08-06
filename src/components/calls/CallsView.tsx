@@ -76,6 +76,15 @@ function callHourMinute(iso: string): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// Real opening hours: 09:30–19:00 every day, except Friday which splits
+// around the midday break (09:30–13:00, then 15:00–19:00).
+function isWithinBusinessHours(iso: string): boolean {
+  const d = new Date(iso);
+  const hm = callHourMinute(iso);
+  const windows = d.getDay() === 5 ? [["09:30", "13:00"], ["15:00", "19:00"]] : [["09:30", "19:00"]];
+  return windows.some(([from, to]) => hm >= from && hm <= to);
+}
+
 export function CallsView() {
   const { user } = useAuth();
   const router = useRouter();
@@ -94,6 +103,7 @@ export function CallsView() {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
+  const [businessHoursOnly, setBusinessHoursOnly] = useState(false);
   const [timeRangeLabel, setTimeRangeLabel] = useState("Toute la journée");
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [pageSize, setPageSize] = useState<number | "all">(20);
@@ -170,14 +180,16 @@ export function CallsView() {
       if (directionFilter.length && !directionFilter.includes(c.direction)) return false;
       if (dateFrom && c.startTime < dateFrom) return false;
       if (dateTo && c.startTime > `${dateTo}T23:59:59`) return false;
-      if (timeFrom || timeTo) {
+      if (businessHoursOnly) {
+        if (!isWithinBusinessHours(c.startTime)) return false;
+      } else if (timeFrom || timeTo) {
         const hm = callHourMinute(c.startTime);
         if (timeFrom && hm < timeFrom) return false;
         if (timeTo && hm > timeTo) return false;
       }
       return true;
     });
-  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, timeFrom, timeTo, effectiveSelectedDn]);
+  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedDn]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -191,7 +203,7 @@ export function CallsView() {
   }, [filtered, sortField, sortDirection]);
 
   const hasActiveFilter = Boolean(
-    search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || effectiveSelectedDn
+    search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedDn
   );
 
   // With no filter active, the tiles use the real aggregate counts from the
@@ -328,9 +340,10 @@ export function CallsView() {
             <CallTimeRangePicker
               open={timePickerOpen}
               onClose={() => setTimePickerOpen(false)}
-              onApply={(range, label) => {
-                setTimeFrom(range.from);
-                setTimeTo(range.to);
+              onApply={(range, label, businessHours) => {
+                setBusinessHoursOnly(Boolean(businessHours));
+                setTimeFrom(businessHours ? "" : range.from);
+                setTimeTo(businessHours ? "" : range.to);
                 setTimeRangeLabel(label);
               }}
             />
