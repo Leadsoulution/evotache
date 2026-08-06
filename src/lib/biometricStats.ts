@@ -118,6 +118,16 @@ export function getPresentEmployees(events: BiometricEvent[], employees: Biometr
   return present.sort((a, b) => b.lastPunchTime.localeCompare(a.lastPunchTime));
 }
 
+/** Employees (from the full roster) with zero punches in the given event
+ * set — meant to be called with the page's *filtered* events, so narrowing
+ * by date/department/etc. changes who counts as absent for that slice,
+ * unlike getPresentEmployees which deliberately ignores filters since
+ * presence is a live fact. */
+export function getAbsentEmployees(employees: BiometricEmployee[], filteredEvents: BiometricEvent[]): BiometricEmployee[] {
+  const codesWithEvents = new Set(filteredEvents.map((e) => e.empCode));
+  return employees.filter((e) => !e.hidden && !codesWithEvents.has(e.empCode));
+}
+
 export function countByEmployee(events: BiometricEvent[], employees: BiometricEmployee[]): BarChartDatum[] {
   return employees
     .filter((e) => !e.hidden)

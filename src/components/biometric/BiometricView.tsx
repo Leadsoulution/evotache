@@ -33,6 +33,7 @@ import {
   countByStatus,
   deriveEmployees,
   eventsForEmployee,
+  getAbsentEmployees,
   getPresentEmployees,
 } from "@/lib/biometricStats";
 import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, FingerprintIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, UsersIcon } from "@/components/ui/icons";
@@ -227,6 +228,11 @@ export function BiometricView() {
   const departmentChart = useMemo(() => countByDepartment(filtered), [filtered]);
   const employeeChart = useMemo(() => countByEmployee(filtered, employees), [filtered, employees]);
 
+  // Unlike "présents maintenant" (a live fact, always the full window),
+  // absence is inherently about a period — so it's driven by the same
+  // filtered set as the charts/table, and changes as the filters do.
+  const absentEmployees = useMemo(() => getAbsentEmployees(employees, filtered), [employees, filtered]);
+
   useEffect(() => {
     if (user && !allowed) router.replace("/");
   }, [user, allowed, router]);
@@ -324,6 +330,35 @@ export function BiometricView() {
                 <PieChart data={departmentChart} />
               </ChartCard>
             </div>
+          </section>
+
+          {/* Driven by the same filtered set as the charts above — unlike
+              "présents maintenant", absence only means something relative
+              to a period, so it changes as the date/département/etc.
+              filters below change. */}
+          <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 dark:border-amber-900/40 dark:bg-amber-950/10">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Absents</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Aucun pointage sur la période / le filtre sélectionné</p>
+              </div>
+              <span className="text-2xl font-bold tabular-nums leading-none text-amber-600 dark:text-amber-400">{absentEmployees.length}</span>
+            </div>
+
+            {absentEmployees.length > 0 ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {absentEmployees.map((e) => (
+                  <div key={e.empCode} className="flex flex-col items-center gap-1">
+                    <Avatar name={e.name} color={e.color} size="md" className="opacity-60 grayscale" />
+                    <span className="max-w-[64px] truncate text-[11px] text-slate-500 dark:text-slate-400" title={e.name}>
+                      {e.name.split(" ")[0]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-slate-400">Tout le monde a pointé sur cette période.</p>
+            )}
           </section>
 
           <div className="flex flex-wrap items-center gap-2">
