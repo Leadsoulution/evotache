@@ -1,6 +1,6 @@
 import { COLOR_PALETTE } from "@/config/colorPalette";
 import type { BarChartDatum } from "@/components/stats/BarChart";
-import type { BiometricEvent } from "@/types/biometric";
+import type { BiometricEvent, BiometricSchedule } from "@/types/biometric";
 
 // ZKBio Time's punch_state_display vocabulary is set by whatever language
 // the device/software itself is configured in — the API docs show English
@@ -133,6 +133,97 @@ export function countByEmployee(events: BiometricEvent[], employees: BiometricEm
     .filter((e) => !e.hidden)
     .map((e) => ({ key: e.empCode, label: e.name, value: eventsForEmployee(events, e.empCode).length, color: e.color }))
     .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+}
+
+function localDateKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export interface DailyAttendanceRow {
+  empCode: string;
+  name: string;
+  color: string;
+  date: string; // "YYYY-MM-DD", browser-local calendar day
+  firstEntry: string | null; // ISO
+  lastExit: string | null; // ISO
+  isLate: boolean;
+  lateSeconds: number;
+}
+
+/** One row per (employee, calendar day) present in the given event set —
+ * driven by the page's filtered events (same as getAbsentEmployees), so a
+ * date-range filter naturally produces one row per day per employee rather
+ * than one row overall. Lateness compares that day's first check-in
+ * against `schedule.startTime` — the same cutoff every day, including
+ * Friday (only the lunch break differs there, not the morning start). */
+export function computeDailyAttendance(events: BiometricEvent[], employees: BiometricEmployee[], schedule: BiometricSchedule): DailyAttendanceRow[] {
+  const employeeByCode = new Map(employees.map((e) => [e.empCode, e]));
+  const byKey = new Map<string, BiometricEvent[]>();
+  for (const event of events) {
+    const emp = employeeByCode.get(event.empCode);
+    if (!emp || emp.hidden) continue;
+    const key = `${event.empCode}__${localDateKey(event.punchTime)}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key)!.push(event);
+  }
+
+  const [startHour, startMinute] = schedule.startTime.split(":").map(Number);
+  const rows: DailyAttendanceRow[] = [];
+  for (const [key, dayEvents] of byKey) {
+    const [empCode, date] = key.split("__");
+    const emp = employeeByCode.get(empCode)!;
+    const checkIns = dayEvents.filter((e) => e.punchStateLabel === STATUS_CHECK_IN).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
+    const checkOuts = dayEvents.filter((e) => e.punchStateLabel === STATUS_CHECK_OUT).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
+    const firstEntry = checkIns[0]?.punchTime ?? null;
+    const lastExit = checkOuts.length ? checkOuts[checkOuts.length - 1].punchTime : null;
+
+    let isLate = false;
+    let lateSeconds = 0;
+    if (firstEntry) {
+      const entryDate = new Date(firstEntry);
+      const expected = new Date(entryDate);
+      expected.setHours(startHour, startMinute, 0, 0);
+      const diffMs = entryDate.getTime() - expected.getTime();
+      if (diffMs > 0) {
+        isLate = true;
+        lateSeconds = Math.round(diffMs / 1000);
+      }
+    }
+
+    rows.push({ empCode, name: emp.name, color: emp.color, date, firstEntry, lastExit, isLate, lateSeconds });
+  }
+
+  return rows.sort((a, b) => (a.date === b.date ? a.name.localeCompare(b.name) : b.date.localeCompare(a.date)));
+}
+
+export function formatLateDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (hours > 0 || minutes > 0) parts.push(`${minutes} min`);
+  parts.push(`${seconds}s`);
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} et ${parts[parts.length - 1]}`;
+}
+
+/** How many days each employee was late — built from computeDailyAttendance
+ * rows (already filtered), so it reflects the same period as the rest of
+ * the page's stats. */
+export function countLateByEmployee(rows: DailyAttendanceRow[]): BarChartDatum[] {
+  const counts = new Map<string, { label: string; color: string; value: number }>();
+  for (const row of rows) {
+    if (!row.isLate) continue;
+    const current = counts.get(row.empCode);
+    if (current) current.value += 1;
+    else counts.set(row.empCode, { label: row.name, color: row.color, value: 1 });
+  }
+  return Array.from(counts.entries())
+    .map(([empCode, v]) => ({ key: empCode, label: v.label, value: v.value, color: v.color }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 }

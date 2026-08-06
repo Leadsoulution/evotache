@@ -12,3 +12,13 @@ export interface BiometricEvent {
   terminalAlias: string | null;
   createdAt: string;
 }
+
+// The "on time" cutoff used to flag late arrivals — startTime applies every
+// day (including Friday's morning), fridayBreakStart/End only affect the
+// Heures d'ouverture filter preset, not lateness.
+export interface BiometricSchedule {
+  startTime: string;
+  endTime: string;
+  fridayBreakStart: string;
+  fridayBreakEnd: string;
+}

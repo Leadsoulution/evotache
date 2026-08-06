@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useBiometricEvents } from "@/hooks/useBiometricEvents";
 import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
+import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
 import { usePagination } from "@/hooks/usePagination";
 import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
+import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
+import { BiometricScheduleEditor } from "./BiometricScheduleEditor";
 import { BiometricDateRangePicker } from "./BiometricDateRangePicker";
 import { BiometricTimeRangePicker } from "./BiometricTimeRangePicker";
 import { FilterMenu } from "@/components/ui/FilterMenu";
@@ -28,15 +31,31 @@ import {
   STATUS_CHECK_IN,
   STATUS_CHECK_OUT,
   STATUS_LABEL,
+  computeDailyAttendance,
   countByDepartment,
   countByEmployee,
   countByStatus,
+  countLateByEmployee,
   deriveEmployees,
   eventsForEmployee,
+  formatLateDuration,
   getAbsentEmployees,
   getPresentEmployees,
 } from "@/lib/biometricStats";
-import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, FingerprintIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, UsersIcon } from "@/components/ui/icons";
+import {
+  AlertTriangleIcon,
+  CalendarIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  FingerprintIcon,
+  PencilIcon,
+  PhoneMissedIcon,
+  RefreshIcon,
+  SearchIcon,
+  SortIcon,
+  UsersIcon,
+} from "@/components/ui/icons";
 import type { BiometricEvent } from "@/types/biometric";
 
 const NO_DEPARTMENT_LABEL = "Sans département";
@@ -90,8 +109,10 @@ export function BiometricView() {
   const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
   const { events, stats, loading } = useBiometricEvents();
   const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
+  const { schedule, refetch: refetchSchedule } = useBiometricSchedule();
   const toast = useToast();
   const [managingEmployees, setManagingEmployees] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
@@ -129,6 +150,16 @@ export function BiometricView() {
     try {
       await saveBiometricEmployeeOverride(empCode, patch);
       refetchOverrides();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Échec de la mise à jour.");
+    }
+  }
+
+  async function handleSaveSchedule(next: typeof schedule) {
+    try {
+      await saveBiometricSchedule(next);
+      refetchSchedule();
+      toast.success("Heures de travail mises à jour.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Échec de la mise à jour.");
     }
@@ -233,6 +264,13 @@ export function BiometricView() {
   // filtered set as the charts/table, and changes as the filters do.
   const absentEmployees = useMemo(() => getAbsentEmployees(employees, filtered), [employees, filtered]);
 
+  // One row per (employee, day) in the filtered set, with lateness judged
+  // against the configurable schedule — same filtered-data footing as the
+  // charts/absents above.
+  const dailyAttendance = useMemo(() => computeDailyAttendance(filtered, employees, schedule), [filtered, employees, schedule]);
+  const lateCount = useMemo(() => dailyAttendance.filter((r) => r.isLate).length, [dailyAttendance]);
+  const lateChart = useMemo(() => countLateByEmployee(dailyAttendance), [dailyAttendance]);
+
   useEffect(() => {
     if (user && !allowed) router.replace("/");
   }, [user, allowed, router]);
@@ -305,11 +343,12 @@ export function BiometricView() {
           />
           <BiometricEmployeeManager open={managingEmployees} employees={employees} onClose={() => setManagingEmployees(false)} onSave={handleSaveEmployeeOverride} />
 
-          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
+          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-5 dark:bg-slate-950">
             <StatTile label="Total pointages" value={kpis.total} icon={<FingerprintIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Entrées" value={`${kpis.checkIns} (${kpis.checkInPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Sorties" value={`${kpis.checkOuts} (${kpis.checkOutPct}%)`} icon={<PhoneMissedIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Employés" value={kpis.uniqueEmployees} icon={<UsersIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Retards" value={lateCount} icon={<AlertTriangleIcon className="h-4.5 w-4.5" />} tone={lateCount > 0 ? "warning" : "default"} />
           </section>
 
           {/* Asymmetric on purpose (2:1 rather than three equal thirds) —
@@ -328,6 +367,9 @@ export function BiometricView() {
               </ChartCard>
               <ChartCard title="Par département">
                 <PieChart data={departmentChart} />
+              </ChartCard>
+              <ChartCard title="Retards par employé">
+                <BarChart data={lateChart} />
               </ChartCard>
             </div>
           </section>
@@ -360,6 +402,87 @@ export function BiometricView() {
               <p className="mt-3 text-xs text-slate-400">Tout le monde a pointé sur cette période.</p>
             )}
           </section>
+
+          {/* One row per employee per day in the current filter — entrée =
+              premier pointage "Enregistrement" du jour, sortie = dernier
+              "Départ" du jour. Le retard est calculé contre l'heure de
+              début configurable ci-dessous. */}
+          <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Détail des présences</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Retard calculé si l&apos;entrée est après {schedule.startTime}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSchedule(true)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <PencilIcon className="h-3.5 w-3.5" />
+                Modifier les heures de travail
+              </button>
+            </div>
+
+            {dailyAttendance.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-400">Aucune présence sur la période / le filtre sélectionné.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                      <th scope="col" className="whitespace-nowrap px-4 py-2">
+                        Nom
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        Date
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        Entrée
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        Sortie
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        En retard
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        Temps de retard
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyAttendance.map((row) => (
+                      <tr key={`${row.empCode}-${row.date}`} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                        <td className="whitespace-nowrap px-4 py-2 font-medium text-slate-800 dark:text-slate-100">{row.name}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{row.date}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
+                          {row.firstEntry ? formatEventTime(row.firstEntry) : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{row.lastExit ? formatEventTime(row.lastExit) : "—"}</td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {row.isLate ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+                              <AlertTriangleIcon className="h-3 w-3" />
+                              Oui
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">Non</span>
+                          )}
+                        </td>
+                        <td className={cn("whitespace-nowrap px-3 py-2 tabular-nums", row.isLate ? "font-medium text-red-600 dark:text-red-400" : "text-slate-400")}>
+                          {row.isLate ? formatLateDuration(row.lateSeconds) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <BiometricScheduleEditor open={editingSchedule} schedule={schedule} onClose={() => setEditingSchedule(false)} onSave={handleSaveSchedule} />
 
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative">

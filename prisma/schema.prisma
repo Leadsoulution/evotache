@@ -565,3 +565,20 @@ model BiometricEmployeeOverride {
 
   @@map("biometric_employee_overrides")
 }
+
+// Single shared config (singleton, same pattern as BackupSheetConfig) for
+// the "on time" cutoff used to flag late arrivals. Mirrors the same
+// start/end/Friday-break shape already used for the Heures d'ouverture
+// filter preset (CallsView/BiometricView's isWithinBusinessHours) — a
+// lateness check only ever needs the start time, but keeping the full
+// shape here lets one editor eventually drive both.
+model BiometricSchedule {
+  id               String   @id @default(cuid())
+  startTime        String   @default("09:30")
+  endTime          String   @default("19:00")
+  fridayBreakStart String   @default("13:00")
+  fridayBreakEnd   String   @default("15:00")
+  updatedAt        DateTime @updatedAt
+
+  @@map("biometric_schedule")
+}
