@@ -59,6 +59,7 @@ async function handleIncomingMessage(chatId: number, text: string): Promise<void
   void runAgentTurn({
     agentId: config.userId,
     conversationId: conversation.id,
+    channel: "telegram",
     onReply: (replyText) => sendTelegramMessage(String(chatId), replyText),
   });
 }

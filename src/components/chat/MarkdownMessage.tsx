@@ -32,9 +32,10 @@ export function MarkdownMessage({ text, isOwn }: MarkdownMessageProps) {
     ul: ({ children }) => <ul className="mt-1.5 list-disc space-y-0.5 pl-4">{children}</ul>,
     ol: ({ children }) => <ol className="mt-1.5 list-decimal space-y-0.5 pl-4">{children}</ol>,
     li: ({ children }) => <li className="pl-0.5">{children}</li>,
-    h1: ({ children }) => <p className="mt-2 text-base font-semibold first:mt-0">{children}</p>,
-    h2: ({ children }) => <p className="mt-2 text-sm font-semibold first:mt-0">{children}</p>,
-    h3: ({ children }) => <p className="mt-2 text-sm font-semibold first:mt-0">{children}</p>,
+    h1: ({ children }) => <p className="mt-3 text-base font-bold tracking-tight first:mt-0">{children}</p>,
+    h2: ({ children }) => <p className="mt-3 text-[0.95rem] font-semibold tracking-tight first:mt-0">{children}</p>,
+    h3: ({ children }) => <p className="mt-2 text-xs font-semibold uppercase tracking-wide opacity-75 first:mt-0">{children}</p>,
+    hr: () => <hr className={cn("my-2.5", isOwn ? "border-white/25" : "border-slate-200 dark:border-slate-700")} />,
     blockquote: ({ children }) => <blockquote className={cn("mt-1.5 border-l-2 pl-2 italic opacity-90", isOwn ? "border-white/40" : "border-slate-300 dark:border-slate-600")}>{children}</blockquote>,
     table: ({ children }) => (
       <div className="mt-1.5 overflow-x-auto">
