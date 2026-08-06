@@ -11,6 +11,8 @@ import { saveThreeCxUserOverride } from "@/services/threeCxUserApi";
 import { ThreeCxConnectionCard } from "./ThreeCxConnectionCard";
 import { ThreeCxUserSelectorBar } from "./ThreeCxUserSelectorBar";
 import { ThreeCxUserManager } from "./ThreeCxUserManager";
+import { CallDateRangePicker } from "./CallDateRangePicker";
+import { CallTimeRangePicker } from "./CallTimeRangePicker";
 import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatTile } from "@/components/stats/StatTile";
@@ -22,7 +24,7 @@ import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
 import { DIRECTION_LABEL, STATUS_BADGE, STATUS_LABEL, callsForUser, countByDirection, countByStatus, countByUser, deriveInternalUsers } from "@/lib/callStats";
-import { CheckIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon } from "@/components/ui/icons";
+import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon } from "@/components/ui/icons";
 import type { PhoneCall } from "@/types/call";
 
 type SortField = "source" | "dest" | "direction" | "status" | "startTime" | "ringSeconds" | "talkSeconds";
@@ -88,8 +90,12 @@ export function CallsView() {
   const [directionFilter, setDirectionFilter] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [dateRangeLabel, setDateRangeLabel] = useState("Toutes les dates");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
+  const [timeRangeLabel, setTimeRangeLabel] = useState("Toute la journée");
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [pageSize, setPageSize] = useState<number | "all">(20);
   const [sortField, setSortField] = useState<SortField>("startTime");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -292,42 +298,42 @@ export function CallsView() {
             {directionOptions.length > 0 && (
               <FilterMenu label="Direction" count={directionFilter.length} options={directionOptions} value={directionFilter} onChange={setDirectionFilter} />
             )}
-            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              Après
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              Avant
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              Heure ≥
-              <input
-                type="time"
-                value={timeFrom}
-                onChange={(event) => setTimeFrom(event.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              Heure ≤
-              <input
-                type="time"
-                value={timeTo}
-                onChange={(event) => setTimeTo(event.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              />
-            </label>
+            <button
+              type="button"
+              onClick={() => setDatePickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <CalendarIcon className="h-3.5 w-3.5 opacity-60" />
+              {dateRangeLabel}
+              <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimePickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <ClockIcon className="h-3.5 w-3.5 opacity-60" />
+              {timeRangeLabel}
+              <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
+            </button>
+            <CallDateRangePicker
+              open={datePickerOpen}
+              onClose={() => setDatePickerOpen(false)}
+              onApply={(range, label) => {
+                setDateFrom(range.from ?? "");
+                setDateTo(range.to ?? "");
+                setDateRangeLabel(label);
+              }}
+            />
+            <CallTimeRangePicker
+              open={timePickerOpen}
+              onClose={() => setTimePickerOpen(false)}
+              onApply={(range, label) => {
+                setTimeFrom(range.from);
+                setTimeTo(range.to);
+                setTimeRangeLabel(label);
+              }}
+            />
           </div>
 
           {sorted.length === 0 && (
