@@ -41,10 +41,16 @@ function Write-Log($message) {
 try {
     # 1. Log into ZKBio Time to get a fresh token (no documented refresh
     #    flow, so this script just logs in fresh on every run instead).
+    Write-Log "Connexion à la pointeuse ($PointeuseUrl)..."
     $loginBody = @{ username = $PointeuseUser; password = $PointeusePass } | ConvertTo-Json
-    $loginResponse = Invoke-RestMethod -Uri "$PointeuseUrl/api-token-auth/" -Method Post -Body $loginBody -ContentType "application/json"
+    try {
+        $loginResponse = Invoke-RestMethod -Uri "$PointeuseUrl/api-token-auth/" -Method Post -Body $loginBody -ContentType "application/json"
+    } catch {
+        throw "Échec de connexion à la POINTEUSE (identifiants $PointeuseUser incorrects ?) : $($_.Exception.Message)"
+    }
     $token = $loginResponse.token
-    if (-not $token) { throw "No token in login response." }
+    if (-not $token) { throw "Pas de token dans la réponse de la pointeuse." }
+    Write-Log "Connexion pointeuse OK."
 
     # 2. Time window: since the last successful run, or the last 24h on
     #    first run. ZKBio Time expects naive "YYYY-MM-DD HH:mm:ss" — its own
@@ -69,8 +75,13 @@ try {
 
     # 4. Push to EvoTasks (skip the call entirely if there's nothing new).
     if ($allTransactions.Count -gt 0) {
+        Write-Log "Envoi de $($allTransactions.Count) transaction(s) vers EvoTasks..."
         $body = @{ transactions = $allTransactions } | ConvertTo-Json -Depth 10
-        $ingestResponse = Invoke-RestMethod -Uri $EvoTasksUrl -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $IngestToken" }
+        try {
+            $ingestResponse = Invoke-RestMethod -Uri $EvoTasksUrl -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $IngestToken" }
+        } catch {
+            throw "Échec d'envoi vers EVOTASKS (le token ne correspond pas à BIOMETRIC_INGEST_TOKEN sur Hostinger ?) : $($_.Exception.Message)"
+        }
         Write-Log "Ingested: $($ingestResponse.synced) synced, $($ingestResponse.checkIns) check-in(s), $($ingestResponse.checkOuts) check-out(s)."
     }
 
