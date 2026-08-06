@@ -14,6 +14,7 @@ import { BiometricDateRangePicker } from "./BiometricDateRangePicker";
 import { BiometricTimeRangePicker } from "./BiometricTimeRangePicker";
 import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Pagination } from "@/components/ui/Pagination";
+import { Avatar } from "@/components/ui/Avatar";
 import { StatTile } from "@/components/stats/StatTile";
 import { ChartCard } from "@/components/stats/ChartCard";
 import { BarChart } from "@/components/stats/BarChart";
@@ -22,7 +23,18 @@ import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
-import { STATUS_BADGE, STATUS_CHECK_IN, STATUS_CHECK_OUT, STATUS_LABEL, countByDepartment, countByEmployee, countByStatus, deriveEmployees, eventsForEmployee } from "@/lib/biometricStats";
+import {
+  STATUS_BADGE,
+  STATUS_CHECK_IN,
+  STATUS_CHECK_OUT,
+  STATUS_LABEL,
+  countByDepartment,
+  countByEmployee,
+  countByStatus,
+  deriveEmployees,
+  eventsForEmployee,
+  getPresentEmployees,
+} from "@/lib/biometricStats";
 import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, FingerprintIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, UsersIcon } from "@/components/ui/icons";
 import type { BiometricEvent } from "@/types/biometric";
 
@@ -101,6 +113,11 @@ export function BiometricView() {
   // an avatar-row selector matching the Calls page's ThreeCxUserSelectorBar,
   // not fetched via a separate "list employees" API call.
   const employees = useMemo(() => deriveEmployees(events, overrides), [events, overrides]);
+
+  // Always computed from the full fetched window, never the active
+  // filters — whether someone is in the building right now shouldn't
+  // change because of an unrelated status/date filter.
+  const presentEmployees = useMemo(() => getPresentEmployees(events, employees), [events, employees]);
 
   // If the selected employee gets hidden (this tab or another), stop
   // filtering by a code that's no longer selectable — derived at render
@@ -247,6 +264,47 @@ export function BiometricView() {
 
       {!loading && (
         <>
+          {/* Signature section: who's actually in the building right now —
+              the one question raw punch data can answer that call data
+              never could, so it leads the page instead of a KPI-tiles row. */}
+          <section className="relative overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-white p-5 shadow-sm dark:border-teal-900/50 dark:from-teal-950/30 dark:via-slate-900 dark:to-slate-900">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3 w-3 shrink-0">
+                  <span className="motion-safe:absolute motion-safe:inline-flex motion-safe:h-full motion-safe:w-full motion-safe:animate-ping motion-safe:rounded-full motion-safe:bg-teal-400 motion-safe:opacity-75" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-teal-500" />
+                </span>
+                <div>
+                  <p className="text-3xl font-bold tabular-nums leading-none text-teal-700 dark:text-teal-300">{presentEmployees.length}</p>
+                  <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">
+                    présent{presentEmployees.length !== 1 ? "s" : ""} maintenant
+                  </p>
+                </div>
+              </div>
+              {presentEmployees[0] && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Dernière arrivée : <span className="font-medium text-slate-700 dark:text-slate-200">{presentEmployees[0].name}</span> à{" "}
+                  {formatEventTime(presentEmployees[0].lastPunchTime)}
+                </p>
+              )}
+            </div>
+
+            {presentEmployees.length > 0 ? (
+              <div className="mt-4 flex items-center gap-3 overflow-x-auto pb-1">
+                {presentEmployees.map((e) => (
+                  <div key={e.empCode} className="flex shrink-0 flex-col items-center gap-1">
+                    <Avatar name={e.name} color={e.color} size="md" className="ring-2 ring-teal-200 dark:ring-teal-800" />
+                    <span className="max-w-[64px] truncate text-[11px] text-slate-500 dark:text-slate-400" title={e.name}>
+                      {e.name.split(" ")[0]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-slate-400">Personne n&apos;est actuellement pointé comme présent.</p>
+            )}
+          </section>
+
           <BiometricEmployeeSelectorBar
             employees={employees}
             selectedEmpCode={effectiveSelectedEmpCode}
@@ -262,16 +320,24 @@ export function BiometricView() {
             <StatTile label="Employés" value={kpis.uniqueEmployees} icon={<UsersIcon className="h-4.5 w-4.5" />} />
           </section>
 
+          {/* Asymmetric on purpose (2:1 rather than three equal thirds) —
+              the employee ranking is the most actionable chart, so it leads
+              wide, with the statut/département breakdowns stacked beside it
+              instead of competing for equal weight. */}
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <ChartCard title="Pointages par statut">
-              <PieChart data={statusChart} />
-            </ChartCard>
-            <ChartCard title="Pointages par département">
-              <PieChart data={departmentChart} />
-            </ChartCard>
-            <ChartCard title="Pointages par employé">
-              <BarChart data={employeeChart} />
-            </ChartCard>
+            <div className="lg:col-span-2">
+              <ChartCard title="Pointages par employé">
+                <BarChart data={employeeChart} />
+              </ChartCard>
+            </div>
+            <div className="flex flex-col gap-4">
+              <ChartCard title="Par statut">
+                <PieChart data={statusChart} />
+              </ChartCard>
+              <ChartCard title="Par département">
+                <PieChart data={departmentChart} />
+              </ChartCard>
+            </div>
           </section>
 
           <div className="flex flex-wrap items-center gap-2">

@@ -92,6 +92,32 @@ export function countByDepartment(events: BiometricEvent[]): BarChartDatum[] {
     .sort((a, b) => b.value - a.value);
 }
 
+export interface PresentEmployee extends BiometricEmployee {
+  lastPunchTime: string;
+}
+
+/** Who's currently in the building — the one thing punch data can answer
+ * that call data never could, so it's the page's own signature view rather
+ * than a copy of Calls' KPI-tiles-then-charts layout. An employee counts as
+ * present when their single most recent punch (across the whole fetched
+ * window, not the active filters — presence is a live fact, not something
+ * that should disappear because of an unrelated date filter) was a
+ * check-in. Sorted most-recently-arrived first. */
+export function getPresentEmployees(events: BiometricEvent[], employees: BiometricEmployee[]): PresentEmployee[] {
+  const latestByCode = new Map<string, BiometricEvent>();
+  for (const event of events) {
+    const current = latestByCode.get(event.empCode);
+    if (!current || event.punchTime > current.punchTime) latestByCode.set(event.empCode, event);
+  }
+  const present: PresentEmployee[] = [];
+  for (const employee of employees) {
+    if (employee.hidden) continue;
+    const latest = latestByCode.get(employee.empCode);
+    if (latest?.punchStateLabel === STATUS_CHECK_IN) present.push({ ...employee, lastPunchTime: latest.punchTime });
+  }
+  return present.sort((a, b) => b.lastPunchTime.localeCompare(a.lastPunchTime));
+}
+
 export function countByEmployee(events: BiometricEvent[], employees: BiometricEmployee[]): BarChartDatum[] {
   return employees
     .filter((e) => !e.hidden)
