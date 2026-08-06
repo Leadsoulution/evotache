@@ -87,10 +87,9 @@ export function BiometricView() {
   const { user } = useAuth();
   const router = useRouter();
   const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
-  const { events, stats, loading, refetch } = useBiometricEvents();
+  const { events, stats, loading } = useBiometricEvents();
   const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
   const toast = useToast();
-  const [refreshing, setRefreshing] = useState(false);
   const [managingEmployees, setManagingEmployees] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -144,21 +143,8 @@ export function BiometricView() {
 
   // Data arrives via a local script pushing to /api/biometric/ingest (the
   // device is on a private network Hostinger can't reach), not a pull from
-  // this page — so there's nothing to "sync" here, just an immediate
-  // refetch of what's already stored, on top of the automatic 30s poll.
-  // Still shows a toast with the fresh totals so the click feels like it
-  // did something, same as the sync button on the Calls page.
-  async function handleRefresh() {
-    setRefreshing(true);
-    try {
-      const data = await refetch();
-      if (data) toast.success(`${data.stats.total} pointage(s) au total, dont ${data.stats.checkIns} entrée(s) et ${data.stats.checkOuts} sortie(s).`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Échec de l'actualisation.");
-    } finally {
-      setRefreshing(false);
-    }
-  }
+  // this page — so there's no "sync now" action here, just the automatic
+  // poll (useBiometricEvents refreshes on its own).
 
   // Built from whatever values are actually present in the synced data,
   // rather than a hardcoded list — adapts automatically if the device ever
@@ -254,15 +240,10 @@ export function BiometricView() {
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Biométrie</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Historique des pointages — reçu automatiquement depuis la pointeuse biométrique.</p>
         </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshIcon className="h-4 w-4" />
-          {refreshing ? "Actualisation…" : "Actualiser"}
-        </button>
+        <p className="inline-flex shrink-0 items-center gap-1.5 self-start text-xs text-slate-400 dark:text-slate-500">
+          <RefreshIcon className="h-3.5 w-3.5 motion-safe:animate-spin motion-safe:[animation-duration:3s]" />
+          Actualisation automatique toutes les minutes
+        </p>
       </header>
 
       {loading && <TaskListSkeleton />}
