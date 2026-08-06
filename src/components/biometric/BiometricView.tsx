@@ -146,10 +146,15 @@ export function BiometricView() {
   // device is on a private network Hostinger can't reach), not a pull from
   // this page — so there's nothing to "sync" here, just an immediate
   // refetch of what's already stored, on top of the automatic 30s poll.
+  // Still shows a toast with the fresh totals so the click feels like it
+  // did something, same as the sync button on the Calls page.
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      await refetch();
+      const data = await refetch();
+      if (data) toast.success(`${data.stats.total} pointage(s) au total, dont ${data.stats.checkIns} entrée(s) et ${data.stats.checkOuts} sortie(s).`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Échec de l'actualisation.");
     } finally {
       setRefreshing(false);
     }
