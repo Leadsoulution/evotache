@@ -1,0 +1,105 @@
+<#
+.SYNOPSIS
+  Pushes new fingerprint attendance punches from a local ZKBio Time server
+  to EvoTasks' Biométrie page.
+
+.DESCRIPTION
+  Runs on a machine that IS on the same local network as the biometric
+  device (EvoTasks itself runs on Hostinger and can't reach a private LAN
+  address like 192.168.1.137). Logs into ZKBio Time, fetches punches since
+  the last successful run, and POSTs the raw rows to EvoTasks' ingest
+  endpoint — EvoTasks does all the parsing/normalization server-side, so
+  this script stays intentionally dumb and rarely needs updating.
+
+  Meant to be run on a schedule (Task Scheduler, every 10-15 min) — see
+  the setup notes at the bottom of this file.
+
+.NOTES
+  Fill in the 5 values below before running. Nothing here needs to be
+  secret from EvoTasks' own codebase, but the *values* you fill in
+  (password, ingest token) ARE secrets — don't commit this file with them
+  filled in to a public place; keep your copy local to the PC that runs it.
+#>
+
+# ---- Fill these in ----
+$PointeuseUrl   = "http://192.168.1.137:8080"        # ZKBio Time base URL (local)
+$PointeuseUser  = "admin"                             # ZKBio Time username
+$PointeusePass  = "REPLACE_ME"                        # ZKBio Time password
+$EvoTasksUrl    = "https://evotasks.app/api/biometric/ingest"
+$IngestToken    = "REPLACE_ME"                        # must match BIOMETRIC_INGEST_TOKEN on Hostinger
+# ------------------------
+
+$StateFile = Join-Path $PSScriptRoot "biometric-sync-state.txt"
+$LogFile   = Join-Path $PSScriptRoot "biometric-sync.log"
+
+function Write-Log($message) {
+    $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $message"
+    Write-Host $line
+    Add-Content -Path $LogFile -Value $line
+}
+
+try {
+    # 1. Log into ZKBio Time to get a fresh token (no documented refresh
+    #    flow, so this script just logs in fresh on every run instead).
+    $loginBody = @{ username = $PointeuseUser; password = $PointeusePass } | ConvertTo-Json
+    $loginResponse = Invoke-RestMethod -Uri "$PointeuseUrl/api-token-auth/" -Method Post -Body $loginBody -ContentType "application/json"
+    $token = $loginResponse.token
+    if (-not $token) { throw "No token in login response." }
+
+    # 2. Time window: since the last successful run, or the last 24h on
+    #    first run. ZKBio Time expects naive "YYYY-MM-DD HH:mm:ss" — its own
+    #    local wall-clock, no timezone conversion needed on this end.
+    $endTime = Get-Date
+    $startTime = if (Test-Path $StateFile) { [datetime](Get-Content $StateFile -Raw) } else { $endTime.AddHours(-24) }
+    $startStr = $startTime.ToString("yyyy-MM-dd HH:mm:ss")
+    $endStr = $endTime.ToString("yyyy-MM-dd HH:mm:ss")
+
+    # 3. Fetch every page of transactions in that window.
+    $allTransactions = @()
+    $page = 1
+    do {
+        $url = "$PointeuseUrl/iclock/api/transactions/?start_time=$([uri]::EscapeDataString($startStr))&end_time=$([uri]::EscapeDataString($endStr))&page=$page&page_size=500"
+        $response = Invoke-RestMethod -Uri $url -Headers @{ Authorization = "JWT $token" }
+        $rows = @($response.data)
+        $allTransactions += $rows
+        $page++
+    } while ($rows.Count -eq 500)
+
+    Write-Log "Fetched $($allTransactions.Count) transaction(s) for $startStr .. $endStr."
+
+    # 4. Push to EvoTasks (skip the call entirely if there's nothing new).
+    if ($allTransactions.Count -gt 0) {
+        $body = @{ transactions = $allTransactions } | ConvertTo-Json -Depth 10
+        $ingestResponse = Invoke-RestMethod -Uri $EvoTasksUrl -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $IngestToken" }
+        Write-Log "Ingested: $($ingestResponse.synced) synced, $($ingestResponse.checkIns) check-in(s), $($ingestResponse.checkOuts) check-out(s)."
+    }
+
+    # 5. Only advance the checkpoint after a successful push, so a failed
+    #    run retries the same window next time instead of losing data.
+    $endTime.ToString("o") | Set-Content -Path $StateFile
+    Write-Log "Done."
+} catch {
+    Write-Log "ERROR: $($_.Exception.Message)"
+    exit 1
+}
+
+<#
+.SETUP (one-time, on the Windows PC on the same network as the pointeuse)
+
+1. Fill in the 5 values at the top of this file (password + ingest token).
+2. On Hostinger, set the environment variable BIOMETRIC_INGEST_TOKEN to the
+   exact same value you used for $IngestToken above.
+3. Test it once by hand:
+     powershell -File biometric-sync.ps1
+   Check biometric-sync.log for errors, and check /biometrie in EvoTasks
+   for the new punches.
+4. Schedule it to run every 10-15 minutes:
+   - Open Task Scheduler -> Create Task
+   - Trigger: Daily, repeat every 15 minutes, for a duration of 1 day (so
+     it keeps repeating indefinitely)
+   - Action: Start a program
+       Program: powershell.exe
+       Arguments: -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\biometric-sync.ps1"
+   - Under Settings, check "Run task as soon as possible after a scheduled
+     start is missed" so a reboot doesn't lose a cycle.
+#>

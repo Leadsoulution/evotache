@@ -8,7 +8,6 @@ import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
 import { usePagination } from "@/hooks/usePagination";
 import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
-import { BiometricConnectionCard } from "./BiometricConnectionCard";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
 import { BiometricDateRangePicker } from "./BiometricDateRangePicker";
@@ -79,7 +78,7 @@ export function BiometricView() {
   const { events, stats, loading, refetch } = useBiometricEvents();
   const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
   const toast = useToast();
-  const [syncing, setSyncing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [managingEmployees, setManagingEmployees] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -126,18 +125,16 @@ export function BiometricView() {
     }
   }
 
-  async function handleSync() {
-    setSyncing(true);
+  // Data arrives via a local script pushing to /api/biometric/ingest (the
+  // device is on a private network Hostinger can't reach), not a pull from
+  // this page — so there's nothing to "sync" here, just an immediate
+  // refetch of what's already stored, on top of the automatic 30s poll.
+  async function handleRefresh() {
+    setRefreshing(true);
     try {
-      const res = await fetch("/api/biometric/sync", { method: "POST" });
-      const data = (await res.json()) as { synced: number; checkIns: number; checkOuts: number; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
-      toast.success(`Synchronisé : ${data.synced} pointage(s), dont ${data.checkIns} entrée(s) et ${data.checkOuts} sortie(s).`);
-      refetch();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sync failed.");
+      await refetch();
     } finally {
-      setSyncing(false);
+      setRefreshing(false);
     }
   }
 
@@ -233,20 +230,18 @@ export function BiometricView() {
       <header className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Biométrie</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Historique des pointages — synchronisé depuis la pointeuse biométrique à la demande.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Historique des pointages — reçu automatiquement depuis la pointeuse biométrique.</p>
         </div>
         <button
           type="button"
-          onClick={handleSync}
-          disabled={syncing}
+          onClick={handleRefresh}
+          disabled={refreshing}
           className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshIcon className="h-4 w-4" />
-          {syncing ? "Synchronisation…" : "Synchroniser"}
+          {refreshing ? "Actualisation…" : "Actualiser"}
         </button>
       </header>
-
-      <BiometricConnectionCard />
 
       {loading && <TaskListSkeleton />}
 
@@ -339,7 +334,7 @@ export function BiometricView() {
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <FingerprintIcon className="h-10 w-10 text-slate-300 dark:text-slate-700" />
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                {events.length === 0 ? "Aucun pointage synchronisé pour l'instant — clique sur \"Synchroniser\"." : "Aucun pointage ne correspond aux filtres."}
+                {events.length === 0 ? "Aucun pointage reçu pour l'instant — vérifie que le script de synchronisation tourne bien." : "Aucun pointage ne correspond aux filtres."}
               </p>
             </div>
           )}

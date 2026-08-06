@@ -1,12 +1,13 @@
 import { db } from "@/lib/db";
-import { listTransactions } from "@/lib/biometricApi";
+import { toBiometricEventEntry } from "@/lib/biometricApi";
+import type { RawTransaction } from "@/lib/biometricApi";
 
-const SYNC_DAYS_BACK = 30;
-
-export async function syncBiometricEvents(): Promise<{ synced: number; checkIns: number; checkOuts: number }> {
-  const endTime = new Date();
-  const startTime = new Date(endTime.getTime() - SYNC_DAYS_BACK * 24 * 60 * 60 * 1000);
-  const entries = await listTransactions(startTime, endTime);
+/** Upserts a batch of raw ZKBio Time transaction rows pushed by the local
+ * ingest script — same upsert-by-externalId shape as every other synced
+ * integration (PhoneCall/3CX), just triggered by an incoming POST instead
+ * of this server calling out to the device itself. */
+export async function ingestBiometricEvents(rawRows: RawTransaction[]): Promise<{ synced: number; checkIns: number; checkOuts: number }> {
+  const entries = rawRows.map(toBiometricEventEntry);
 
   for (const entry of entries) {
     const data = {
