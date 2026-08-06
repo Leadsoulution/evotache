@@ -60,18 +60,41 @@ try {
     $startStr = $startTime.ToString("yyyy-MM-dd HH:mm:ss")
     $endStr = $endTime.ToString("yyyy-MM-dd HH:mm:ss")
 
-    # 3. Fetch every page of transactions in that window.
+    # 3. Fetch every page of transactions in that window. ZKBio Time's own
+    #    docs are ambiguous about whether a token from /api-token-auth/ is
+    #    used as "Token <t>" or "JWT <t>" — try "Token" first (it matches
+    #    this endpoint's response shape better) and fall back to "JWT" on a
+    #    401, so this self-corrects instead of guessing wrong forever.
+    $authScheme = "Token"
+    function Invoke-PointeuseGet($url) {
+        try {
+            return Invoke-RestMethod -Uri $url -Headers @{ Authorization = "$script:authScheme $token" }
+        } catch {
+            $status = $_.Exception.Response.StatusCode.value__
+            if ($status -eq 401 -and $script:authScheme -eq "Token") {
+                Write-Log "Le format 'Token' a été refusé, on essaie 'JWT'..."
+                $script:authScheme = "JWT"
+                return Invoke-RestMethod -Uri $url -Headers @{ Authorization = "$script:authScheme $token" }
+            }
+            throw
+        }
+    }
+
     $allTransactions = @()
     $page = 1
-    do {
-        $url = "$PointeuseUrl/iclock/api/transactions/?start_time=$([uri]::EscapeDataString($startStr))&end_time=$([uri]::EscapeDataString($endStr))&page=$page&page_size=500"
-        $response = Invoke-RestMethod -Uri $url -Headers @{ Authorization = "JWT $token" }
-        $rows = @($response.data)
-        $allTransactions += $rows
-        $page++
-    } while ($rows.Count -eq 500)
+    try {
+        do {
+            $url = "$PointeuseUrl/iclock/api/transactions/?start_time=$([uri]::EscapeDataString($startStr))&end_time=$([uri]::EscapeDataString($endStr))&page=$page&page_size=500"
+            $response = Invoke-PointeuseGet $url
+            $rows = @($response.data)
+            $allTransactions += $rows
+            $page++
+        } while ($rows.Count -eq 500)
+    } catch {
+        throw "Échec de récupération des données sur la POINTEUSE : $($_.Exception.Message)"
+    }
 
-    Write-Log "Fetched $($allTransactions.Count) transaction(s) for $startStr .. $endStr."
+    Write-Log "Fetched $($allTransactions.Count) transaction(s) for $startStr .. $endStr (format d'autorisation utilisé : $authScheme)."
 
     # 4. Push to EvoTasks (skip the call entirely if there's nothing new).
     if ($allTransactions.Count -gt 0) {
