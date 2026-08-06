@@ -22,7 +22,7 @@ import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
-import { STATUS_BADGE, STATUS_LABEL, countByDepartment, countByEmployee, countByStatus, deriveEmployees, eventsForEmployee } from "@/lib/biometricStats";
+import { STATUS_BADGE, STATUS_CHECK_IN, STATUS_CHECK_OUT, STATUS_LABEL, countByDepartment, countByEmployee, countByStatus, deriveEmployees, eventsForEmployee } from "@/lib/biometricStats";
 import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, FingerprintIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, UsersIcon } from "@/components/ui/icons";
 import type { BiometricEvent } from "@/types/biometric";
 
@@ -202,8 +202,8 @@ export function BiometricView() {
       const checkOutPct = stats.total ? Math.round((stats.checkOuts / stats.total) * 100) : 0;
       return { total: stats.total, checkIns: stats.checkIns, checkOuts: stats.checkOuts, checkInPct, checkOutPct, uniqueEmployees: stats.uniqueEmployees };
     }
-    const checkIns = filtered.filter((e) => e.punchStateLabel === "Check In");
-    const checkOuts = filtered.filter((e) => e.punchStateLabel === "Check Out");
+    const checkIns = filtered.filter((e) => e.punchStateLabel === STATUS_CHECK_IN);
+    const checkOuts = filtered.filter((e) => e.punchStateLabel === STATUS_CHECK_OUT);
     const checkInPct = filtered.length ? Math.round((checkIns.length / filtered.length) * 100) : 0;
     const checkOutPct = filtered.length ? Math.round((checkOuts.length / filtered.length) * 100) : 0;
     const uniqueEmployees = new Set(filtered.map((e) => e.empCode)).size;

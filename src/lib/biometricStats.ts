@@ -2,26 +2,25 @@ import { COLOR_PALETTE } from "@/config/colorPalette";
 import type { BarChartDatum } from "@/components/stats/BarChart";
 import type { BiometricEvent } from "@/types/biometric";
 
-// ZKBio Time's own punch_state_display vocabulary (per its API docs, "Check
-// In"/"Check Out" confirmed; the others follow the same device's standard
-// codes) — unrecognized values fall back to their raw label instead of
-// disappearing, same pattern as 3CX's Direction handling.
+// ZKBio Time's punch_state_display vocabulary is set by whatever language
+// the device/software itself is configured in — the API docs show English
+// ("Check In"/"Check Out"), but this instance is French-localized and
+// actually returns "Enregistrement"/"Départ" (confirmed live against real
+// synced data). These two are used as the canonical check-in/check-out
+// markers everywhere (KPI counts, sync counts) — unrecognized values still
+// fall back to their raw label instead of disappearing, same pattern as
+// 3CX's Direction handling.
+export const STATUS_CHECK_IN = "Enregistrement";
+export const STATUS_CHECK_OUT = "Départ";
+
 export const STATUS_LABEL: Record<string, string> = {
-  "Check In": "Entrée",
-  "Check Out": "Sortie",
-  "Break Out": "Pause (sortie)",
-  "Break In": "Pause (retour)",
-  "OverTime In": "Heures sup. (entrée)",
-  "OverTime Out": "Heures sup. (sortie)",
+  [STATUS_CHECK_IN]: "Entrée",
+  [STATUS_CHECK_OUT]: "Sortie",
 };
 
 export const STATUS_BADGE: Record<string, string> = {
-  "Check In": "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  "Check Out": "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  "Break Out": "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  "Break In": "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  "OverTime In": "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-  "OverTime Out": "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+  [STATUS_CHECK_IN]: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  [STATUS_CHECK_OUT]: "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 };
 
 const NO_DEPARTMENT_LABEL = "Sans département";

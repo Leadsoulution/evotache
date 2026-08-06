@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { toBiometricEventEntry } from "@/lib/biometricApi";
+import { STATUS_CHECK_IN, STATUS_CHECK_OUT } from "@/lib/biometricStats";
 import type { RawTransaction } from "@/lib/biometricApi";
 
 /** Upserts a batch of raw ZKBio Time transaction rows pushed by the local
@@ -28,7 +29,7 @@ export async function ingestBiometricEvents(rawRows: RawTransaction[]): Promise<
     });
   }
 
-  const checkIns = entries.filter((e) => e.punchStateLabel === "Check In").length;
-  const checkOuts = entries.filter((e) => e.punchStateLabel === "Check Out").length;
+  const checkIns = entries.filter((e) => e.punchStateLabel === STATUS_CHECK_IN).length;
+  const checkOuts = entries.filter((e) => e.punchStateLabel === STATUS_CHECK_OUT).length;
   return { synced: entries.length, checkIns, checkOuts };
 }

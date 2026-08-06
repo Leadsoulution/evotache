@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { toPublicBiometricEvent } from "@/lib/publicBiometricEvent";
+import { STATUS_CHECK_IN, STATUS_CHECK_OUT } from "@/lib/biometricStats";
 
 // Most recent events only — nothing prunes the table, so an unbounded fetch
 // would only grow slower over time. `stats` below runs real aggregate
@@ -21,8 +22,8 @@ export async function GET() {
   const [events, total, checkIns, checkOuts, employeeGroups] = await Promise.all([
     db.biometricEvent.findMany({ orderBy: { punchTime: "desc" }, take: MAX_ROWS }),
     db.biometricEvent.count(),
-    db.biometricEvent.count({ where: { punchStateLabel: "Check In" } }),
-    db.biometricEvent.count({ where: { punchStateLabel: "Check Out" } }),
+    db.biometricEvent.count({ where: { punchStateLabel: STATUS_CHECK_IN } }),
+    db.biometricEvent.count({ where: { punchStateLabel: STATUS_CHECK_OUT } }),
     db.biometricEvent.groupBy({ by: ["empCode"] }),
   ]);
 
