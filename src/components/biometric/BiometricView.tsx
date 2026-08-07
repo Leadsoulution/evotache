@@ -503,12 +503,48 @@ export function BiometricView() {
           {/* Asymmetric on purpose (2:1 rather than three equal thirds) —
               the employee ranking is the most actionable chart, so it leads
               wide, with the remaining breakdowns stacked beside it instead
-              of competing for equal weight. */}
+              of competing for equal weight. Absents is nested into this
+              same left column (stacked below the ranking chart) rather
+              than placed as its own full-width section after the grid: a
+              CSS grid row is always as tall as its tallest column, so a
+              section placed right after the grid would sit below empty
+              space equal to however much shorter the left column was —
+              nesting it here lets it flow immediately under the chart
+              instead, using that space rather than leaving it empty. */}
           <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+            <div className="flex flex-col gap-4 lg:col-span-2">
               <ChartCard title="Pointages par employé">
                 <BarChart data={employeeChart} />
               </ChartCard>
+
+              {/* Driven by the same filtered set as the charts above —
+                  unlike "présents maintenant", absence only means something
+                  relative to a period, so it changes as the
+                  date/département/etc. filters below change. */}
+              <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 dark:border-amber-900/40 dark:bg-amber-950/10">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Absents</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Aucun pointage sur la période / le filtre sélectionné</p>
+                  </div>
+                  <span className="text-2xl font-bold tabular-nums leading-none text-amber-600 dark:text-amber-400">{absentEmployees.length}</span>
+                </div>
+
+                {absentEmployees.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {absentEmployees.map((e) => (
+                      <div key={e.empCode} className="flex flex-col items-center gap-1">
+                        <Avatar name={e.name} color={e.color} size="md" className="opacity-60 grayscale" />
+                        <span className="max-w-[64px] truncate text-[11px] text-slate-500 dark:text-slate-400" title={e.name}>
+                          {e.name.split(" ")[0]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-400">Tout le monde a pointé sur cette période.</p>
+                )}
+              </section>
             </div>
             <div className="flex flex-col gap-4">
               <ChartCard title="Par statut">
@@ -518,35 +554,6 @@ export function BiometricView() {
                 <BarChart data={lateChart} />
               </ChartCard>
             </div>
-          </section>
-
-          {/* Driven by the same filtered set as the charts above — unlike
-              "présents maintenant", absence only means something relative
-              to a period, so it changes as the date/département/etc.
-              filters below change. */}
-          <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 dark:border-amber-900/40 dark:bg-amber-950/10">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Absents</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Aucun pointage sur la période / le filtre sélectionné</p>
-              </div>
-              <span className="text-2xl font-bold tabular-nums leading-none text-amber-600 dark:text-amber-400">{absentEmployees.length}</span>
-            </div>
-
-            {absentEmployees.length > 0 ? (
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                {absentEmployees.map((e) => (
-                  <div key={e.empCode} className="flex flex-col items-center gap-1">
-                    <Avatar name={e.name} color={e.color} size="md" className="opacity-60 grayscale" />
-                    <span className="max-w-[64px] truncate text-[11px] text-slate-500 dark:text-slate-400" title={e.name}>
-                      {e.name.split(" ")[0]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-slate-400">Tout le monde a pointé sur cette période.</p>
-            )}
           </section>
 
           {/* One row per employee for a single day — the same reference day
