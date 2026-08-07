@@ -40,6 +40,7 @@ import {
   formatLateDuration,
   getAbsentEmployees,
   getPresentEmployees,
+  latestLocalDate,
 } from "@/lib/biometricStats";
 import {
   AlertTriangleIcon,
@@ -92,6 +93,25 @@ function formatEventTime(iso: string): string {
 function eventHourMinute(iso: string): string {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// "maintenant" when the presence panel's reference day is today, "hier"
+// for yesterday, otherwise the actual date — filtering to a past day and
+// still reading "maintenant" would be misleading now that the panel
+// itself is filter-driven (see getPresentEmployees).
+function presentDayLabel(dayKey: string | null): string {
+  if (!dayKey) return "maintenant";
+  const today = new Date();
+  if (dayKey === localDateKey(today)) return "maintenant";
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dayKey === localDateKey(yesterday)) return "hier";
+  const [, month, day] = dayKey.split("-");
+  return `le ${day}/${month}`;
 }
 
 // Real opening hours: 09:30–19:00 every day, except Friday which splits
@@ -214,10 +234,12 @@ export function BiometricView() {
   // Driven by the filtered set (not the raw events) so search/statut/
   // département/date/heure narrow down who can show up here too — someone
   // outside the active filters shouldn't appear as "present" just because
-  // their last punch happened to be a check-in. Still scoped to *today*
-  // internally (getPresentEmployees), so a date filter pointing at a past
-  // day correctly shows nobody present.
+  // their last punch happened to be a check-in. getPresentEmployees scopes
+  // itself to whichever day is most recent within that filtered set, so a
+  // date filter pointing at a past day shows who was present *that* day
+  // instead of always reading as "right now".
   const presentEmployees = useMemo(() => getPresentEmployees(filtered, employees), [filtered, employees]);
+  const presentDay = useMemo(() => latestLocalDate(filtered), [filtered]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -393,7 +415,7 @@ export function BiometricView() {
                 <div>
                   <p className="text-3xl font-bold tabular-nums leading-none text-teal-700 dark:text-teal-300">{presentEmployees.length}</p>
                   <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">
-                    présent{presentEmployees.length !== 1 ? "s" : ""} maintenant
+                    présent{presentEmployees.length !== 1 ? "s" : ""} {presentDayLabel(presentDay)}
                   </p>
                 </div>
               </div>

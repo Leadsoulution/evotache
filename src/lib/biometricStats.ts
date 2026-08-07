@@ -101,11 +101,7 @@ export interface PresentEmployee extends BiometricEmployee {
  * decides that, so someone checked in with no check-out yet still
  * (correctly) shows as present. Sorted most-recently-arrived first. */
 export function getPresentEmployees(events: BiometricEvent[], employees: BiometricEmployee[]): PresentEmployee[] {
-  let latestKey = "";
-  for (const event of events) {
-    const key = localDateKey(event.punchTime);
-    if (key > latestKey) latestKey = key;
-  }
+  const latestKey = latestLocalDate(events) ?? "";
 
   const latestByCode = new Map<string, BiometricEvent>();
   for (const event of events) {
@@ -144,6 +140,20 @@ export function countByEmployee(events: BiometricEvent[], employees: BiometricEm
 function localDateKey(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** The most recent calendar day (browser-local) with at least one event in
+ * the list, or null if there are none — the day getPresentEmployees scopes
+ * itself to, and exported so the page can label the "Présents" panel
+ * accordingly ("maintenant" vs "hier" vs a specific date) instead of
+ * always saying "maintenant" even when showing a past day. */
+export function latestLocalDate(events: BiometricEvent[]): string | null {
+  let latestKey = "";
+  for (const event of events) {
+    const key = localDateKey(event.punchTime);
+    if (key > latestKey) latestKey = key;
+  }
+  return latestKey || null;
 }
 
 export interface DailyAttendanceRow {
