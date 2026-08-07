@@ -311,10 +311,14 @@ export function BiometricView() {
 
   // One row per (employee, day) in the filtered set, with lateness judged
   // against the configurable schedule — same filtered-data footing as the
-  // charts/absents above.
+  // charts/absents above. The "Retards" KPI tile and "Retards par employé"
+  // chart read from this (the whole filtered period), same as every other
+  // KPI/chart on the page — only the "Détail des présences" table below
+  // drills into a single day.
+  const periodAttendance = useMemo(() => computeDailyAttendance(filtered, employees, schedule), [filtered, employees, schedule]);
+  const lateCount = useMemo(() => periodAttendance.filter((r) => r.isLate).length, [periodAttendance]);
+  const lateChart = useMemo(() => countLateByEmployee(periodAttendance), [periodAttendance]);
   const dailyAttendance = useMemo(() => computeDailyAttendance(detailDayEvents, employees, schedule), [detailDayEvents, employees, schedule]);
-  const lateCount = useMemo(() => dailyAttendance.filter((r) => r.isLate).length, [dailyAttendance]);
-  const lateChart = useMemo(() => countLateByEmployee(dailyAttendance), [dailyAttendance]);
 
   useEffect(() => {
     if (user && !allowed) router.replace("/");
