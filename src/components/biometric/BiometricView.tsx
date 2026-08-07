@@ -99,14 +99,14 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// "maintenant" when the presence panel's reference day is today, "hier"
-// for yesterday, otherwise the actual date — filtering to a past day and
-// still reading "maintenant" would be misleading now that the panel
-// itself is filter-driven (see getPresentEmployees).
-function presentDayLabel(dayKey: string | null): string {
-  if (!dayKey) return "maintenant";
+// `todayWord` when the reference day is today, "hier" for yesterday,
+// otherwise the actual date — filtering to a past day and still reading
+// as "today" would be misleading now that both the présence panel and the
+// attendance detail table are filter-driven (see getPresentEmployees).
+function dayLabel(dayKey: string | null, todayWord: string): string {
+  if (!dayKey) return todayWord;
   const today = new Date();
-  if (dayKey === localDateKey(today)) return "maintenant";
+  if (dayKey === localDateKey(today)) return todayWord;
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   if (dayKey === localDateKey(yesterday)) return "hier";
@@ -241,6 +241,13 @@ export function BiometricView() {
   const presentEmployees = useMemo(() => getPresentEmployees(filtered, employees), [filtered, employees]);
   const presentDay = useMemo(() => latestLocalDate(filtered), [filtered]);
 
+  // "Détail des présences" drills into a single day rather than listing
+  // every day in the filtered window at once — same reference day as the
+  // présence panel above, so it reads as "today" with no filter and
+  // switches to whichever day gets filtered to (e.g. "hier") instead of
+  // mixing several days' rows together in one table.
+  const detailDayEvents = useMemo(() => (presentDay ? filtered.filter((e) => localDateKey(new Date(e.punchTime)) === presentDay) : []), [filtered, presentDay]);
+
   const sorted = useMemo(() => {
     const copy = [...filtered];
     copy.sort((a, b) => {
@@ -305,7 +312,7 @@ export function BiometricView() {
   // One row per (employee, day) in the filtered set, with lateness judged
   // against the configurable schedule — same filtered-data footing as the
   // charts/absents above.
-  const dailyAttendance = useMemo(() => computeDailyAttendance(filtered, employees, schedule), [filtered, employees, schedule]);
+  const dailyAttendance = useMemo(() => computeDailyAttendance(detailDayEvents, employees, schedule), [detailDayEvents, employees, schedule]);
   const lateCount = useMemo(() => dailyAttendance.filter((r) => r.isLate).length, [dailyAttendance]);
   const lateChart = useMemo(() => countLateByEmployee(dailyAttendance), [dailyAttendance]);
 
@@ -415,7 +422,7 @@ export function BiometricView() {
                 <div>
                   <p className="text-3xl font-bold tabular-nums leading-none text-teal-700 dark:text-teal-300">{presentEmployees.length}</p>
                   <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">
-                    présent{presentEmployees.length !== 1 ? "s" : ""} {presentDayLabel(presentDay)}
+                    présent{presentEmployees.length !== 1 ? "s" : ""} {dayLabel(presentDay, "maintenant")}
                   </p>
                 </div>
               </div>
@@ -508,14 +515,18 @@ export function BiometricView() {
             )}
           </section>
 
-          {/* One row per employee per day in the current filter — entrée =
-              premier pointage "Enregistrement" du jour, sortie = dernier
-              "Départ" du jour. Le retard est calculé contre l'heure de
-              début configurable ci-dessous. */}
+          {/* One row per employee for a single day — the same reference day
+              as the présence panel above (today by default, or whichever
+              day gets filtered to), not every day in the filtered window
+              at once. Entrée = premier pointage "Enregistrement" du jour,
+              sortie = dernier "Départ" du jour. Le retard est calculé
+              contre l'heure de début configurable ci-dessous. */}
           <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
               <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Détail des présences</p>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Détail des présences <span className="font-normal text-slate-400">— {dayLabel(presentDay, "aujourd'hui")}</span>
+                </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Retard calculé si l&apos;entrée est après {schedule.startTime}
                 </p>
