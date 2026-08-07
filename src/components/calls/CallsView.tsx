@@ -23,8 +23,18 @@ import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
-import { DIRECTION_LABEL, STATUS_BADGE, STATUS_LABEL, callsForUser, countByDirection, countByStatus, countByUser, deriveInternalUsers } from "@/lib/callStats";
-import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, XIcon } from "@/components/ui/icons";
+import {
+  DIRECTION_LABEL,
+  STATUS_BADGE,
+  STATUS_LABEL,
+  callsForUser,
+  computeHandledMissedCalls,
+  countByDirection,
+  countByStatus,
+  countByUser,
+  deriveInternalUsers,
+} from "@/lib/callStats";
+import { AlertTriangleIcon, CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, XIcon } from "@/components/ui/icons";
 import type { PhoneCall } from "@/types/call";
 
 type SortField = "source" | "dest" | "direction" | "status" | "startTime" | "ringSeconds" | "talkSeconds";
@@ -121,6 +131,11 @@ export function CallsView() {
   // shown as an avatar-row selector matching the Statistics page's
   // UserSelectorBar, not fetched via a separate "list users" API call.
   const internalUsers = useMemo(() => deriveInternalUsers(calls, overrides), [calls, overrides]);
+
+  // Built from the full fetched history, not `filtered` — a date filter
+  // narrowing the table shouldn't also hide a callback that happened
+  // outside that window but still counts toward the 24h check.
+  const handledMissedCallIds = useMemo(() => computeHandledMissedCalls(calls), [calls]);
 
   // If the selected user gets hidden (this tab or another), stop filtering
   // by a dn that's no longer selectable — derived at render time rather
@@ -234,10 +249,15 @@ export function CallsView() {
   // combination, so the tiles fall back to counting within that capped
   // recent-history window, same as the table/charts below.
   const kpis = useMemo(() => {
+    // Missed-but-unhandled isn't backed by a real DB aggregate (it's
+    // derived client-side from computeHandledMissedCalls), so unlike the
+    // other tiles it's always counted within the filtered/capped window,
+    // even with no filter active.
+    const missedUnhandled = filtered.filter((c) => c.direction === "Inbound" && c.status === "Unanswered" && !handledMissedCallIds.has(c.id)).length;
     if (!hasActiveFilter) {
       const answeredPct = stats.total ? Math.round((stats.answered / stats.total) * 100) : 0;
       const missedPct = stats.total ? Math.round((stats.missed / stats.total) * 100) : 0;
-      return { total: stats.total, answered: stats.answered, missed: stats.missed, avgTalk: stats.avgTalk, totalTalk: stats.totalTalk, answeredPct, missedPct };
+      return { total: stats.total, answered: stats.answered, missed: stats.missed, avgTalk: stats.avgTalk, totalTalk: stats.totalTalk, answeredPct, missedPct, missedUnhandled };
     }
     const answered = filtered.filter((c) => c.answered);
     const missed = filtered.filter((c) => c.status === "Unanswered");
@@ -245,8 +265,8 @@ export function CallsView() {
     const avgTalk = answered.length ? Math.round(totalTalk / answered.length) : 0;
     const answeredPct = filtered.length ? Math.round((answered.length / filtered.length) * 100) : 0;
     const missedPct = filtered.length ? Math.round((missed.length / filtered.length) * 100) : 0;
-    return { total: filtered.length, answered: answered.length, missed: missed.length, avgTalk, totalTalk, answeredPct, missedPct };
-  }, [filtered, hasActiveFilter, stats]);
+    return { total: filtered.length, answered: answered.length, missed: missed.length, avgTalk, totalTalk, answeredPct, missedPct, missedUnhandled };
+  }, [filtered, hasActiveFilter, stats, handledMissedCallIds]);
 
   const { page, setPage, pageCount, start, end } = usePagination(sorted.length, pageSize);
   const paged = sorted.slice(start, end);
@@ -360,7 +380,7 @@ export function CallsView() {
           <ThreeCxUserSelectorBar users={internalUsers} selectedDn={effectiveSelectedDn} onSelect={setSelectedUserDn} onManage={() => setManagingUsers(true)} />
           <ThreeCxUserManager open={managingUsers} users={internalUsers} onClose={() => setManagingUsers(false)} onSave={handleSaveUserOverride} />
 
-          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-5 dark:bg-slate-950">
+          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-6 dark:bg-slate-950">
             <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Répondus" value={`${kpis.answered} (${kpis.answeredPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
             <StatTile
@@ -368,6 +388,12 @@ export function CallsView() {
               value={`${kpis.missed} (${kpis.missedPct}%)`}
               icon={<PhoneMissedIcon className="h-4.5 w-4.5" />}
               tone={kpis.missed > 0 ? "warning" : "default"}
+            />
+            <StatTile
+              label="Manqués non traités"
+              value={kpis.missedUnhandled}
+              icon={<AlertTriangleIcon className="h-4.5 w-4.5" />}
+              tone={kpis.missedUnhandled > 0 ? "warning" : "default"}
             />
             <StatTile label="Durée moyenne (parlé)" value={formatDuration(kpis.avgTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Durée totale (parlé)" value={formatDuration(kpis.totalTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
@@ -396,7 +422,7 @@ export function CallsView() {
 
           {sorted.length > 0 && (
             <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <table className="w-full min-w-[860px] border-collapse text-sm">
+              <table className="w-full min-w-[960px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                     {COLUMN_SORT_FIELD.map(({ label, field }) => (
@@ -413,27 +439,50 @@ export function CallsView() {
                         </button>
                       </th>
                     ))}
+                    <th scope="col" className="whitespace-nowrap px-3 py-2">
+                      Traité
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((call: PhoneCall) => (
-                    <tr key={call.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
-                      <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{call.sourceName || call.sourceNumber}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{call.destName || call.destNumber}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{DIRECTION_LABEL[call.direction] ?? call.direction}</td>
-                      <td className="whitespace-nowrap px-3 py-2">
-                        <span className={cn("rounded-md px-1.5 py-0.5 text-xs font-medium", STATUS_BADGE[call.status] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}>
-                          {statusOptions.find((o) => o.value === call.status)?.label ?? call.status}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
-                        <div>{formatDueDate(call.startTime)}</div>
-                        <div className="text-xs text-slate-400 dark:text-slate-500">{formatCallTime(call.startTime)}</div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.ringSeconds)}</td>
-                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.talkSeconds)}</td>
-                    </tr>
-                  ))}
+                  {paged.map((call: PhoneCall) => {
+                    const isMissedInbound = call.direction === "Inbound" && call.status === "Unanswered";
+                    return (
+                      <tr key={call.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                        <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{call.sourceName || call.sourceNumber}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{call.destName || call.destNumber}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{DIRECTION_LABEL[call.direction] ?? call.direction}</td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          <span className={cn("rounded-md px-1.5 py-0.5 text-xs font-medium", STATUS_BADGE[call.status] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}>
+                            {statusOptions.find((o) => o.value === call.status)?.label ?? call.status}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
+                          <div>{formatDueDate(call.startTime)}</div>
+                          <div className="text-xs text-slate-400 dark:text-slate-500">{formatCallTime(call.startTime)}</div>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.ringSeconds)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{formatDuration(call.talkSeconds)}</td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {isMissedInbound ? (
+                            handledMissedCallIds.has(call.id) ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                <CheckIcon className="h-3 w-3" />
+                                Oui
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+                                <AlertTriangleIcon className="h-3 w-3" />
+                                Non
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

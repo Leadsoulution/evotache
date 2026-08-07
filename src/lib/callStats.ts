@@ -96,6 +96,45 @@ export function countByDirection(calls: PhoneCall[]): BarChartDatum[] {
     .sort((a, b) => b.value - a.value);
 }
 
+const CALLBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function normalizedNumber(raw: string): string {
+  return raw.replace(/\D/g, "");
+}
+
+/** IDs of missed inbound calls ("Unanswered") that got followed up — an
+ * outbound call placed to the same external number within 24h after it
+ * rang. Neither 3CX nor this app track that link natively (every call is
+ * an independent record with its own status), so it's derived here:
+ * numbers are compared with formatting stripped (3CX doesn't always write
+ * the same caller's number identically between an inbound leg and an
+ * outbound one), and callers should pass the *full* call history rather
+ * than whatever's currently filtered — narrowing to a single day would
+ * otherwise hide a callback that happened the next day but is still
+ * within the 24h window. */
+export function computeHandledMissedCalls(calls: PhoneCall[]): Set<number> {
+  const outboundTimesByNumber = new Map<string, number[]>();
+  for (const c of calls) {
+    if (c.direction !== "Outbound") continue;
+    const key = normalizedNumber(c.destNumber);
+    if (!key) continue;
+    if (!outboundTimesByNumber.has(key)) outboundTimesByNumber.set(key, []);
+    outboundTimesByNumber.get(key)!.push(new Date(c.startTime).getTime());
+  }
+
+  const handled = new Set<number>();
+  for (const c of calls) {
+    if (c.direction !== "Inbound" || c.status !== "Unanswered") continue;
+    const key = normalizedNumber(c.sourceNumber);
+    const candidates = key ? outboundTimesByNumber.get(key) : undefined;
+    if (!candidates) continue;
+    const missedAt = new Date(c.startTime).getTime();
+    const wasCalledBack = candidates.some((t) => t > missedAt && t - missedAt <= CALLBACK_WINDOW_MS);
+    if (wasCalledBack) handled.add(c.id);
+  }
+  return handled;
+}
+
 export function countByUser(calls: PhoneCall[], users: InternalUser[]): BarChartDatum[] {
   return users
     .filter((u) => !u.hidden)
