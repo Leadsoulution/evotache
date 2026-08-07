@@ -189,7 +189,14 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
     rows.push({ empCode, name: emp.name, color: emp.color, date, firstEntry, lastExit, isLate, lateSeconds });
   }
 
-  return rows.sort((a, b) => (a.date === b.date ? a.name.localeCompare(b.name) : b.date.localeCompare(a.date)));
+  // Most recently punched first — within the same day this is entry time
+  // (not alphabetical by name), so whoever just checked in surfaces at the
+  // top instead of wherever their name happens to fall.
+  return rows.sort((a, b) => {
+    const aKey = a.firstEntry ?? a.lastExit ?? "";
+    const bKey = b.firstEntry ?? b.lastExit ?? "";
+    return bKey.localeCompare(aKey);
+  });
 }
 
 export function formatLateDuration(totalSeconds: number): string {
