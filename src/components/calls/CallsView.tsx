@@ -288,7 +288,7 @@ export function CallsView() {
       <header className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Appels</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Historique des appels — synchronisé depuis 3CX à la demande.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Historique des appels — synchronisé automatiquement depuis 3CX, ou à la demande via le bouton.</p>
         </div>
         <button
           type="button"
