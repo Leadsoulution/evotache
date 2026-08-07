@@ -55,6 +55,7 @@ import {
   SearchIcon,
   SortIcon,
   UsersIcon,
+  XIcon,
 } from "@/components/ui/icons";
 import type { BiometricEvent } from "@/types/biometric";
 
@@ -228,6 +229,20 @@ export function BiometricView() {
   const hasActiveFilter = Boolean(
     search.trim() || statusFilter.length || departmentFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedEmpCode
   );
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter([]);
+    setDepartmentFilter([]);
+    setDateFrom("");
+    setDateTo("");
+    setDateRangeLabel("Toutes les dates");
+    setTimeFrom("");
+    setTimeTo("");
+    setBusinessHoursOnly(false);
+    setTimeRangeLabel("Toute la journée");
+    setSelectedEmpCode(null);
+  }
 
   // With no filter active, the tiles use the real aggregate counts from the
   // API (`stats`) rather than the fetched/capped `events` list — otherwise
@@ -542,6 +557,16 @@ export function BiometricView() {
                 setTimeRangeLabel(label);
               }}
             />
+            {hasActiveFilter && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+                Effacer les filtres
+              </button>
+            )}
           </div>
 
           {sorted.length === 0 && (

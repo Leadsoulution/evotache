@@ -36,6 +36,7 @@ import {
   SortIcon,
   TrashIcon,
   TrendingUpIcon,
+  XIcon,
 } from "@/components/ui/icons";
 import type { AdCampaign } from "@/types/socialMedia";
 
@@ -109,6 +110,18 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
       return true;
     });
   }, [campaigns, search, platformFilter, objectiveFilter, deliveryFilter]);
+
+  // Scoped to the list filters only (search/platform/objective/delivery) —
+  // dateRange is a separate "which reporting period to sync" control, not
+  // a client-side filter, so clearing filters doesn't touch it.
+  const hasActiveFilter = Boolean(search.trim() || platformFilter.length || objectiveFilter.length || deliveryFilter.length);
+
+  function clearFilters() {
+    setSearch("");
+    setPlatformFilter([]);
+    setObjectiveFilter([]);
+    setDeliveryFilter([]);
+  }
 
   const sorted = useMemo(() => {
     const withMetrics = filtered.map((c) => ({ campaign: c, metrics: computeCampaignMetrics(c) }));
@@ -237,6 +250,16 @@ export function AdCampaignsView({ projectId }: { projectId: string }) {
             />
             {deliveryOptions.length > 0 && (
               <FilterMenu label="Delivery" count={deliveryFilter.length} options={deliveryOptions} value={deliveryFilter} onChange={setDeliveryFilter} />
+            )}
+            {hasActiveFilter && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+                Clear filters
+              </button>
             )}
             <div className="ml-auto flex items-center gap-1">
               <Menu

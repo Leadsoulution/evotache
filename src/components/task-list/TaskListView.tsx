@@ -340,6 +340,8 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         onTaskTypeFilterChange={setTaskTypeFilter}
         myTasksOnly={myTasksOnly}
         onMyTasksOnlyChange={setMyTasksOnly}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={clearFilters}
         assignees={assignees}
         projects={projects}
         teams={teams}

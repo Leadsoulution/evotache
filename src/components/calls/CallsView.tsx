@@ -24,7 +24,7 @@ import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
 import { DIRECTION_LABEL, STATUS_BADGE, STATUS_LABEL, callsForUser, countByDirection, countByStatus, countByUser, deriveInternalUsers } from "@/lib/callStats";
-import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon } from "@/components/ui/icons";
+import { CalendarIcon, CheckIcon, ChevronDownIcon, ClockIcon, PhoneIcon, PhoneMissedIcon, RefreshIcon, SearchIcon, SortIcon, XIcon } from "@/components/ui/icons";
 import type { PhoneCall } from "@/types/call";
 
 type SortField = "source" | "dest" | "direction" | "status" | "startTime" | "ringSeconds" | "talkSeconds";
@@ -206,6 +206,20 @@ export function CallsView() {
     search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedDn
   );
 
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter([]);
+    setDirectionFilter([]);
+    setDateFrom("");
+    setDateTo("");
+    setDateRangeLabel("Toutes les dates");
+    setTimeFrom("");
+    setTimeTo("");
+    setBusinessHoursOnly(false);
+    setTimeRangeLabel("Toute la journée");
+    setSelectedUserDn(null);
+  }
+
   // With no filter active, the tiles use the real aggregate counts from the
   // API (`stats`) rather than the fetched/capped `calls` list — otherwise
   // "Total appels" freezes forever once the real count passes MAX_ROWS
@@ -351,6 +365,16 @@ export function CallsView() {
                 setTimeRangeLabel(label);
               }}
             />
+            {hasActiveFilter && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+                Effacer les filtres
+              </button>
+            )}
           </div>
 
           {sorted.length === 0 && (

@@ -38,6 +38,7 @@ export const fr: Record<TranslationKey, string> = {
   "tasks.department": "Département",
   "tasks.type": "Type",
   "tasks.myTasks": "Mes tâches",
+  "tasks.clearFilters": "Effacer les filtres",
   "tasks.group": "Grouper",
   "tasks.sort": "Trier",
   "tasks.columns": "Colonnes",

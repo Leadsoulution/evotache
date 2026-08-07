@@ -55,6 +55,8 @@ interface TaskListToolbarProps {
   onTaskTypeFilterChange: (value: TaskTypeFilter[]) => void;
   myTasksOnly: boolean;
   onMyTasksOnlyChange: (value: boolean) => void;
+  hasActiveFilters: boolean;
+  onClearFilters: () => void;
   assignees: Assignee[];
   projects: Project[];
   teams: Team[];
@@ -97,6 +99,8 @@ export function TaskListToolbar({
   onTaskTypeFilterChange,
   myTasksOnly,
   onMyTasksOnlyChange,
+  hasActiveFilters,
+  onClearFilters,
   assignees,
   projects,
   teams,
@@ -187,6 +191,17 @@ export function TaskListToolbar({
           <UserIcon className="h-3.5 w-3.5" />
           {t("tasks.myTasks")}
         </button>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            <XIcon className="h-3.5 w-3.5" />
+            {t("tasks.clearFilters")}
+          </button>
+        )}
 
         <div className="mx-1 hidden h-5 w-px bg-slate-200 sm:block dark:bg-slate-700" />
 

@@ -37,6 +37,7 @@ export const en = {
   "tasks.department": "Department",
   "tasks.type": "Type",
   "tasks.myTasks": "My Tasks",
+  "tasks.clearFilters": "Clear filters",
   "tasks.group": "Group",
   "tasks.sort": "Sort",
   "tasks.columns": "Columns",
