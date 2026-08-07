@@ -98,14 +98,20 @@ export interface PresentEmployee extends BiometricEmployee {
 
 /** Who's currently in the building — the one thing punch data can answer
  * that call data never could, so it's the page's own signature view rather
- * than a copy of Calls' KPI-tiles-then-charts layout. An employee counts as
- * present when their single most recent punch (across the whole fetched
- * window, not the active filters — presence is a live fact, not something
- * that should disappear because of an unrelated date filter) was a
- * check-in. Sorted most-recently-arrived first. */
+ * than a copy of Calls' KPI-tiles-then-charts layout. Scoped to *today*
+ * only (not the active filters — presence is a live fact, not something
+ * that should disappear because of an unrelated date filter, but it also
+ * shouldn't persist forever: someone who checked in yesterday and never
+ * checked out must not still read as "present" once a new day starts).
+ * Within today, an employee counts as present when their most recent punch
+ * was a check-in — whether or not they've checked out yet is exactly what
+ * decides that, so someone who checked in today with no check-out yet
+ * still (correctly) shows as present. Sorted most-recently-arrived first. */
 export function getPresentEmployees(events: BiometricEvent[], employees: BiometricEmployee[]): PresentEmployee[] {
+  const todayKey = localDateKey(new Date().toISOString());
   const latestByCode = new Map<string, BiometricEvent>();
   for (const event of events) {
+    if (localDateKey(event.punchTime) !== todayKey) continue;
     const current = latestByCode.get(event.empCode);
     if (!current || event.punchTime > current.punchTime) latestByCode.set(event.empCode, event);
   }
