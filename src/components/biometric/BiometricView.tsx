@@ -99,6 +99,11 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function localMonthKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 // `todayWord` when the reference day is today, "hier" for yesterday,
 // otherwise the actual date — filtering to a past day and still reading
 // as "today" would be misleading now that both the présence panel and the
@@ -247,6 +252,31 @@ export function BiometricView() {
   // switches to whichever day gets filtered to (e.g. "hier") instead of
   // mixing several days' rows together in one table.
   const detailDayEvents = useMemo(() => (presentDay ? filtered.filter((e) => localDateKey(new Date(e.punchTime)) === presentDay) : []), [filtered, presentDay]);
+
+  // Monthly late count for the "Retards ce mois" column — the month of the
+  // same reference day used above, so it reads as the current month with
+  // no filter, or the month of whichever day gets filtered to. Built from
+  // the full unfiltered history (not `filtered`/`detailDayEvents`, which
+  // are narrowed to a single day) so a day filter doesn't also shrink the
+  // month it's counting within.
+  const referenceMonthKey = useMemo(() => {
+    if (presentDay) return presentDay.slice(0, 7);
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, [presentDay]);
+  const monthEvents = useMemo(() => {
+    const base = effectiveSelectedEmpCode ? eventsForEmployee(events, effectiveSelectedEmpCode) : events;
+    return base.filter((e) => localMonthKey(e.punchTime) === referenceMonthKey);
+  }, [events, effectiveSelectedEmpCode, referenceMonthKey]);
+  const monthLateCountByEmp = useMemo(() => {
+    const rows = computeDailyAttendance(monthEvents, employees, schedule);
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (!row.isLate) continue;
+      counts.set(row.empCode, (counts.get(row.empCode) ?? 0) + 1);
+    }
+    return counts;
+  }, [monthEvents, employees, schedule]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -549,7 +579,7 @@ export function BiometricView() {
               <p className="px-4 py-6 text-center text-sm text-slate-400">Aucune présence sur la période / le filtre sélectionné.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] border-collapse text-sm">
+                <table className="w-full min-w-[760px] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                       <th scope="col" className="whitespace-nowrap px-4 py-2">
@@ -569,6 +599,9 @@ export function BiometricView() {
                       </th>
                       <th scope="col" className="whitespace-nowrap px-3 py-2">
                         Temps de retard
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        Retards ce mois
                       </th>
                     </tr>
                   </thead>
@@ -594,6 +627,7 @@ export function BiometricView() {
                         <td className={cn("whitespace-nowrap px-3 py-2 tabular-nums", row.isLate ? "font-medium text-red-600 dark:text-red-400" : "text-slate-400")}>
                           {row.isLate ? formatLateDuration(row.lateSeconds) : "—"}
                         </td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{monthLateCountByEmp.get(row.empCode) ?? 0}</td>
                       </tr>
                     ))}
                   </tbody>
