@@ -504,7 +504,7 @@ export function BiometricView() {
               the employee ranking is the most actionable chart, so it leads
               wide, with the remaining breakdowns stacked beside it instead
               of competing for equal weight. */}
-          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <ChartCard title="Pointages par employé">
                 <BarChart data={employeeChart} />
