@@ -32,7 +32,6 @@ import {
   STATUS_CHECK_OUT,
   STATUS_LABEL,
   computeDailyAttendance,
-  countByDepartment,
   countByEmployee,
   countByStatus,
   countLateByEmployee,
@@ -271,7 +270,6 @@ export function BiometricView() {
   // Charts follow the same filtered set as the KPI tiles, so narrowing by
   // employee/status/department/date visibly reshapes them too.
   const statusChart = useMemo(() => countByStatus(filtered), [filtered]);
-  const departmentChart = useMemo(() => countByDepartment(filtered), [filtered]);
   const employeeChart = useMemo(() => countByEmployee(filtered, employees), [filtered, employees]);
 
   // Unlike "présents maintenant" (a live fact, always the full window),
@@ -368,8 +366,8 @@ export function BiometricView() {
 
           {/* Asymmetric on purpose (2:1 rather than three equal thirds) —
               the employee ranking is the most actionable chart, so it leads
-              wide, with the statut/département breakdowns stacked beside it
-              instead of competing for equal weight. */}
+              wide, with the remaining breakdowns stacked beside it instead
+              of competing for equal weight. */}
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <ChartCard title="Pointages par employé">
@@ -379,9 +377,6 @@ export function BiometricView() {
             <div className="flex flex-col gap-4">
               <ChartCard title="Par statut">
                 <PieChart data={statusChart} />
-              </ChartCard>
-              <ChartCard title="Par département">
-                <PieChart data={departmentChart} />
               </ChartCard>
               <ChartCard title="Retards par employé">
                 <BarChart data={lateChart} />

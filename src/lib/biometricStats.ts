@@ -23,8 +23,6 @@ export const STATUS_BADGE: Record<string, string> = {
   [STATUS_CHECK_OUT]: "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 };
 
-const NO_DEPARTMENT_LABEL = "Sans département";
-
 export interface BiometricEmployee {
   empCode: string;
   name: string;
@@ -78,17 +76,6 @@ export function countByStatus(events: BiometricEvent[]): BarChartDatum[] {
   for (const e of events) counts.set(e.punchStateLabel, (counts.get(e.punchStateLabel) ?? 0) + 1);
   return Array.from(counts.entries())
     .map(([status, value], i) => ({ key: status, label: STATUS_LABEL[status] ?? status, value, color: COLOR_PALETTE[i % COLOR_PALETTE.length] }))
-    .sort((a, b) => b.value - a.value);
-}
-
-export function countByDepartment(events: BiometricEvent[]): BarChartDatum[] {
-  const counts = new Map<string, number>();
-  for (const e of events) {
-    const dept = e.department || NO_DEPARTMENT_LABEL;
-    counts.set(dept, (counts.get(dept) ?? 0) + 1);
-  }
-  return Array.from(counts.entries())
-    .map(([dept, value], i) => ({ key: dept, label: dept, value, color: COLOR_PALETTE[i % COLOR_PALETTE.length] }))
     .sort((a, b) => b.value - a.value);
 }
 
