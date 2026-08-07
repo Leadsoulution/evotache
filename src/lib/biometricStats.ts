@@ -83,25 +83,33 @@ export interface PresentEmployee extends BiometricEmployee {
   lastPunchTime: string;
 }
 
-/** Who's currently in the building — the one thing punch data can answer
- * that call data never could, so it's the page's own signature view rather
- * than a copy of Calls' KPI-tiles-then-charts layout. Callers typically
- * pass the page's already-filtered events, so search/statut/département/
- * etc. narrow down who can appear here too. Always internally re-scoped to
- * *today* on top of whatever's passed in — presence shouldn't persist
- * forever: someone who checked in yesterday and never checked out must
- * not still read as "present" once a new day starts (and a date filter
- * pointing at a past day correctly ends up showing nobody, since nothing
- * in the passed set is "today" anymore). Within today, an employee counts
- * as present when their most recent punch was a check-in — whether or not
- * they've checked out yet is exactly what decides that, so someone who
- * checked in today with no check-out yet still (correctly) shows as
- * present. Sorted most-recently-arrived first. */
+/** Who's "present" as of the most recent day actually covered by `events`
+ * — the one thing punch data can answer that call data never could, so
+ * it's the page's own signature view rather than a copy of Calls'
+ * KPI-tiles-then-charts layout. Callers typically pass the page's
+ * already-filtered events, so search/statut/département/date/etc. narrow
+ * down who can appear here too: with no date filter that latest day is
+ * today (so this reads as "right now"), but filtered to a specific past
+ * day it reads as "who was present at the end of that day" instead —
+ * without this, filtering to yesterday would show 0 people just because
+ * none of yesterday's punches are literally "today". Scoping to *a* day
+ * (whichever one that turns out to be) rather than every event ever still
+ * matters: someone who checked in on some day and never checked out must
+ * not still read as "present" on every later day forever. Within that
+ * day, an employee counts as present when their most recent punch was a
+ * check-in — whether or not they've checked out yet is exactly what
+ * decides that, so someone checked in with no check-out yet still
+ * (correctly) shows as present. Sorted most-recently-arrived first. */
 export function getPresentEmployees(events: BiometricEvent[], employees: BiometricEmployee[]): PresentEmployee[] {
-  const todayKey = localDateKey(new Date().toISOString());
+  let latestKey = "";
+  for (const event of events) {
+    const key = localDateKey(event.punchTime);
+    if (key > latestKey) latestKey = key;
+  }
+
   const latestByCode = new Map<string, BiometricEvent>();
   for (const event of events) {
-    if (localDateKey(event.punchTime) !== todayKey) continue;
+    if (localDateKey(event.punchTime) !== latestKey) continue;
     const current = latestByCode.get(event.empCode);
     if (!current || event.punchTime > current.punchTime) latestByCode.set(event.empCode, event);
   }
