@@ -280,33 +280,6 @@ export function CallsView() {
 
       {!loading && (
         <>
-          <ThreeCxUserSelectorBar users={internalUsers} selectedDn={effectiveSelectedDn} onSelect={setSelectedUserDn} onManage={() => setManagingUsers(true)} />
-          <ThreeCxUserManager open={managingUsers} users={internalUsers} onClose={() => setManagingUsers(false)} onSave={handleSaveUserOverride} />
-
-          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
-            <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />
-            <StatTile label="Répondus" value={`${kpis.answered} (${kpis.answeredPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
-            <StatTile
-              label="Manqués"
-              value={`${kpis.missed} (${kpis.missedPct}%)`}
-              icon={<PhoneMissedIcon className="h-4.5 w-4.5" />}
-              tone={kpis.missed > 0 ? "warning" : "default"}
-            />
-            <StatTile label="Durée moyenne (parlé)" value={formatDuration(kpis.avgTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
-          </section>
-
-          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <ChartCard title="Appels par statut">
-              <PieChart data={statusChart} />
-            </ChartCard>
-            <ChartCard title="Appels par direction">
-              <PieChart data={directionChart} />
-            </ChartCard>
-            <ChartCard title="Appels par utilisateur">
-              <BarChart data={userChart} />
-            </ChartCard>
-          </section>
-
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative w-full sm:w-64">
               <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -376,6 +349,33 @@ export function CallsView() {
               </button>
             )}
           </div>
+
+          <ThreeCxUserSelectorBar users={internalUsers} selectedDn={effectiveSelectedDn} onSelect={setSelectedUserDn} onManage={() => setManagingUsers(true)} />
+          <ThreeCxUserManager open={managingUsers} users={internalUsers} onClose={() => setManagingUsers(false)} onSave={handleSaveUserOverride} />
+
+          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
+            <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Répondus" value={`${kpis.answered} (${kpis.answeredPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
+            <StatTile
+              label="Manqués"
+              value={`${kpis.missed} (${kpis.missedPct}%)`}
+              icon={<PhoneMissedIcon className="h-4.5 w-4.5" />}
+              tone={kpis.missed > 0 ? "warning" : "default"}
+            />
+            <StatTile label="Durée moyenne (parlé)" value={formatDuration(kpis.avgTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <ChartCard title="Appels par statut">
+              <PieChart data={statusChart} />
+            </ChartCard>
+            <ChartCard title="Appels par direction">
+              <PieChart data={directionChart} />
+            </ChartCard>
+            <ChartCard title="Appels par utilisateur">
+              <BarChart data={userChart} />
+            </ChartCard>
+          </section>
 
           {sorted.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center dark:border-slate-800 dark:bg-slate-900">

@@ -307,6 +307,76 @@ export function BiometricView() {
 
       {!loading && (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative w-full sm:w-64">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Rechercher un employé…"
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
+              />
+            </label>
+            {statusOptions.length > 0 && (
+              <FilterMenu label="Statut" count={statusFilter.length} options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
+            )}
+            {departmentOptions.length > 0 && (
+              <FilterMenu label="Département" count={departmentFilter.length} options={departmentOptions} value={departmentFilter} onChange={setDepartmentFilter} />
+            )}
+            <button
+              type="button"
+              onClick={() => setDatePickerOpen(true)}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              <span className="max-w-[220px] truncate" title={dateRangeLabel}>
+                {dateRangeLabel}
+              </span>
+              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimePickerOpen(true)}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <ClockIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              <span className="max-w-[220px] truncate" title={timeRangeLabel}>
+                {timeRangeLabel}
+              </span>
+              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+            </button>
+            <BiometricDateRangePicker
+              open={datePickerOpen}
+              onClose={() => setDatePickerOpen(false)}
+              onApply={(range, label) => {
+                setDateFrom(range.from ?? "");
+                setDateTo(range.to ?? "");
+                setDateRangeLabel(label);
+              }}
+            />
+            <BiometricTimeRangePicker
+              open={timePickerOpen}
+              onClose={() => setTimePickerOpen(false)}
+              onApply={(range, label, businessHours) => {
+                setBusinessHoursOnly(Boolean(businessHours));
+                setTimeFrom(businessHours ? "" : range.from);
+                setTimeTo(businessHours ? "" : range.to);
+                setTimeRangeLabel(label);
+              }}
+            />
+            {hasActiveFilter && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+                Effacer les filtres
+              </button>
+            )}
+          </div>
+
           {/* Signature section: who's actually in the building right now —
               the one question raw punch data can answer that call data
               never could, so it leads the page instead of a KPI-tiles row. */}
@@ -493,76 +563,6 @@ export function BiometricView() {
           </section>
 
           <BiometricScheduleEditor open={editingSchedule} schedule={schedule} onClose={() => setEditingSchedule(false)} onSave={handleSaveSchedule} />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="relative w-full sm:w-64">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Rechercher un employé…"
-                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
-              />
-            </label>
-            {statusOptions.length > 0 && (
-              <FilterMenu label="Statut" count={statusFilter.length} options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
-            )}
-            {departmentOptions.length > 0 && (
-              <FilterMenu label="Département" count={departmentFilter.length} options={departmentOptions} value={departmentFilter} onChange={setDepartmentFilter} />
-            )}
-            <button
-              type="button"
-              onClick={() => setDatePickerOpen(true)}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <CalendarIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
-              <span className="max-w-[220px] truncate" title={dateRangeLabel}>
-                {dateRangeLabel}
-              </span>
-              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setTimePickerOpen(true)}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <ClockIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
-              <span className="max-w-[220px] truncate" title={timeRangeLabel}>
-                {timeRangeLabel}
-              </span>
-              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
-            </button>
-            <BiometricDateRangePicker
-              open={datePickerOpen}
-              onClose={() => setDatePickerOpen(false)}
-              onApply={(range, label) => {
-                setDateFrom(range.from ?? "");
-                setDateTo(range.to ?? "");
-                setDateRangeLabel(label);
-              }}
-            />
-            <BiometricTimeRangePicker
-              open={timePickerOpen}
-              onClose={() => setTimePickerOpen(false)}
-              onApply={(range, label, businessHours) => {
-                setBusinessHoursOnly(Boolean(businessHours));
-                setTimeFrom(businessHours ? "" : range.from);
-                setTimeTo(businessHours ? "" : range.to);
-                setTimeRangeLabel(label);
-              }}
-            />
-            {hasActiveFilter && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              >
-                <XIcon className="h-3.5 w-3.5" />
-                Effacer les filtres
-              </button>
-            )}
-          </div>
 
           {sorted.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center dark:border-slate-800 dark:bg-slate-900">
