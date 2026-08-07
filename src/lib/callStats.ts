@@ -98,8 +98,17 @@ export function countByDirection(calls: PhoneCall[]): BarChartDatum[] {
 
 const CALLBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// 3CX doesn't store the same subscriber's number identically on both legs:
+// a missed inbound call's caller shows up international (+212614700516)
+// while a later outbound call to the same person shows up local
+// (0614700516) — same 9-digit subscriber number, different prefix
+// (country code vs. local leading 0). Comparing the full digit string
+// (confirmed live) missed the vast majority of real callbacks for exactly
+// this reason, so this keeps only the last 9 digits — the subscriber
+// number itself — which lines both formats up.
 function normalizedNumber(raw: string): string {
-  return raw.replace(/\D/g, "");
+  const digits = raw.replace(/\D/g, "");
+  return digits.length > 9 ? digits.slice(-9) : digits;
 }
 
 /** IDs of missed inbound calls ("Unanswered") that got followed up — an
