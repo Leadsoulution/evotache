@@ -126,6 +126,7 @@ export function CallsView() {
   const [sortField, setSortField] = useState<SortField>("startTime");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [selectedUserDn, setSelectedUserDn] = useState<string | null>(null);
+  const [unhandledOnly, setUnhandledOnly] = useState(false);
 
   // Real 3CX users/extensions, derived from the synced call data itself —
   // shown as an avatar-row selector matching the Statistics page's
@@ -134,7 +135,7 @@ export function CallsView() {
 
   // Built from the full fetched history, not `filtered` — a date filter
   // narrowing the table shouldn't also hide a callback that happened
-  // outside that window but still counts toward the 24h check.
+  // outside that window but still counts toward the 1h check.
   const handledMissedCallIds = useMemo(() => computeHandledMissedCalls(calls), [calls]);
 
   // If the selected user gets hidden (this tab or another), stop filtering
@@ -208,9 +209,10 @@ export function CallsView() {
         if (timeFrom && hm < timeFrom) return false;
         if (timeTo && hm > timeTo) return false;
       }
+      if (unhandledOnly && (c.direction !== "Inbound" || c.status !== "Unanswered" || handledMissedCallIds.has(c.id))) return false;
       return true;
     });
-  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedDn]);
+  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedDn, unhandledOnly, handledMissedCallIds]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -224,7 +226,7 @@ export function CallsView() {
   }, [filtered, sortField, sortDirection]);
 
   const hasActiveFilter = Boolean(
-    search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedDn
+    search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedDn || unhandledOnly
   );
 
   function clearFilters() {
@@ -239,6 +241,7 @@ export function CallsView() {
     setBusinessHoursOnly(false);
     setTimeRangeLabel("Toute la journée");
     setSelectedUserDn(null);
+    setUnhandledOnly(false);
   }
 
   // With no filter active, the tiles use the real aggregate counts from the
@@ -307,6 +310,53 @@ export function CallsView() {
 
       {!loading && (
         <>
+          {/* Quick-view shortcuts — each just toggles the same underlying
+              filter state as the dropdowns below (statusFilter/
+              directionFilter/unhandledOnly), so they stay in sync with
+              whatever's already selected there instead of being a
+              separate, disconnected view. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setStatusFilter((prev) => (prev.includes("Unanswered") ? prev.filter((v) => v !== "Unanswered") : [...prev, "Unanswered"]))}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+                statusFilter.includes("Unanswered")
+                  ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              )}
+            >
+              <PhoneMissedIcon className="h-3.5 w-3.5" />
+              Appels manqués
+            </button>
+            <button
+              type="button"
+              onClick={() => setDirectionFilter((prev) => (prev.includes("Internal") ? prev.filter((v) => v !== "Internal") : [...prev, "Internal"]))}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+                directionFilter.includes("Internal")
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              )}
+            >
+              <PhoneIcon className="h-3.5 w-3.5" />
+              Interne
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnhandledOnly((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+                unhandledOnly
+                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              )}
+            >
+              <AlertTriangleIcon className="h-3.5 w-3.5" />
+              Non traité
+            </button>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative w-full sm:w-64">
               <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
