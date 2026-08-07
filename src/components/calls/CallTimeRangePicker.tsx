@@ -88,9 +88,9 @@ export function CallTimeRangePicker({ open, onClose, onApply }: CallTimeRangePic
       <div
         role="dialog"
         aria-modal="true"
-        className="flex max-h-[90vh] w-full max-w-md animate-scale-in overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="flex max-h-[90vh] w-full max-w-md animate-scale-in flex-col overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:overflow-hidden"
       >
-        <div className="w-48 shrink-0 overflow-y-auto border-r border-slate-100 p-2 dark:border-slate-800">
+        <div className="w-full shrink-0 overflow-y-auto border-b border-slate-100 p-2 dark:border-slate-800 sm:w-48 sm:border-b-0 sm:border-r">
           <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
             <input
               type="radio"
@@ -163,7 +163,7 @@ export function CallTimeRangePicker({ open, onClose, onApply }: CallTimeRangePic
             <p className="text-xs text-slate-400">Le vendredi est filtré séparément (9h30–13h et 15h–19h) pour tenir compte de la pause de midi.</p>
           )}
 
-          <div className="flex items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
             <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
             <span>{currentLabel}</span>
           </div>

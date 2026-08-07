@@ -294,14 +294,14 @@ export function CallsView() {
           </section>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="relative">
+            <label className="relative w-full sm:w-64">
               <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Rechercher un numéro…"
-                className="w-64 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
               />
             </label>
             {statusOptions.length > 0 && (
@@ -313,20 +313,24 @@ export function CallsView() {
             <button
               type="button"
               onClick={() => setDatePickerOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <CalendarIcon className="h-3.5 w-3.5 opacity-60" />
-              {dateRangeLabel}
-              <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              <span className="max-w-[220px] truncate" title={dateRangeLabel}>
+                {dateRangeLabel}
+              </span>
+              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
             </button>
             <button
               type="button"
               onClick={() => setTimePickerOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <ClockIcon className="h-3.5 w-3.5 opacity-60" />
-              {timeRangeLabel}
-              <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
+              <ClockIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              <span className="max-w-[220px] truncate" title={timeRangeLabel}>
+                {timeRangeLabel}
+              </span>
+              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
             </button>
             <CallDateRangePicker
               open={datePickerOpen}
