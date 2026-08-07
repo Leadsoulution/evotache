@@ -5,6 +5,7 @@ export interface CallStats {
   answered: number;
   missed: number;
   avgTalk: number;
+  totalTalk: number;
 }
 
 export interface CallsResponse {
@@ -12,7 +13,7 @@ export interface CallsResponse {
   stats: CallStats;
 }
 
-const EMPTY_STATS: CallStats = { total: 0, answered: 0, missed: 0, avgTalk: 0 };
+const EMPTY_STATS: CallStats = { total: 0, answered: 0, missed: 0, avgTalk: 0, totalTalk: 0 };
 
 export async function fetchCalls(): Promise<CallsResponse> {
   const response = await fetch("/api/calls");

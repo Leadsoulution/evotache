@@ -58,9 +58,15 @@ function sortValue(call: PhoneCall, field: SortField): string | number {
   }
 }
 
+// Per-call durations (ring/talk) never reach an hour, but the "Durée
+// totale (parlé)" KPI sums across every call in the period and easily
+// does — the hour segment only appears once it's actually needed, so
+// individual call rows keep their existing m:ss look.
 function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
@@ -231,14 +237,15 @@ export function CallsView() {
     if (!hasActiveFilter) {
       const answeredPct = stats.total ? Math.round((stats.answered / stats.total) * 100) : 0;
       const missedPct = stats.total ? Math.round((stats.missed / stats.total) * 100) : 0;
-      return { total: stats.total, answered: stats.answered, missed: stats.missed, avgTalk: stats.avgTalk, answeredPct, missedPct };
+      return { total: stats.total, answered: stats.answered, missed: stats.missed, avgTalk: stats.avgTalk, totalTalk: stats.totalTalk, answeredPct, missedPct };
     }
     const answered = filtered.filter((c) => c.answered);
     const missed = filtered.filter((c) => c.status === "Unanswered");
-    const avgTalk = answered.length ? Math.round(answered.reduce((sum, c) => sum + c.talkSeconds, 0) / answered.length) : 0;
+    const totalTalk = answered.reduce((sum, c) => sum + c.talkSeconds, 0);
+    const avgTalk = answered.length ? Math.round(totalTalk / answered.length) : 0;
     const answeredPct = filtered.length ? Math.round((answered.length / filtered.length) * 100) : 0;
     const missedPct = filtered.length ? Math.round((missed.length / filtered.length) * 100) : 0;
-    return { total: filtered.length, answered: answered.length, missed: missed.length, avgTalk, answeredPct, missedPct };
+    return { total: filtered.length, answered: answered.length, missed: missed.length, avgTalk, totalTalk, answeredPct, missedPct };
   }, [filtered, hasActiveFilter, stats]);
 
   const { page, setPage, pageCount, start, end } = usePagination(sorted.length, pageSize);
@@ -353,7 +360,7 @@ export function CallsView() {
           <ThreeCxUserSelectorBar users={internalUsers} selectedDn={effectiveSelectedDn} onSelect={setSelectedUserDn} onManage={() => setManagingUsers(true)} />
           <ThreeCxUserManager open={managingUsers} users={internalUsers} onClose={() => setManagingUsers(false)} onSave={handleSaveUserOverride} />
 
-          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-4 dark:bg-slate-950">
+          <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-5 dark:bg-slate-950">
             <StatTile label="Total appels" value={kpis.total} icon={<PhoneIcon className="h-4.5 w-4.5" />} />
             <StatTile label="Répondus" value={`${kpis.answered} (${kpis.answeredPct}%)`} icon={<CheckIcon className="h-4.5 w-4.5" />} />
             <StatTile
@@ -363,6 +370,7 @@ export function CallsView() {
               tone={kpis.missed > 0 ? "warning" : "default"}
             />
             <StatTile label="Durée moyenne (parlé)" value={formatDuration(kpis.avgTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
+            <StatTile label="Durée totale (parlé)" value={formatDuration(kpis.totalTalk)} icon={<ClockIcon className="h-4.5 w-4.5" />} />
           </section>
 
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">

@@ -24,11 +24,11 @@ export async function GET() {
     db.phoneCall.count(),
     db.phoneCall.count({ where: { answered: true } }),
     db.phoneCall.count({ where: { status: "Unanswered" } }),
-    db.phoneCall.aggregate({ _avg: { talkSeconds: true }, where: { answered: true } }),
+    db.phoneCall.aggregate({ _avg: { talkSeconds: true }, _sum: { talkSeconds: true }, where: { answered: true } }),
   ]);
 
   return NextResponse.json({
     calls: calls.map(toPublicPhoneCall),
-    stats: { total, answered, missed, avgTalk: Math.round(talkAgg._avg.talkSeconds ?? 0) },
+    stats: { total, answered, missed, avgTalk: Math.round(talkAgg._avg.talkSeconds ?? 0), totalTalk: talkAgg._sum.talkSeconds ?? 0 },
   });
 }
