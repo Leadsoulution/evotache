@@ -135,11 +135,6 @@ export function BiometricView() {
   // not fetched via a separate "list employees" API call.
   const employees = useMemo(() => deriveEmployees(events, overrides), [events, overrides]);
 
-  // Always computed from the full fetched window, never the active
-  // filters — whether someone is in the building right now shouldn't
-  // change because of an unrelated status/date filter.
-  const presentEmployees = useMemo(() => getPresentEmployees(events, employees), [events, employees]);
-
   // If the selected employee gets hidden (this tab or another), stop
   // filtering by a code that's no longer selectable — derived at render
   // time rather than via an effect + setState, which would trigger an
@@ -215,6 +210,14 @@ export function BiometricView() {
       return true;
     });
   }, [events, search, statusFilter, departmentFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedEmpCode]);
+
+  // Driven by the filtered set (not the raw events) so search/statut/
+  // département/date/heure narrow down who can show up here too — someone
+  // outside the active filters shouldn't appear as "present" just because
+  // their last punch happened to be a check-in. Still scoped to *today*
+  // internally (getPresentEmployees), so a date filter pointing at a past
+  // day correctly shows nobody present.
+  const presentEmployees = useMemo(() => getPresentEmployees(filtered, employees), [filtered, employees]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];

@@ -85,15 +85,18 @@ export interface PresentEmployee extends BiometricEmployee {
 
 /** Who's currently in the building — the one thing punch data can answer
  * that call data never could, so it's the page's own signature view rather
- * than a copy of Calls' KPI-tiles-then-charts layout. Scoped to *today*
- * only (not the active filters — presence is a live fact, not something
- * that should disappear because of an unrelated date filter, but it also
- * shouldn't persist forever: someone who checked in yesterday and never
- * checked out must not still read as "present" once a new day starts).
- * Within today, an employee counts as present when their most recent punch
- * was a check-in — whether or not they've checked out yet is exactly what
- * decides that, so someone who checked in today with no check-out yet
- * still (correctly) shows as present. Sorted most-recently-arrived first. */
+ * than a copy of Calls' KPI-tiles-then-charts layout. Callers typically
+ * pass the page's already-filtered events, so search/statut/département/
+ * etc. narrow down who can appear here too. Always internally re-scoped to
+ * *today* on top of whatever's passed in — presence shouldn't persist
+ * forever: someone who checked in yesterday and never checked out must
+ * not still read as "present" once a new day starts (and a date filter
+ * pointing at a past day correctly ends up showing nobody, since nothing
+ * in the passed set is "today" anymore). Within today, an employee counts
+ * as present when their most recent punch was a check-in — whether or not
+ * they've checked out yet is exactly what decides that, so someone who
+ * checked in today with no check-out yet still (correctly) shows as
+ * present. Sorted most-recently-arrived first. */
 export function getPresentEmployees(events: BiometricEvent[], employees: BiometricEmployee[]): PresentEmployee[] {
   const todayKey = localDateKey(new Date().toISOString());
   const latestByCode = new Map<string, BiometricEvent>();
