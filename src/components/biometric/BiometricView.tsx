@@ -334,10 +334,12 @@ export function BiometricView() {
   const statusChart = useMemo(() => countByStatus(filtered), [filtered]);
   const employeeChart = useMemo(() => countByEmployee(filtered, employees), [filtered, employees]);
 
-  // Unlike "présents maintenant" (a live fact, always the full window),
-  // absence is inherently about a period — so it's driven by the same
-  // filtered set as the charts/table, and changes as the filters do.
-  const absentEmployees = useMemo(() => getAbsentEmployees(employees, filtered), [employees, filtered]);
+  // Same single reference day as "Présents"/"Détail des présences" — today
+  // by default, or whichever day gets filtered to. Scoping this to the
+  // whole filtered history instead would mean almost nobody ever reads as
+  // absent, since most employees have punched *at some point* across the
+  // full history; "absent" only means something relative to one day.
+  const absentEmployees = useMemo(() => getAbsentEmployees(employees, detailDayEvents), [employees, detailDayEvents]);
 
   // One row per (employee, day) in the filtered set, with lateness judged
   // against the configurable schedule — same filtered-data footing as the
@@ -524,8 +526,10 @@ export function BiometricView() {
               <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 dark:border-amber-900/40 dark:bg-amber-950/10">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Absents</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Aucun pointage sur la période / le filtre sélectionné</p>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Absents <span className="font-normal text-slate-400">— {dayLabel(presentDay, "aujourd'hui")}</span>
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Aucun pointage ce jour-là</p>
                   </div>
                   <span className="text-2xl font-bold tabular-nums leading-none text-amber-600 dark:text-amber-400">{absentEmployees.length}</span>
                 </div>
@@ -542,7 +546,7 @@ export function BiometricView() {
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-xs text-slate-400">Tout le monde a pointé sur cette période.</p>
+                  <p className="mt-3 text-xs text-slate-400">Tout le monde a pointé ce jour-là.</p>
                 )}
               </section>
             </div>
