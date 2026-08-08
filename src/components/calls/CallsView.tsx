@@ -391,7 +391,7 @@ export function CallsView() {
               {filterViews.map((view) => (
                 <span
                   key={view.id}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  className="inline-flex items-center gap-0.5 rounded-full border border-slate-200 py-0.5 pl-2.5 pr-0.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300"
                 >
                   <button type="button" onClick={() => handleApplyFilterView(view)} className="hover:text-indigo-600 dark:hover:text-indigo-400">
                     {view.name}
@@ -400,9 +400,9 @@ export function CallsView() {
                     type="button"
                     onClick={() => handleDeleteFilterView(view.id)}
                     aria-label={`Supprimer le filtre ${view.name}`}
-                    className="rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                   >
-                    <XIcon className="h-3 w-3" />
+                    <XIcon className="h-2.5 w-2.5" />
                   </button>
                 </span>
               ))}
