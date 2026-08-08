@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canAccessCalls } from "@/config/roleMeta";
 
 // Private per-user, not shared org-wide — a saved view is just "this
 // user's own filter combination, remembered", same access gate as the
@@ -10,7 +10,7 @@ import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 export async function GET() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageUsers(sessionUser.role) && !canManageWorkflow(sessionUser.role)) {
+  if (!canAccessCalls(sessionUser)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -37,7 +37,7 @@ interface CreateCallFilterViewBody {
 export async function POST(request: NextRequest) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageUsers(sessionUser.role) && !canManageWorkflow(sessionUser.role)) {
+  if (!canAccessCalls(sessionUser)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

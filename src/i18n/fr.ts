@@ -19,7 +19,7 @@ export const fr: Record<TranslationKey, string> = {
   "nav.statistics": "Statistiques",
   "nav.calls": "Appels",
   "nav.biometrics": "Biométrie",
-  "nav.admin": "Admin",
+  "nav.admin": "Paramètres",
 
   // Common
   "common.save": "Enregistrer",

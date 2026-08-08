@@ -7,7 +7,7 @@ import { useBiometricEvents } from "@/hooks/useBiometricEvents";
 import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
 import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
 import { usePagination } from "@/hooks/usePagination";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canAccessBiometrics, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
 import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
@@ -127,7 +127,11 @@ function isWithinBusinessHours(iso: string): boolean {
 export function BiometricView() {
   const { user } = useAuth();
   const router = useRouter();
-  const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
+  const allowed = user ? canAccessBiometrics(user) : false;
+  // A view-only granted user (see roleMeta.canAccessBiometrics) can see
+  // this page but shouldn't get admin-only actions: editing the working
+  // hours schedule or employee display overrides.
+  const isManagerOrAdmin = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
   const { events, stats, loading } = useBiometricEvents();
   const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
   const { schedule, refetch: refetchSchedule } = useBiometricSchedule();
@@ -482,7 +486,7 @@ export function BiometricView() {
             employees={employees}
             selectedEmpCode={effectiveSelectedEmpCode}
             onSelect={setSelectedEmpCode}
-            onManage={() => setManagingEmployees(true)}
+            onManage={isManagerOrAdmin ? () => setManagingEmployees(true) : undefined}
           />
           <BiometricEmployeeManager open={managingEmployees} employees={employees} onClose={() => setManagingEmployees(false)} onSave={handleSaveEmployeeOverride} />
 
@@ -568,14 +572,16 @@ export function BiometricView() {
                   Retard calculé si l&apos;entrée est après {schedule.startTime}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditingSchedule(true)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                <PencilIcon className="h-3.5 w-3.5" />
-                Modifier les heures de travail
-              </button>
+              {isManagerOrAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setEditingSchedule(true)}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <PencilIcon className="h-3.5 w-3.5" />
+                  Modifier les heures de travail
+                </button>
+              )}
             </div>
 
             {dailyAttendance.length === 0 ? (

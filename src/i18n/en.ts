@@ -18,7 +18,7 @@ export const en = {
   "nav.statistics": "Statistics",
   "nav.calls": "Calls",
   "nav.biometrics": "Biometrics",
-  "nav.admin": "Admin",
+  "nav.admin": "Settings",
 
   // Common
   "common.save": "Save",

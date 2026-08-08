@@ -37,6 +37,7 @@ interface CreateUserInput {
   managerIds?: string[];
   teamIds?: string[];
   visibleSectionHrefs?: string[] | null;
+  extraSectionHrefs?: string[];
   hiddenColumnIds?: string[];
 }
 
@@ -61,6 +62,7 @@ interface UpdateUserInput {
   managerIds?: string[];
   teamIds?: string[];
   visibleSectionHrefs?: string[] | null;
+  extraSectionHrefs?: string[];
   hiddenColumnIds?: string[];
 }
 

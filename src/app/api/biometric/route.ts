@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canAccessBiometrics } from "@/config/roleMeta";
 import { toPublicBiometricEvent } from "@/lib/publicBiometricEvent";
 import { STATUS_CHECK_IN, STATUS_CHECK_OUT } from "@/lib/biometricStats";
 
@@ -15,7 +15,7 @@ const MAX_ROWS = 2000;
 export async function GET() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageUsers(sessionUser.role) && !canManageWorkflow(sessionUser.role)) {
+  if (!canAccessBiometrics(sessionUser)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

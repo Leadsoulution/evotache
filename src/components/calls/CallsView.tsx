@@ -7,7 +7,7 @@ import { useCalls } from "@/hooks/useCalls";
 import { useThreeCxUsers } from "@/hooks/useThreeCxUsers";
 import { useCallFilterViews } from "@/hooks/useCallFilterViews";
 import { usePagination } from "@/hooks/usePagination";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canAccessCalls, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { saveThreeCxUserOverride } from "@/services/threeCxUserApi";
 import { createCallFilterView, deleteCallFilterView } from "@/services/callFilterViewApi";
 import { ThreeCxConnectionCard } from "./ThreeCxConnectionCard";
@@ -121,7 +121,11 @@ function isWithinBusinessHours(iso: string): boolean {
 export function CallsView() {
   const { user } = useAuth();
   const router = useRouter();
-  const allowed = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
+  const allowed = user ? canAccessCalls(user) : false;
+  // A view-only granted user (see roleMeta.canAccessCalls) can see this
+  // page but shouldn't get admin-only actions: syncing from 3CX, managing
+  // the 3CX connection, or editing extension display overrides.
+  const isManagerOrAdmin = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
   const { calls, stats, loading, refetch } = useCalls();
   const { overrides, refetch: refetchOverrides } = useThreeCxUsers();
   const { views: filterViews, refetch: refetchFilterViews } = useCallFilterViews();
@@ -365,18 +369,20 @@ export function CallsView() {
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Appels</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Historique des appels — synchronisé automatiquement depuis 3CX, ou à la demande via le bouton.</p>
         </div>
-        <button
-          type="button"
-          onClick={handleSync}
-          disabled={syncing}
-          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshIcon className="h-4 w-4" />
-          {syncing ? "Synchronisation…" : "Synchroniser"}
-        </button>
+        {isManagerOrAdmin && (
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshIcon className="h-4 w-4" />
+            {syncing ? "Synchronisation…" : "Synchroniser"}
+          </button>
+        )}
       </header>
 
-      <ThreeCxConnectionCard />
+      {isManagerOrAdmin && <ThreeCxConnectionCard />}
 
       {loading && <TaskListSkeleton />}
 
@@ -504,7 +510,12 @@ export function CallsView() {
 
           <SaveCallFilterModal open={saveFilterModalOpen} saving={savingFilterView} onClose={() => setSaveFilterModalOpen(false)} onSave={handleSaveFilterView} />
 
-          <ThreeCxUserSelectorBar users={internalUsers} selectedDn={effectiveSelectedDn} onSelect={setSelectedUserDn} onManage={() => setManagingUsers(true)} />
+          <ThreeCxUserSelectorBar
+            users={internalUsers}
+            selectedDn={effectiveSelectedDn}
+            onSelect={setSelectedUserDn}
+            onManage={isManagerOrAdmin ? () => setManagingUsers(true) : undefined}
+          />
           <ThreeCxUserManager open={managingUsers} users={internalUsers} onClose={() => setManagingUsers(false)} onSave={handleSaveUserOverride} />
 
           <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-6 dark:bg-slate-950">

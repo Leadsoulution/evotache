@@ -18,6 +18,7 @@ interface CreateUserInput {
   managerIds?: string[];
   teamIds?: string[];
   visibleSectionHrefs?: string[] | null;
+  extraSectionHrefs?: string[];
   hiddenColumnIds?: string[];
 }
 
@@ -32,6 +33,7 @@ interface UpdateUserPatch {
   managerIds?: string[];
   teamIds?: string[];
   visibleSectionHrefs?: string[] | null;
+  extraSectionHrefs?: string[];
   hiddenColumnIds?: string[];
 }
 
@@ -87,6 +89,7 @@ export function useUsers(): UseUsersResult {
         ...(patch.photoDataUrl !== undefined && { photoDataUrl: patch.photoDataUrl }),
         ...(patch.managerIds !== undefined && { managerIds: patch.managerIds }),
         ...(patch.visibleSectionHrefs !== undefined && { visibleSectionHrefs: patch.visibleSectionHrefs }),
+        ...(patch.extraSectionHrefs !== undefined && { extraSectionHrefs: patch.extraSectionHrefs }),
         ...(patch.hiddenColumnIds !== undefined && { hiddenColumnIds: patch.hiddenColumnIds }),
       };
       await mutate(previous.map((u) => (u.id === id ? { ...u, ...userPatch } : u)), { revalidate: false });

@@ -38,6 +38,12 @@ model User {
   // everything". Prisma arrays can't be nullable, so this is stored as Json
   // (either a JSON array of strings, or JSON null) instead of String[]?.
   visibleSectionHrefs Json?
+  // Hrefs an admin has explicitly granted this user beyond what their role
+  // would normally include — currently only meaningful for /calls and
+  // /biometrie, which are otherwise gated to the admin/member roles. Always
+  // a plain array (no "null means no restriction" case like
+  // visibleSectionHrefs above, since this only ever adds, never narrows).
+  extraSectionHrefs   String[]   @default([])
   hiddenColumnIds     String[]   @default([])
   // AI agent "employee" account — never logs in with a password, excluded
   // from assignee pickers, has an AgentConfig row with its persona/tools.

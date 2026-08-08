@@ -16,7 +16,7 @@ import {
   SparklesIcon,
   UsersIcon,
 } from "@/components/ui/icons";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canAccessBiometrics, canAccessCalls, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import type { TranslationKey } from "@/i18n/en";
 import type { AppUser } from "@/types/user";
 
@@ -42,16 +42,30 @@ export const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/statistics", label: "nav.statistics", icon: ChartBarIcon },
 ];
 
+// Sections gated to admin/member by default but grantable to any user via
+// User.extraSectionHrefs (see UserFormDialog's "Extra access" fieldset).
+export const EXTRA_ACCESS_NAV_ITEMS: NavItem[] = [
+  { href: "/calls", label: "nav.calls", icon: PhoneIcon },
+  { href: "/biometrie", label: "nav.biometrics", icon: FingerprintIcon },
+];
+
+// The role/grant-gated items below (calls/biometrie/admin) are intentionally
+// kept separate from the visibleSectionHrefs narrowing applied to
+// BASE_NAV_ITEMS: that allow-list is only ever populated from the "Visible
+// sections" checklist in UserFormDialog, which only lists BASE_NAV_ITEMS —
+// so folding these into the same filter would silently strip a user's
+// calls/biometrie/admin access the moment an admin unchecked even one
+// unrelated base section for them.
 export function getNavItems(user: AppUser): NavItem[] {
-  const items = [...BASE_NAV_ITEMS];
-  if (canManageUsers(user.role) || canManageWorkflow(user.role)) {
-    items.push({ href: "/calls", label: "nav.calls", icon: PhoneIcon });
-    items.push({ href: "/biometrie", label: "nav.biometrics", icon: FingerprintIcon });
-    items.push({ href: "/admin", label: "nav.admin", icon: ShieldIcon });
+  const baseItems = user.visibleSectionHrefs
+    ? BASE_NAV_ITEMS.filter((item) => user.visibleSectionHrefs!.includes(item.href))
+    : BASE_NAV_ITEMS;
+
+  const items = [...baseItems];
+  for (const item of EXTRA_ACCESS_NAV_ITEMS) {
+    const canAccess = item.href === "/calls" ? canAccessCalls(user) : canAccessBiometrics(user);
+    if (canAccess) items.push(item);
   }
-  if (!user.visibleSectionHrefs) return items;
-  const allowed = new Set(user.visibleSectionHrefs);
-  // The admin-imposed allow-list only ever narrows the role-appropriate set —
-  // it never grants a section the role gate above wouldn't already include.
-  return items.filter((item) => allowed.has(item.href));
+  if (canManageUsers(user.role) || canManageWorkflow(user.role)) items.push({ href: "/admin", label: "nav.admin", icon: ShieldIcon });
+  return items;
 }

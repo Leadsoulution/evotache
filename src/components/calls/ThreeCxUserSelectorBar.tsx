@@ -9,7 +9,8 @@ interface ThreeCxUserSelectorBarProps {
   users: InternalUser[];
   selectedDn: string | null;
   onSelect: (dn: string | null) => void;
-  onManage: () => void;
+  /** Omit to hide the "Gérer" button entirely (e.g. for a view-only granted user who isn't a manager/admin). */
+  onManage?: () => void;
 }
 
 /** Mirrors UserSelectorBar's (src/components/filters/UserSelectorBar.tsx)
@@ -81,14 +82,16 @@ export function ThreeCxUserSelectorBar({ users, selectedDn, onSelect, onManage }
           );
         })}
       </div>
-      <button
-        type="button"
-        onClick={onManage}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-      >
-        <PencilIcon className="h-3.5 w-3.5" />
-        Gérer
-      </button>
+      {onManage && (
+        <button
+          type="button"
+          onClick={onManage}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          <PencilIcon className="h-3.5 w-3.5" />
+          Gérer
+        </button>
+      )}
     </div>
   );
 }

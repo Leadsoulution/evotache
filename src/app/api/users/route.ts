@@ -26,6 +26,7 @@ interface CreateUserBody {
   managerIds?: string[];
   teamIds?: string[];
   visibleSectionHrefs?: string[] | null;
+  extraSectionHrefs?: string[];
   hiddenColumnIds?: string[];
 }
 
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
       status: "active",
       managerIds: body.managerIds ?? [],
       visibleSectionHrefs: body.visibleSectionHrefs ?? Prisma.JsonNull,
+      extraSectionHrefs: body.extraSectionHrefs ?? [],
       hiddenColumnIds: body.hiddenColumnIds ?? [],
     },
   });

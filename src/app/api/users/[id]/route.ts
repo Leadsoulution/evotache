@@ -33,6 +33,7 @@ interface UpdateUserBody {
   managerIds?: string[];
   teamIds?: string[];
   visibleSectionHrefs?: string[] | null;
+  extraSectionHrefs?: string[];
   hiddenColumnIds?: string[];
 }
 
@@ -64,6 +65,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       ...(rest.photoDataUrl !== undefined && { photoDataUrl: rest.photoDataUrl }),
       ...(rest.managerIds !== undefined && { managerIds: rest.managerIds }),
       ...(rest.visibleSectionHrefs !== undefined && { visibleSectionHrefs: rest.visibleSectionHrefs ?? Prisma.JsonNull }),
+      ...(rest.extraSectionHrefs !== undefined && { extraSectionHrefs: rest.extraSectionHrefs }),
       ...(rest.hiddenColumnIds !== undefined && { hiddenColumnIds: rest.hiddenColumnIds }),
       ...(password && { passwordHash: await bcrypt.hash(password, 10) }),
     },
