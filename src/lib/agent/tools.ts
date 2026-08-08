@@ -9,7 +9,23 @@ import { deleteFile } from "@/lib/storage";
 import { listDriveFiles, listRecentGmail, readDriveFile, sendGmail } from "@/lib/googleApi";
 import { searchWeb } from "@/lib/webSearch";
 import { triggerN8nWorkflow } from "@/lib/n8n";
+import { toPublicBiometricEvent } from "@/lib/publicBiometricEvent";
+import { computeDailyAttendance, deriveEmployees, formatLateDuration, getAbsentEmployees, getPresentEmployees } from "@/lib/biometricStats";
+import { addCalendarDays, casablancaDateKey, casablancaHourMinute, casablancaTimeString } from "@/lib/casablancaTime";
+import { toPublicPhoneCall } from "@/lib/publicPhoneCall";
+import { computeHandledMissedCalls } from "@/lib/callStats";
 import type { AgentTool } from "@/types/agent";
+
+/** Shared by the biometric/calls report tools: "today"/"aujourd'hui" and
+ * "yesterday"/"hier" resolve relative to Casablanca's real current date
+ * (not the server's own timezone — see casablancaTime.ts), anything else
+ * is passed through as an explicit "YYYY-MM-DD" date. */
+function resolveDayKey(dateArg: unknown, todayKey: string): string {
+  const raw = typeof dateArg === "string" ? dateArg.trim().toLowerCase() : "";
+  if (!raw || raw === "today" || raw === "aujourd'hui") return todayKey;
+  if (raw === "yesterday" || raw === "hier") return addCalendarDays(todayKey, -1);
+  return raw;
+}
 
 export interface ToolContext {
   agentId: string;
@@ -952,6 +968,112 @@ const triggerN8n: ToolDef = {
   },
 };
 
+const DEFAULT_BIOMETRIC_SCHEDULE = { startTime: "09:30", endTime: "19:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00" };
+
+const getBiometricReport: ToolDef = {
+  name: "get_biometric_report",
+  requires: ["biometric"],
+  description:
+    "Get an attendance report for a given day from the fingerprint pointeuse: who's présent/absent, how many were en retard, and (if detailed) each employee's entry/exit time and lateness. All times are Casablanca time regardless of the server's own timezone.",
+  parameters: {
+    type: "object",
+    properties: {
+      date: { type: "string", description: "\"today\"/\"aujourd'hui\", \"yesterday\"/\"hier\", or an explicit \"YYYY-MM-DD\" date. Defaults to today." },
+      startTime: { type: "string", description: "Optional \"HH:mm\" start of the time window to restrict punches to. Omit for the full day." },
+      endTime: { type: "string", description: "Optional \"HH:mm\" end of the time window." },
+      detailed: { type: "boolean", description: "If true, include each employee's entry/exit time and lateness, not just summary counts." },
+    },
+  },
+  execute: async (args) => {
+    const todayKey = casablancaDateKey(new Date());
+    const targetKey = resolveDayKey(args.date, todayKey);
+    const startTime = typeof args.startTime === "string" ? args.startTime : null;
+    const endTime = typeof args.endTime === "string" ? args.endTime : null;
+    const detailed = Boolean(args.detailed);
+
+    const [rows, overrides, scheduleRow] = await Promise.all([
+      db.biometricEvent.findMany({ orderBy: { punchTime: "desc" }, take: 5000 }),
+      db.biometricEmployeeOverride.findMany(),
+      db.biometricSchedule.findFirst(),
+    ]);
+    const events = rows.map(toPublicBiometricEvent);
+    const schedule = scheduleRow ?? DEFAULT_BIOMETRIC_SCHEDULE;
+    const employees = deriveEmployees(events, overrides);
+
+    let dayEvents = events.filter((e) => casablancaDateKey(e.punchTime) === targetKey);
+    if (startTime) dayEvents = dayEvents.filter((e) => casablancaHourMinute(e.punchTime) >= startTime);
+    if (endTime) dayEvents = dayEvents.filter((e) => casablancaHourMinute(e.punchTime) <= endTime);
+
+    const present = getPresentEmployees(dayEvents, employees);
+    const absent = getAbsentEmployees(employees, dayEvents);
+    const dailyAttendance = computeDailyAttendance(dayEvents, employees, schedule);
+    const lateRows = dailyAttendance.filter((r) => r.isLate);
+
+    const summary = {
+      date: targetKey,
+      totalPunches: dayEvents.length,
+      presentCount: present.length,
+      presentNames: present.map((p) => p.name),
+      absentCount: absent.length,
+      absentNames: absent.map((a) => a.name),
+      lateCount: lateRows.length,
+      lateNames: lateRows.map((r) => r.name),
+    };
+    if (!detailed) return summary;
+    return {
+      ...summary,
+      detail: dailyAttendance.map((r) => ({
+        name: r.name,
+        entree: r.firstEntry ? casablancaTimeString(r.firstEntry) : null,
+        sortie: r.lastExit ? casablancaTimeString(r.lastExit) : null,
+        enRetard: r.isLate,
+        tempsDeRetard: r.isLate ? formatLateDuration(r.lateSeconds) : null,
+      })),
+    };
+  },
+};
+
+const getCallsReport: ToolDef = {
+  name: "get_calls_report",
+  requires: ["calls"],
+  description:
+    "Get a phone calls report for a given day from the 3CX call history: total/répondus/manqués, average and total talk duration, and how many missed calls weren't called back within 1h. All times are Casablanca time regardless of the server's own timezone.",
+  parameters: {
+    type: "object",
+    properties: {
+      date: { type: "string", description: "\"today\"/\"aujourd'hui\", \"yesterday\"/\"hier\", or an explicit \"YYYY-MM-DD\" date. Defaults to today." },
+    },
+  },
+  execute: async (args) => {
+    const todayKey = casablancaDateKey(new Date());
+    const targetKey = resolveDayKey(args.date, todayKey);
+
+    const rows = await db.phoneCall.findMany({ orderBy: { startTime: "desc" }, take: 5000 });
+    const calls = rows.map(toPublicPhoneCall);
+    const dayCalls = calls.filter((c) => casablancaDateKey(c.startTime) === targetKey);
+    const answered = dayCalls.filter((c) => c.answered);
+    const missed = dayCalls.filter((c) => c.status === "Unanswered");
+    const totalTalkSeconds = answered.reduce((sum, c) => sum + c.talkSeconds, 0);
+    const avgTalkSeconds = answered.length ? Math.round(totalTalkSeconds / answered.length) : 0;
+
+    // computeHandledMissedCalls needs the full history (not just dayCalls) so
+    // a callback that happened just past midnight still counts within its 1h window.
+    const handled = computeHandledMissedCalls(calls);
+    const missedInbound = dayCalls.filter((c) => c.direction === "Inbound" && c.status === "Unanswered");
+    const missedNotHandled = missedInbound.filter((c) => !handled.has(c.id)).length;
+
+    return {
+      date: targetKey,
+      total: dayCalls.length,
+      answered: answered.length,
+      missed: missed.length,
+      missedNotHandled,
+      avgTalkSeconds,
+      totalTalkSeconds,
+    };
+  },
+};
+
 export const AGENT_TOOL_DEFS: ToolDef[] = [
   listOverdueItems,
   getStats,
@@ -988,4 +1110,6 @@ export const AGENT_TOOL_DEFS: ToolDef[] = [
   readDriveFileTool,
   webSearchTool,
   triggerN8n,
+  getBiometricReport,
+  getCallsReport,
 ];
