@@ -11,7 +11,7 @@ import { searchWeb } from "@/lib/webSearch";
 import { triggerN8nWorkflow } from "@/lib/n8n";
 import { toPublicBiometricEvent } from "@/lib/publicBiometricEvent";
 import { computeDailyAttendance, deriveEmployees, formatLateDuration, getAbsentEmployees, getPresentEmployees } from "@/lib/biometricStats";
-import { addCalendarDays, casablancaDateKey, casablancaHourMinute, casablancaTimeString } from "@/lib/casablancaTime";
+import { addCalendarDays, casablancaDateKey, casablancaTimeString } from "@/lib/casablancaTime";
 import { toPublicPhoneCall } from "@/lib/publicPhoneCall";
 import { computeHandledMissedCalls } from "@/lib/callStats";
 import type { AgentTool } from "@/types/agent";
@@ -974,21 +974,17 @@ const getBiometricReport: ToolDef = {
   name: "get_biometric_report",
   requires: ["biometric"],
   description:
-    "Get an attendance report for a given day from the fingerprint pointeuse: who's présent/absent, how many were en retard, and (if detailed) each employee's entry/exit time and lateness. All times are Casablanca time regardless of the server's own timezone.",
+    "Get an attendance report for a given day from the fingerprint pointeuse: who's présent/absent, how many were en retard, and (if detailed) each employee's entry/exit time and lateness. Always covers the employee's actual first entry / last exit for the whole day (lateness is judged against the configured schedule's start time, not a time window) — there is no way to restrict this to a sub-day time range. All times are Casablanca time regardless of the server's own timezone.",
   parameters: {
     type: "object",
     properties: {
       date: { type: "string", description: "\"today\"/\"aujourd'hui\", \"yesterday\"/\"hier\", or an explicit \"YYYY-MM-DD\" date. Defaults to today." },
-      startTime: { type: "string", description: "Optional \"HH:mm\" start of the time window to restrict punches to. Omit for the full day." },
-      endTime: { type: "string", description: "Optional \"HH:mm\" end of the time window." },
       detailed: { type: "boolean", description: "If true, include each employee's entry/exit time and lateness, not just summary counts." },
     },
   },
   execute: async (args) => {
     const todayKey = casablancaDateKey(new Date());
     const targetKey = resolveDayKey(args.date, todayKey);
-    const startTime = typeof args.startTime === "string" ? args.startTime : null;
-    const endTime = typeof args.endTime === "string" ? args.endTime : null;
     const detailed = Boolean(args.detailed);
 
     const [rows, overrides, scheduleRow] = await Promise.all([
@@ -1000,9 +996,12 @@ const getBiometricReport: ToolDef = {
     const schedule = scheduleRow ?? DEFAULT_BIOMETRIC_SCHEDULE;
     const employees = deriveEmployees(events, overrides);
 
-    let dayEvents = events.filter((e) => casablancaDateKey(e.punchTime) === targetKey);
-    if (startTime) dayEvents = dayEvents.filter((e) => casablancaHourMinute(e.punchTime) >= startTime);
-    if (endTime) dayEvents = dayEvents.filter((e) => casablancaHourMinute(e.punchTime) <= endTime);
+    // Never pre-filter punches to a time window before computing first
+    // entry/last exit — a real early entry just outside a requested window
+    // would get dropped, leaving a later stray punch to masquerade as the
+    // "entry" instead (confirmed live: real 09:21 entries were replaced by
+    // unrelated 18:xx punches once a "09:30–19:00" window excluded them).
+    const dayEvents = events.filter((e) => casablancaDateKey(e.punchTime) === targetKey);
 
     const present = getPresentEmployees(dayEvents, employees);
     const absent = getAbsentEmployees(employees, dayEvents);
