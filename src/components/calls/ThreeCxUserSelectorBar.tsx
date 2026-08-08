@@ -73,10 +73,10 @@ export function ThreeCxUserSelectorBar({ users, selectedDn, onSelect, onManage }
             >
               <Avatar name={u.name} color={u.color} size="md" className={cn(selected && "ring-2 ring-indigo-500")} />
               <span
-                className={cn("max-w-[72px] truncate text-xs font-medium", selected ? "text-indigo-700 dark:text-indigo-300" : "text-slate-500 dark:text-slate-400")}
+                className={cn("max-w-[112px] truncate text-xs font-medium", selected ? "text-indigo-700 dark:text-indigo-300" : "text-slate-500 dark:text-slate-400")}
                 title={`${u.name} (${u.dn})`}
               >
-                {u.name.split(" ")[0]}
+                {u.name}
               </span>
             </button>
           );
