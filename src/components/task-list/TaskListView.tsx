@@ -63,6 +63,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   });
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter[]>([]);
   const [myTasksOnly, setMyTasksOnly] = useState(false);
+  const [showDone, setShowDone] = useState(false);
   const [viewMode, setViewMode] = useState<TaskViewMode>("list");
   const [groupField, setGroupField] = useState<GroupField>("status");
   const [sortField, setSortField] = useState<SortField>("manual");
@@ -112,13 +113,27 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
       projectFilter.length ||
       teamFilter.length ||
       taskTypeFilter.length ||
-      myTasksOnly
+      myTasksOnly ||
+      showDone
+  );
+
+  // The last status is treated as "done" throughout this app (same idiom
+  // as doneStatusId() in agent/tools.ts, useOverdueNotifications.ts, etc.)
+  // — hidden from the list view by default so completed work doesn't
+  // clutter it, unless the user explicitly picked a status via the Status
+  // filter (that explicit choice wins over the default hide) or toggled
+  // "Show done". Board view is deliberately unaffected (see boardTasks) —
+  // a kanban's whole point is showing every column, done included.
+  const doneStatusId = statuses[statuses.length - 1]?.id;
+  const effectiveStatusFilter = useMemo(
+    () => (statusFilter.length > 0 || showDone || !doneStatusId ? statusFilter : statuses.filter((s) => s.id !== doneStatusId).map((s) => s.id)),
+    [statusFilter, showDone, statuses, doneStatusId]
   );
 
   const groups: TaskTableGroup[] = useMemo(() => {
     const filters: TaskFilters = {
       search: debouncedSearch,
-      statuses: statusFilter,
+      statuses: effectiveStatusFilter,
       priorities: priorityFilter,
       assigneeIds: assigneeFilter,
       projectIds: projectFilter,
@@ -150,7 +165,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   }, [
     tasks,
     debouncedSearch,
-    statusFilter,
+    effectiveStatusFilter,
     priorityFilter,
     assigneeFilter,
     projectFilter,
@@ -202,6 +217,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     teamFilter,
     taskTypeFilter,
     myTasksOnly,
+    showDone,
     sortField,
     sortDirection,
     groupField,
@@ -274,6 +290,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     setTeamFilter([]);
     setTaskTypeFilter([]);
     setMyTasksOnly(false);
+    setShowDone(false);
   }
 
   function handleAddSubtask(parentId: string) {
@@ -340,6 +357,8 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
         onTaskTypeFilterChange={setTaskTypeFilter}
         myTasksOnly={myTasksOnly}
         onMyTasksOnlyChange={setMyTasksOnly}
+        showDone={showDone}
+        onShowDoneChange={setShowDone}
         hasActiveFilters={hasActiveFilters}
         onClearFilters={clearFilters}
         assignees={assignees}

@@ -345,6 +345,15 @@ export function TaskTable({
             <th scope="col" className="px-2 py-2" aria-hidden="true" />
           </tr>
         </thead>
+        {permissions.canCreate && (
+          <tbody>
+            <tr className="border-b border-slate-100 dark:border-slate-800">
+              <td colSpan={columnCount} className="p-0">
+                <NewTaskRow onCreate={onCreate} />
+              </td>
+            </tr>
+          </tbody>
+        )}
         {groups.map((group) => (
           <TaskGroup
             key={group.key}

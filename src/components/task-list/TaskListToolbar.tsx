@@ -6,7 +6,7 @@ import { FilterMenu } from "@/components/ui/FilterMenu";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProjectAvatar } from "@/components/projects/ProjectAvatar";
 import { ColumnsMenu } from "./ColumnsMenu";
-import { ChevronDownIcon, CornerDownRightIcon, KanbanIcon, ListIcon, RepeatIcon, SearchIcon, SortIcon, TrashIcon, UserIcon, XIcon } from "@/components/ui/icons";
+import { CheckIcon, ChevronDownIcon, CornerDownRightIcon, KanbanIcon, ListIcon, RepeatIcon, SearchIcon, SortIcon, TrashIcon, UserIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type { Assignee, GroupField, SortDirection, SortField, TaskTypeFilter } from "@/types/task";
 import type { MenuOption } from "@/components/ui/Menu";
@@ -55,6 +55,8 @@ interface TaskListToolbarProps {
   onTaskTypeFilterChange: (value: TaskTypeFilter[]) => void;
   myTasksOnly: boolean;
   onMyTasksOnlyChange: (value: boolean) => void;
+  showDone: boolean;
+  onShowDoneChange: (value: boolean) => void;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
   assignees: Assignee[];
@@ -99,6 +101,8 @@ export function TaskListToolbar({
   onTaskTypeFilterChange,
   myTasksOnly,
   onMyTasksOnlyChange,
+  showDone,
+  onShowDoneChange,
   hasActiveFilters,
   onClearFilters,
   assignees,
@@ -190,6 +194,21 @@ export function TaskListToolbar({
         >
           <UserIcon className="h-3.5 w-3.5" />
           {t("tasks.myTasks")}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onShowDoneChange(!showDone)}
+          aria-pressed={showDone}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium",
+            showDone
+              ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+              : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          )}
+        >
+          <CheckIcon className="h-3.5 w-3.5" />
+          {t("tasks.showDone")}
         </button>
 
         {hasActiveFilters && (

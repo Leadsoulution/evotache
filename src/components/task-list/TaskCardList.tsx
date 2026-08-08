@@ -56,6 +56,11 @@ export function TaskCardList({
 }: TaskCardListProps) {
   return (
     <div className="flex flex-col gap-3 md:hidden">
+      {permissions.canCreate && (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <NewTaskRow onCreate={onCreate} />
+        </div>
+      )}
       {groups.map((group) => (
         <TaskCardGroup
           key={group.key}
