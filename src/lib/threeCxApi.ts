@@ -75,6 +75,49 @@ function isoNoMillis(date: Date): string {
   return date.toISOString().replace(/\.\d+Z$/, ".000Z");
 }
 
+interface RawUserRow {
+  Number: string;
+  FirstName: string | null;
+  LastName: string | null;
+  DisplayName: string | null;
+}
+
+export interface ThreeCxRealUser {
+  dn: string;
+  name: string;
+}
+
+// Confirmed live: unlike ReportCallLogData (500), the Users entity rejects
+// anything over 100 — "The limit of '100' for Top query has been exceeded."
+const USERS_PAGE_SIZE = 100;
+
+/** The extension's own current name, straight from 3CX's Users list —
+ * confirmed live at /xapi/v1/Users (DisplayName = "FirstName LastName",
+ * e.g. "Standrad ( F.KAWTAR )"). Independent of call history, so it's
+ * accurate even for an extension that hasn't had a recent call or was
+ * renamed since its last one. */
+export async function listThreeCxUsers(): Promise<ThreeCxRealUser[]> {
+  const { pbxUrl, accessToken } = await getValidAccessToken();
+  const users: ThreeCxRealUser[] = [];
+  let skip = 0;
+
+  for (;;) {
+    const url = `${pbxUrl}/xapi/v1/Users?$top=${USERS_PAGE_SIZE}&$skip=${skip}&$select=Number,FirstName,LastName,DisplayName`;
+    const response = await fetchThreeCx(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
+    if (!response.ok) throw new Error(`3CX users request failed (${response.status}): ${await response.text()}`);
+    const data = (await response.json()) as { value: RawUserRow[] };
+    const page = data.value ?? [];
+    for (const row of page) {
+      const name = row.DisplayName || [row.FirstName, row.LastName].filter(Boolean).join(" ");
+      if (row.Number && name) users.push({ dn: row.Number, name });
+    }
+    if (page.length < USERS_PAGE_SIZE) break;
+    skip += USERS_PAGE_SIZE;
+  }
+
+  return users;
+}
+
 export async function listCallLog(periodFrom: Date, periodTo: Date): Promise<CallLogEntry[]> {
   const { pbxUrl, accessToken } = await getValidAccessToken();
   const entries: CallLogEntry[] = [];

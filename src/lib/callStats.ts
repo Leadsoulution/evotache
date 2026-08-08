@@ -37,18 +37,26 @@ export interface InternalUser {
 export interface ThreeCxUserOverride {
   dn: string;
   name: string | null;
+  // The extension's real current name straight from 3CX's own Users list
+  // (refreshed on every calls sync — see threeCxSync.ts), independent of
+  // call history. Preferred over whatever name happened to appear in past
+  // calls, which could be stale (renamed since) or a queue name instead of
+  // a person's.
+  realName?: string | null;
   color: string | null;
   hidden: boolean;
 }
 
-/** Internal 3CX users/extensions, derived straight from the synced call
- * data rather than a separate "list users" API call — 3CX's display names
- * for a real named extension consistently end in " (DN)" (e.g. "Commercial
- * P2 (111)"), which distinguishes a real user from a trunk/gateway leg or a
- * raw external caller number (neither of which matches that pattern).
- * `overrides` layers on any admin-set display name/color/hidden flag —
- * default color is assigned by dn order so it stays stable across
- * re-filters/re-sorts instead of depending on call counts. */
+/** Internal 3CX users/extensions. Real names come from 3CX's own Users
+ * list (`override.realName`, synced independently of calls — see
+ * threeCxSync.ts's syncThreeCxUserNames); the call history is only a
+ * fallback for a dn that hasn't been through that sync yet, using the same
+ * "(DN)" suffix heuristic 3CX's call log itself appends to a real named
+ * extension (e.g. "Commercial P2 (111)"), which distinguishes a real user
+ * from a trunk/gateway leg or a raw external caller number. `overrides`
+ * also layers on any admin-set display name/color/hidden flag — default
+ * color is assigned by dn order so it stays stable across re-filters/
+ * re-sorts instead of depending on call counts. */
 export function deriveInternalUsers(calls: PhoneCall[], overrides: ThreeCxUserOverride[] = []): InternalUser[] {
   const byDn = new Map<string, string>();
   const consider = (dn: string, name: string | null) => {
@@ -62,11 +70,14 @@ export function deriveInternalUsers(calls: PhoneCall[], overrides: ThreeCxUserOv
     consider(call.destDn, call.destName);
   }
   const overrideByDn = new Map(overrides.map((o) => [o.dn, o]));
-  return Array.from(byDn.entries())
-    .map(([dn, autoName]) => ({ dn, autoName }))
-    .sort((a, b) => a.dn.localeCompare(b.dn))
-    .map(({ dn, autoName }, i) => {
+  // Union of dns seen in call history AND dns 3CX's Users sync knows about —
+  // an extension with no recent calls yet still shows up once it's synced.
+  const allDns = new Set([...byDn.keys(), ...overrides.filter((o) => o.realName).map((o) => o.dn)]);
+  return Array.from(allDns)
+    .sort((a, b) => a.localeCompare(b))
+    .map((dn, i) => {
       const override = overrideByDn.get(dn);
+      const autoName = override?.realName || byDn.get(dn) || dn;
       return {
         dn,
         name: override?.name || autoName,

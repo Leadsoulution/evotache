@@ -601,7 +601,16 @@ model ThreeCxConnection {
 // "identity" here is the extension itself.
 model ThreeCxUser {
   dn        String   @id
+  // Admin-chosen display name override — takes precedence over realName
+  // when set.
   name      String?
+  // The extension's actual current name in 3CX (Users.DisplayName via
+  // XAPI, confirmed live: e.g. "Standrad ( F.KAWTAR )") — refreshed on
+  // every calls sync, independent of call history. Previously the app only
+  // ever derived a name from whatever happened to appear in past call
+  // records, which could be stale (extension renamed since its last call)
+  // or a queue name instead of a person's.
+  realName  String?
   color     String?
   hidden    Boolean  @default(false)
   updatedAt DateTime @updatedAt
