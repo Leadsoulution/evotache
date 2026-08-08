@@ -1038,7 +1038,7 @@ const getCallsReport: ToolDef = {
   name: "get_calls_report",
   requires: ["calls"],
   description:
-    "Get a phone calls report for a given day from the 3CX call history: total/répondus/manqués, average and total talk duration, how many missed calls weren't called back within 1h, the actual list of missed calls (caller, time, traité), and a per-team-member breakdown (répondus/manqués/total). All times are Casablanca time regardless of the server's own timezone. This is the complete real data — if the caller/number/name for a row isn't in here, it does not exist; never invent an example row or a placeholder number to fill out a table.",
+    "Get a phone calls report for a given day from the 3CX call history: total/répondus/manqués, average and total talk duration, how many missed calls weren't called back within 1h, the actual list of missed INBOUND calls (caller, time, traité: Oui/Non — outbound/internal missed calls aren't included in this list since \"traité\" only means something for a customer who called in), and a per-team-member breakdown (répondus/manqués/total, all directions). All times are Casablanca time regardless of the server's own timezone. This is the complete real data — if the caller/number/name for a row isn't in here, it does not exist; never invent an example row or a placeholder number to fill out a table.",
   parameters: {
     type: "object",
     properties: {
@@ -1063,15 +1063,17 @@ const getCallsReport: ToolDef = {
     const missedInbound = dayCalls.filter((c) => c.direction === "Inbound" && c.status === "Unanswered");
     const missedNotHandled = missedInbound.filter((c) => !handled.has(c.id)).length;
 
-    // Real per-call rows for the missed calls specifically — the exact data
-    // a "rapport des appels manqués" table should be built from, so the
-    // model never has to guess/invent one.
-    const missedCalls = missed.slice(0, MAX_CALLS_REPORT_ROWS).map((c) => ({
+    // Real per-call rows for the missed calls specifically — inbound only,
+    // since "traité" (called back within 1h) only means something for a
+    // customer who called in, not a missed outbound/internal leg — the
+    // exact data a "rapport des appels manqués" table should be built
+    // from, so the model never has to guess/invent one.
+    const missedCalls = missedInbound.slice(0, MAX_CALLS_REPORT_ROWS).map((c) => ({
       appelant: c.sourceName || c.sourceNumber,
       appele: c.destName || c.destNumber,
       statut: CALL_STATUS_LABEL[c.status] ?? c.status,
       heure: casablancaTimeString(c.startTime).slice(0, 5),
-      traite: c.direction === "Inbound" ? (handled.has(c.id) ? "Oui" : "Non") : "N/A",
+      traite: handled.has(c.id) ? "Oui" : "Non",
     }));
 
     // Real internal users, derived from the actual synced call history
