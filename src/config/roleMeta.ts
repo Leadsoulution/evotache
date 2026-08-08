@@ -96,14 +96,14 @@ interface AccessCheckUser {
   extraSectionHrefs?: string[] | null;
 }
 
-// /calls and /biometrie are gated to admin/member roles by default, but an
-// admin can grant a specific user (of any role) view access without
-// changing their role/capabilities otherwise — extraSectionHrefs is purely
-// additive, it never restricts a role that already has access.
+// /calls and /biometrie are admin-only by default (unlike /admin itself,
+// which stays admin+member) — an admin can grant any other user view
+// access individually via extraSectionHrefs, which is purely additive: it
+// never restricts a role that already has access.
 export function canAccessCalls(user: AccessCheckUser): boolean {
-  return canManageUsers(user.role) || canManageWorkflow(user.role) || (user.extraSectionHrefs ?? []).includes("/calls");
+  return canManageUsers(user.role) || (user.extraSectionHrefs ?? []).includes("/calls");
 }
 
 export function canAccessBiometrics(user: AccessCheckUser): boolean {
-  return canManageUsers(user.role) || canManageWorkflow(user.role) || (user.extraSectionHrefs ?? []).includes("/biometrie");
+  return canManageUsers(user.role) || (user.extraSectionHrefs ?? []).includes("/biometrie");
 }
