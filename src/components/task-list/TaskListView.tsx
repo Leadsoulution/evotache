@@ -120,20 +120,26 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   // The last status is treated as "done" throughout this app (same idiom
   // as doneStatusId() in agent/tools.ts, useOverdueNotifications.ts, etc.)
   // — hidden from the list view by default so completed work doesn't
-  // clutter it, unless the user explicitly picked a status via the Status
+  // clutter it, unless the user explicitly picked "Done" via the Status
   // filter (that explicit choice wins over the default hide) or toggled
   // "Show done". Board view is deliberately unaffected (see boardTasks) —
   // a kanban's whole point is showing every column, done included.
+  //
+  // This can't be done by feeding an "everything but done" whitelist into
+  // TaskFilters.statuses the way every other filter works: filterTopLevelTasks
+  // deliberately shows a task's *whole* subtree once any part of it matches
+  // (so subtask context isn't lost while searching/filtering) — which means
+  // a done subtask would still tag along under its visible non-done parent,
+  // confirmed live (a done subtask kept showing even with "Show done" off).
+  // Hiding done needs to prune at every depth instead, so it's applied as a
+  // separate pass below, after the normal tree-preserving filters.
   const doneStatusId = statuses[statuses.length - 1]?.id;
-  const effectiveStatusFilter = useMemo(
-    () => (statusFilter.length > 0 || showDone || !doneStatusId ? statusFilter : statuses.filter((s) => s.id !== doneStatusId).map((s) => s.id)),
-    [statusFilter, showDone, statuses, doneStatusId]
-  );
+  const shouldHideDone = Boolean(doneStatusId) && !showDone && !statusFilter.includes(doneStatusId!);
 
   const groups: TaskTableGroup[] = useMemo(() => {
     const filters: TaskFilters = {
       search: debouncedSearch,
-      statuses: effectiveStatusFilter,
+      statuses: statusFilter,
       priorities: priorityFilter,
       assigneeIds: assigneeFilter,
       projectIds: projectFilter,
@@ -147,25 +153,31 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     const statusOrder = statuses.map((s) => s.id);
     const priorityOrder = priorities.map((p) => p.id);
 
+    let result: TaskTableGroup[];
     if (groupField === "none") {
       const sortedTopLevel = sortTasks(filteredTopLevel, sortField, sortDirection, statusOrder, priorityOrder);
-      return [{ key: "all", label: "All tasks", rows: flattenVisibleTree(sortedTopLevel, tasks, collapsedIds) }];
+      result = [{ key: "all", label: "All tasks", rows: flattenVisibleTree(sortedTopLevel, tasks, collapsedIds) }];
+    } else {
+      // Grouped views bucket every visible task (not just roots) by its own
+      // status/priority/assignee, so a subtask moves into its own group
+      // instead of staying stuck wherever its parent landed.
+      const visibleTasks = collectVisibleTasks(filteredTopLevel, tasks);
+      const groupResults = groupTasks(visibleTasks, groupField, assignees, statuses, priorities);
+      result = groupResults.map((group) => ({
+        key: group.key,
+        label: group.label,
+        rows: flattenGroupTree(sortTasks(group.tasks, sortField, sortDirection, statusOrder, priorityOrder), collapsedIds),
+      }));
     }
 
-    // Grouped views bucket every visible task (not just roots) by its own
-    // status/priority/assignee, so a subtask moves into its own group
-    // instead of staying stuck wherever its parent landed.
-    const visibleTasks = collectVisibleTasks(filteredTopLevel, tasks);
-    const groupResults = groupTasks(visibleTasks, groupField, assignees, statuses, priorities);
-    return groupResults.map((group) => ({
-      key: group.key,
-      label: group.label,
-      rows: flattenGroupTree(sortTasks(group.tasks, sortField, sortDirection, statusOrder, priorityOrder), collapsedIds),
-    }));
+    if (shouldHideDone) {
+      result = result.map((g) => ({ ...g, rows: g.rows.filter((r) => r.task.status !== doneStatusId) })).filter((g) => g.rows.length > 0);
+    }
+    return result;
   }, [
     tasks,
     debouncedSearch,
-    effectiveStatusFilter,
+    statusFilter,
     priorityFilter,
     assigneeFilter,
     projectFilter,
@@ -181,6 +193,8 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     statuses,
     priorities,
     collapsedIds,
+    shouldHideDone,
+    doneStatusId,
   ]);
 
   const boardTasks = useMemo(() => {
