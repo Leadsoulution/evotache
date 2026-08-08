@@ -13,7 +13,7 @@ import { toPublicBiometricEvent } from "@/lib/publicBiometricEvent";
 import { computeDailyAttendance, deriveEmployees, formatLateDuration, getAbsentEmployees, getPresentEmployees } from "@/lib/biometricStats";
 import { addCalendarDays, casablancaDateKey, casablancaTimeString } from "@/lib/casablancaTime";
 import { toPublicPhoneCall } from "@/lib/publicPhoneCall";
-import { computeHandledMissedCalls } from "@/lib/callStats";
+import { STATUS_LABEL as CALL_STATUS_LABEL, computeHandledMissedCalls, deriveInternalUsers } from "@/lib/callStats";
 import type { AgentTool } from "@/types/agent";
 
 /** Shared by the biometric/calls report tools: "today"/"aujourd'hui" and
@@ -1032,11 +1032,13 @@ const getBiometricReport: ToolDef = {
   },
 };
 
+const MAX_CALLS_REPORT_ROWS = 50;
+
 const getCallsReport: ToolDef = {
   name: "get_calls_report",
   requires: ["calls"],
   description:
-    "Get a phone calls report for a given day from the 3CX call history: total/répondus/manqués, average and total talk duration, and how many missed calls weren't called back within 1h. All times are Casablanca time regardless of the server's own timezone.",
+    "Get a phone calls report for a given day from the 3CX call history: total/répondus/manqués, average and total talk duration, how many missed calls weren't called back within 1h, the actual list of missed calls (caller, time, traité), and a per-team-member breakdown (répondus/manqués/total). All times are Casablanca time regardless of the server's own timezone. This is the complete real data — if the caller/number/name for a row isn't in here, it does not exist; never invent an example row or a placeholder number to fill out a table.",
   parameters: {
     type: "object",
     properties: {
@@ -1047,7 +1049,7 @@ const getCallsReport: ToolDef = {
     const todayKey = casablancaDateKey(new Date());
     const targetKey = resolveDayKey(args.date, todayKey);
 
-    const rows = await db.phoneCall.findMany({ orderBy: { startTime: "desc" }, take: 5000 });
+    const [rows, overrides] = await Promise.all([db.phoneCall.findMany({ orderBy: { startTime: "desc" }, take: 5000 }), db.threeCxUser.findMany()]);
     const calls = rows.map(toPublicPhoneCall);
     const dayCalls = calls.filter((c) => casablancaDateKey(c.startTime) === targetKey);
     const answered = dayCalls.filter((c) => c.answered);
@@ -1061,6 +1063,35 @@ const getCallsReport: ToolDef = {
     const missedInbound = dayCalls.filter((c) => c.direction === "Inbound" && c.status === "Unanswered");
     const missedNotHandled = missedInbound.filter((c) => !handled.has(c.id)).length;
 
+    // Real per-call rows for the missed calls specifically — the exact data
+    // a "rapport des appels manqués" table should be built from, so the
+    // model never has to guess/invent one.
+    const missedCalls = missed.slice(0, MAX_CALLS_REPORT_ROWS).map((c) => ({
+      appelant: c.sourceName || c.sourceNumber,
+      appele: c.destName || c.destNumber,
+      statut: CALL_STATUS_LABEL[c.status] ?? c.status,
+      heure: casablancaTimeString(c.startTime).slice(0, 5),
+      traite: c.direction === "Inbound" ? (handled.has(c.id) ? "Oui" : "Non") : "N/A",
+    }));
+
+    // Real internal users, derived from the actual synced call history
+    // (deriveInternalUsers only recognizes a call leg as a real team member
+    // when 3CX's own display name carries a "(DN)" suffix) — never a
+    // fabricated name.
+    const internalUsers = deriveInternalUsers(calls, overrides).filter((u) => !u.hidden);
+    const byUser = internalUsers
+      .map((u) => {
+        const userDayCalls = dayCalls.filter((c) => c.sourceDn === u.dn || c.destDn === u.dn);
+        return {
+          name: u.name,
+          total: userDayCalls.length,
+          answered: userDayCalls.filter((c) => c.answered).length,
+          missed: userDayCalls.filter((c) => c.status === "Unanswered").length,
+        };
+      })
+      .filter((u) => u.total > 0)
+      .sort((a, b) => b.total - a.total);
+
     return {
       date: targetKey,
       total: dayCalls.length,
@@ -1069,6 +1100,8 @@ const getCallsReport: ToolDef = {
       missedNotHandled,
       avgTalkSeconds,
       totalTalkSeconds,
+      missedCalls,
+      byUser,
     };
   },
 };
