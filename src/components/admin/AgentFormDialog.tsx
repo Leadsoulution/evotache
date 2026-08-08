@@ -7,13 +7,24 @@ import { randomPaletteColor } from "@/config/colorPalette";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { ColorSwatchPicker } from "./ColorSwatchPicker";
-import { ImageIcon, XIcon } from "@/components/ui/icons";
-import { AGENT_TOOLS } from "@/types/agent";
+import { ImageIcon, PlusIcon, XIcon } from "@/components/ui/icons";
+import { AGENT_REPORT_TYPES, AGENT_TOOLS } from "@/types/agent";
 import { uploadFile } from "@/services/uploadApi";
-import { createAgentMemory, deleteAgentMemory, fetchAgentMemory, generateTelegramLinkCode, unlinkTelegram } from "@/services/agentApi";
+import {
+  createAgentMemory,
+  createAgentReportSchedule,
+  deleteAgentMemory,
+  deleteAgentReportSchedule,
+  fetchAgentMemory,
+  fetchAgentReportSchedules,
+  generateTelegramLinkCode,
+  setAgentReportScheduleEnabled,
+  unlinkTelegram,
+} from "@/services/agentApi";
+import { useUsers } from "@/hooks/useUsers";
 import { useToast } from "@/components/ui/Toast";
 import { CheckIcon } from "@/components/ui/icons";
-import type { Agent, AgentKind, AgentMemory, AgentTool } from "@/types/agent";
+import type { Agent, AgentKind, AgentMemory, AgentReportSchedule, AgentReportType, AgentTool } from "@/types/agent";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
@@ -57,8 +68,16 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
   const [newMemory, setNewMemory] = useState("");
   const [addingMemory, setAddingMemory] = useState(false);
   const [deletingMemoryId, setDeletingMemoryId] = useState<string | null>(null);
+  const [reportSchedules, setReportSchedules] = useState<AgentReportSchedule[]>([]);
+  const [newScheduleRecipientId, setNewScheduleRecipientId] = useState("");
+  const [newScheduleTimes, setNewScheduleTimes] = useState<string[]>(["09:00"]);
+  const [newScheduleTypes, setNewScheduleTypes] = useState<AgentReportType[]>([]);
+  const [addingSchedule, setAddingSchedule] = useState(false);
+  const [scheduleActionId, setScheduleActionId] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+  const { users } = useUsers();
+  const recipientCandidates = users.filter((u) => !u.isAgent && u.status === "active");
 
   if (open !== wasOpen) {
     setWasOpen(open);
@@ -76,6 +95,10 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       setTelegramCode(null);
       setMemories([]);
       setNewMemory("");
+      setReportSchedules([]);
+      setNewScheduleRecipientId("");
+      setNewScheduleTimes(["09:00"]);
+      setNewScheduleTypes([]);
     }
   }
 
@@ -114,6 +137,67 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       toast.error(err instanceof Error ? err.message : "Failed to delete memory.");
     } finally {
       setDeletingMemoryId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!open || !editingAgent) return;
+    fetchAgentReportSchedules(editingAgent.id).then(setReportSchedules);
+  }, [open, editingAgent]);
+
+  function toggleNewScheduleType(type: AgentReportType) {
+    setNewScheduleTypes((current) => (current.includes(type) ? current.filter((t) => t !== type) : [...current, type]));
+  }
+
+  function updateScheduleTime(index: number, value: string) {
+    setNewScheduleTimes((current) => current.map((t, i) => (i === index ? value : t)));
+  }
+
+  function removeScheduleTime(index: number) {
+    setNewScheduleTimes((current) => current.filter((_, i) => i !== index));
+  }
+
+  async function handleAddSchedule() {
+    if (!editingAgent) return;
+    const times = newScheduleTimes.filter(Boolean);
+    if (!newScheduleRecipientId || times.length === 0 || newScheduleTypes.length === 0) return;
+    setAddingSchedule(true);
+    try {
+      const schedule = await createAgentReportSchedule(editingAgent.id, { recipientId: newScheduleRecipientId, timesOfDay: times, reportTypes: newScheduleTypes });
+      setReportSchedules((current) => [...current, schedule]);
+      setNewScheduleRecipientId("");
+      setNewScheduleTimes(["09:00"]);
+      setNewScheduleTypes([]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add schedule.");
+    } finally {
+      setAddingSchedule(false);
+    }
+  }
+
+  async function handleToggleSchedule(scheduleId: string, enabled: boolean) {
+    if (!editingAgent) return;
+    setScheduleActionId(scheduleId);
+    try {
+      const updated = await setAgentReportScheduleEnabled(editingAgent.id, scheduleId, enabled);
+      setReportSchedules((current) => current.map((s) => (s.id === scheduleId ? { ...s, enabled: updated.enabled } : s)));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update schedule.");
+    } finally {
+      setScheduleActionId(null);
+    }
+  }
+
+  async function handleDeleteSchedule(scheduleId: string) {
+    if (!editingAgent) return;
+    setScheduleActionId(scheduleId);
+    try {
+      await deleteAgentReportSchedule(editingAgent.id, scheduleId);
+      setReportSchedules((current) => current.filter((s) => s.id !== scheduleId));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete schedule.");
+    } finally {
+      setScheduleActionId(null);
     }
   }
 
@@ -376,6 +460,112 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
                     className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     {addingMemory ? "Ajout…" : "Ajouter"}
+                  </button>
+                </div>
+              </div>
+            </fieldset>
+          )}
+
+          {editingAgent && (
+            <fieldset className="block text-sm">
+              <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Scheduled reports</legend>
+              <p className="mb-1.5 text-xs text-slate-400">Send a report to a specific person via chat at fixed times each day (Casablanca time).</p>
+              <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+                {reportSchedules.length > 0 && (
+                  <ul className="flex flex-col gap-1.5">
+                    {reportSchedules.map((schedule) => (
+                      <li key={schedule.id} className="flex items-start justify-between gap-2 rounded-md bg-slate-50 px-2 py-1.5 dark:bg-slate-800">
+                        <div className="text-sm text-slate-700 dark:text-slate-200">
+                          <span className="font-medium">{schedule.recipientName}</span> — {schedule.timesOfDay.join(", ")}
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {schedule.reportTypes.map((t) => AGENT_REPORT_TYPES.find((r) => r.id === t)?.label ?? t).join(" · ")}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <label className="flex cursor-pointer items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                            <input
+                              type="checkbox"
+                              checked={schedule.enabled}
+                              disabled={scheduleActionId === schedule.id}
+                              onChange={(event) => handleToggleSchedule(schedule.id, event.target.checked)}
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
+                            />
+                            Actif
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSchedule(schedule.id)}
+                            disabled={scheduleActionId === schedule.id}
+                            className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                          >
+                            <XIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="flex flex-col gap-2 border-t border-slate-100 pt-2 dark:border-slate-700">
+                  <select
+                    value={newScheduleRecipientId}
+                    onChange={(event) => setNewScheduleRecipientId(event.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Destinataire…</option>
+                    {recipientCandidates.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="flex flex-col gap-1.5">
+                    {newScheduleTimes.map((time, index) => (
+                      <div key={index} className="flex items-center gap-1.5">
+                        <input type="time" value={time} onChange={(event) => updateScheduleTime(index, event.target.value)} className={inputClass} />
+                        {newScheduleTimes.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeScheduleTime(index)}
+                            aria-label="Remove time"
+                            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          >
+                            <XIcon className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setNewScheduleTimes((current) => [...current, "09:00"])}
+                      className="inline-flex w-fit items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950"
+                    >
+                      <PlusIcon className="h-3.5 w-3.5" /> Ajouter une heure
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    {AGENT_REPORT_TYPES.map((type) => (
+                      <label key={type.id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={newScheduleTypes.includes(type.id)}
+                          onChange={() => toggleNewScheduleType(type.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
+                        />
+                        {type.label}
+                      </label>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddSchedule}
+                    disabled={addingSchedule || !newScheduleRecipientId || newScheduleTimes.filter(Boolean).length === 0 || newScheduleTypes.length === 0}
+                    className="w-fit rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    {addingSchedule ? "Ajout…" : "Ajouter"}
                   </button>
                 </div>
               </div>

@@ -67,3 +67,24 @@ export interface AgentMemory {
   content: string;
   createdAt: string;
 }
+
+export type AgentReportType = "calls_unhandled" | "biometric_today";
+
+export const AGENT_REPORT_TYPES: { id: AgentReportType; label: string }[] = [
+  { id: "calls_unhandled", label: "Appels manqués non traités" },
+  { id: "biometric_today", label: "Rapport biométrique du jour" },
+];
+
+/** A recurring report this agent sends to one specific person via chat, at
+ * fixed times each day — see AgentReportSchedule in schema.prisma. */
+export interface AgentReportSchedule {
+  id: string;
+  agentId: string;
+  recipientId: string;
+  recipientName: string;
+  timesOfDay: string[];
+  reportTypes: AgentReportType[];
+  enabled: boolean;
+  lastRunAt: string | null;
+  createdAt: string;
+}

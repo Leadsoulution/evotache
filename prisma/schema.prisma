@@ -50,10 +50,12 @@ model User {
   isAgent             Boolean    @default(false)
   createdAt           DateTime   @default(now())
 
-  pushSubscriptions PushSubscription[]
-  agentConfig       AgentConfig?
-  callFilterViews   CallFilterView[]
-  agentMemories     AgentMemory[]
+  pushSubscriptions               PushSubscription[]
+  agentConfig                     AgentConfig?
+  callFilterViews                 CallFilterView[]
+  agentMemories                   AgentMemory[]
+  agentReportSchedulesAsAgent     AgentReportSchedule[] @relation("AgentReportScheduleAgent")
+  agentReportSchedulesAsRecipient AgentReportSchedule[] @relation("AgentReportScheduleRecipient")
 
   @@map("users")
 }
@@ -281,6 +283,29 @@ model AgentMemory {
   createdAt DateTime @default(now())
 
   @@map("agent_memories")
+}
+
+// A recurring report an agent sends to one specific person via chat, at
+// one or more fixed times each day (Casablanca time) — e.g. "send Elmehdi
+// the unhandled-missed-calls and today's biometric report at 10:30 and
+// 20:30". Deliberately narrow (a fixed pair of report types) rather than a
+// generic scheduled-action framework — AgentSchedule below was built for
+// that but never wired up (no cron route, no actionType contract, no
+// creation path); this solves the one concrete need it was meant for
+// instead of finishing that speculative generality.
+model AgentReportSchedule {
+  id          String    @id @default(cuid())
+  agentId     String
+  agent       User      @relation("AgentReportScheduleAgent", fields: [agentId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User      @relation("AgentReportScheduleRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  timesOfDay  String[]  @default([]) // "HH:mm", Casablanca time
+  reportTypes String[]  @default([]) // "calls_unhandled" | "biometric_today"
+  enabled     Boolean   @default(true)
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("agent_report_schedules")
 }
 
 model AgentSchedule {

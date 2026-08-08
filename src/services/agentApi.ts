@@ -1,4 +1,4 @@
-import type { Agent, AgentKind, AgentMemory, AgentTool } from "@/types/agent";
+import type { Agent, AgentKind, AgentMemory, AgentReportSchedule, AgentReportType, AgentTool } from "@/types/agent";
 
 export class ApiError extends Error {}
 
@@ -88,5 +88,39 @@ export async function createAgentMemory(agentId: string, content: string): Promi
 
 export async function deleteAgentMemory(agentId: string, memoryId: string): Promise<void> {
   const response = await fetch(`/api/agents/${agentId}/memory/${memoryId}`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
+}
+
+export async function fetchAgentReportSchedules(agentId: string): Promise<AgentReportSchedule[]> {
+  const response = await fetch(`/api/agents/${agentId}/report-schedules`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function createAgentReportSchedule(
+  agentId: string,
+  input: { recipientId: string; timesOfDay: string[]; reportTypes: AgentReportType[] }
+): Promise<AgentReportSchedule> {
+  const response = await fetch(`/api/agents/${agentId}/report-schedules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}
+
+export async function setAgentReportScheduleEnabled(agentId: string, scheduleId: string, enabled: boolean): Promise<AgentReportSchedule> {
+  const response = await fetch(`/api/agents/${agentId}/report-schedules/${scheduleId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}
+
+export async function deleteAgentReportSchedule(agentId: string, scheduleId: string): Promise<void> {
+  const response = await fetch(`/api/agents/${agentId}/report-schedules/${scheduleId}`, { method: "DELETE" });
   if (!response.ok) return parseErrorOrThrow(response);
 }
