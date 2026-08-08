@@ -7,6 +7,7 @@ import { useUsers } from "@/hooks/useUsers";
 import { useTeams } from "@/hooks/useTeams";
 import { canManageWorkflow } from "@/config/roleMeta";
 import { ReminderRuleDialog } from "./ReminderRuleDialog";
+import { ScheduledReportsSection } from "./ScheduledReportsSection";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { ErrorState } from "@/components/task-list/ErrorState";
@@ -151,6 +152,8 @@ export function RemindersView() {
           </table>
         </div>
       )}
+
+      {canManage && <ScheduledReportsSection users={users} />}
 
       <ReminderRuleDialog
         open={formOpen}

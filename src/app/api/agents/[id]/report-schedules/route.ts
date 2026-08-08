@@ -8,11 +8,11 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-async function withRecipientName(schedules: { recipientId: string }[]) {
-  const recipientIds = Array.from(new Set(schedules.map((s) => s.recipientId)));
-  const recipients = await db.user.findMany({ where: { id: { in: recipientIds } }, select: { id: true, name: true } });
-  const nameById = new Map(recipients.map((r) => [r.id, r.name]));
-  return schedules.map((s) => ({ ...s, recipientName: nameById.get(s.recipientId) ?? "Unknown" }));
+async function withNames<T extends { agentId: string; recipientId: string }>(schedules: T[]) {
+  const userIds = Array.from(new Set(schedules.flatMap((s) => [s.agentId, s.recipientId])));
+  const users = await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } });
+  const nameById = new Map(users.map((u) => [u.id, u.name]));
+  return schedules.map((s) => ({ ...s, agentName: nameById.get(s.agentId) ?? "Unknown", recipientName: nameById.get(s.recipientId) ?? "Unknown" }));
 }
 
 export async function GET(_request: Request, { params }: RouteContext) {
@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
   const { id } = await params;
   const schedules = await db.agentReportSchedule.findMany({ where: { agentId: id }, orderBy: { createdAt: "asc" } });
-  return NextResponse.json(await withRecipientName(schedules));
+  return NextResponse.json(await withNames(schedules));
 }
 
 interface CreateReportScheduleBody {
@@ -62,6 +62,6 @@ export async function POST(request: Request, { params }: RouteContext) {
   if (!agentConfig) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
 
   const schedule = await db.agentReportSchedule.create({ data: { agentId: id, recipientId, timesOfDay, reportTypes } });
-  const [withName] = await withRecipientName([schedule]);
+  const [withName] = await withNames([schedule]);
   return NextResponse.json(withName, { status: 201 });
 }

@@ -80,6 +80,7 @@ export const AGENT_REPORT_TYPES: { id: AgentReportType; label: string }[] = [
 export interface AgentReportSchedule {
   id: string;
   agentId: string;
+  agentName: string;
   recipientId: string;
   recipientName: string;
   timesOfDay: string[];

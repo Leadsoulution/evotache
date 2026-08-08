@@ -109,6 +109,14 @@ export async function fetchAgentReportSchedules(agentId: string): Promise<AgentR
   return response.json();
 }
 
+/** Every agent's scheduled reports in one call — for the Reminders page,
+ * which isn't scoped to a single agent the way AgentFormDialog is. */
+export async function fetchAllAgentReportSchedules(): Promise<AgentReportSchedule[]> {
+  const response = await fetch("/api/report-schedules");
+  if (!response.ok) return [];
+  return response.json();
+}
+
 export async function createAgentReportSchedule(
   agentId: string,
   input: { recipientId: string; timesOfDay: string[]; reportTypes: AgentReportType[] }
