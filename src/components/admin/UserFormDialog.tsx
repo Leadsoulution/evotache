@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { ROLE_CONFIG, ROLE_ORDER, canAccessBiometrics, canAccessCalls } from "@/config/roleMeta";
+import { ROLE_CONFIG, ROLE_ORDER } from "@/config/roleMeta";
 import { wouldCreateManagerCycle } from "@/lib/orgChart";
 import { randomPaletteColor } from "@/config/colorPalette";
 import { cn } from "@/lib/cn";
@@ -346,30 +346,17 @@ export function UserFormDialog({ open, editingUser, users, teams, onClose, onSub
             <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Extra access</legend>
             <p className="mb-1.5 text-xs text-slate-400">Grant this user access to these pages even though their role wouldn&apos;t normally include them.</p>
             <div className="flex flex-col gap-1 rounded-lg border border-slate-200 p-1.5 dark:border-slate-700">
-              {EXTRA_ACCESS_NAV_ITEMS.map((item) => {
-                const grantedByRole = item.href === "/calls" ? canAccessCalls({ role }) : canAccessBiometrics({ role });
-                return (
-                  <label
-                    key={item.href}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md px-2 py-1.5",
-                      grantedByRole ? "opacity-50" : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={grantedByRole || extraSectionHrefs.includes(item.href)}
-                      disabled={grantedByRole}
-                      onChange={() => toggleExtraSection(item.href)}
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
-                    />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">
-                      {t(item.label)}
-                      {grantedByRole && <span className="text-slate-400"> (included by role)</span>}
-                    </span>
-                  </label>
-                );
-              })}
+              {EXTRA_ACCESS_NAV_ITEMS.map((item) => (
+                <label key={item.href} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={extraSectionHrefs.includes(item.href)}
+                    onChange={() => toggleExtraSection(item.href)}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 dark:border-slate-600 dark:bg-slate-800"
+                  />
+                  <span className="text-sm text-slate-700 dark:text-slate-200">{t(item.label)}</span>
+                </label>
+              ))}
             </div>
           </fieldset>
 
