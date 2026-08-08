@@ -1,28 +1,9 @@
-const TIMEZONE = "Africa/Casablanca";
-
-// ZKBio Time returns naive "YYYY-MM-DD HH:mm:ss" timestamps with no offset
-// attached — they're the device's own wall-clock reading, in Morocco time.
-// Converts that to a real UTC Date using the IANA zone (which also handles
-// Morocco's own Ramadan DST reversion) rather than assuming the server
-// process's local timezone matches.
-export function casablancaWallClockToUtc(naive: string): Date {
-  const isoLike = naive.trim().replace(" ", "T");
-  const guess = new Date(`${isoLike}Z`);
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(guess);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? "0");
-  const casablancaDigitsAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-  const offsetMs = casablancaDigitsAsUtc - guess.getTime();
-  return new Date(guess.getTime() - offsetMs);
-}
+// Moved to its own module — casablancaWallClockToUtc is also needed
+// client-side now (computing lateness against Casablanca time regardless
+// of the viewer's own PC timezone), not just here during ingestion.
+// Re-exported so existing importers of this file don't need to change.
+import { casablancaWallClockToUtc } from "@/lib/casablancaTime";
+export { casablancaWallClockToUtc };
 
 // The exact shape ZKBio Time's own /iclock/api/transactions/ returns per
 // row — the local push script forwards these completely unprocessed, so

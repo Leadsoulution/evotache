@@ -26,6 +26,7 @@ import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
+import { addCalendarDays, casablancaDateKey, casablancaHourMinute, casablancaTimeString, casablancaWeekday } from "@/lib/casablancaTime";
 import {
   STATUS_BADGE,
   STATUS_CHECK_IN,
@@ -83,25 +84,23 @@ function sortValue(event: BiometricEvent, field: SortField): string {
   }
 }
 
-// Local (browser) hour:minute:second — locale-independent, always 24h, so
-// it can double as both the display string and the filter comparison key.
+// Always Casablanca time, regardless of the viewer's own PC/browser
+// timezone — confirmed live that some office PCs have theirs set wrong
+// (e.g. "Morocco +3"), which made punch times and lateness read 2-3h off
+// for anyone looking at the page from one of those machines even though
+// the underlying stored punchTime was correct. formatEventTime doubles as
+// both the display string and (via eventHourMinute) the filter comparison
+// key, so this same fix covers both.
 function formatEventTime(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+  return casablancaTimeString(iso);
 }
 
 function eventHourMinute(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-function localDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return casablancaHourMinute(iso);
 }
 
 function localMonthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return casablancaDateKey(iso).slice(0, 7);
 }
 
 // `todayWord` when the reference day is today, "hier" for yesterday,
@@ -110,11 +109,9 @@ function localMonthKey(iso: string): string {
 // attendance detail table are filter-driven (see getPresentEmployees).
 function dayLabel(dayKey: string | null, todayWord: string): string {
   if (!dayKey) return todayWord;
-  const today = new Date();
-  if (dayKey === localDateKey(today)) return todayWord;
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (dayKey === localDateKey(yesterday)) return "hier";
+  const todayKey = casablancaDateKey(new Date());
+  if (dayKey === todayKey) return todayWord;
+  if (dayKey === addCalendarDays(todayKey, -1)) return "hier";
   const [, month, day] = dayKey.split("-");
   return `le ${day}/${month}`;
 }
@@ -122,9 +119,8 @@ function dayLabel(dayKey: string | null, todayWord: string): string {
 // Real opening hours: 09:30–19:00 every day, except Friday which splits
 // around the midday break (09:30–13:00, then 15:00–19:00).
 function isWithinBusinessHours(iso: string): boolean {
-  const d = new Date(iso);
   const hm = eventHourMinute(iso);
-  const windows = d.getDay() === 5 ? [["09:30", "13:00"], ["15:00", "19:00"]] : [["09:30", "19:00"]];
+  const windows = casablancaWeekday(iso) === 5 ? [["09:30", "13:00"], ["15:00", "19:00"]] : [["09:30", "19:00"]];
   return windows.some(([from, to]) => hm >= from && hm <= to);
 }
 
@@ -251,7 +247,7 @@ export function BiometricView() {
   // présence panel above, so it reads as "today" with no filter and
   // switches to whichever day gets filtered to (e.g. "hier") instead of
   // mixing several days' rows together in one table.
-  const detailDayEvents = useMemo(() => (presentDay ? filtered.filter((e) => localDateKey(new Date(e.punchTime)) === presentDay) : []), [filtered, presentDay]);
+  const detailDayEvents = useMemo(() => (presentDay ? filtered.filter((e) => casablancaDateKey(e.punchTime) === presentDay) : []), [filtered, presentDay]);
 
   // Monthly late count for the "Retards ce mois" column — the month of the
   // same reference day used above, so it reads as the current month with
@@ -259,11 +255,7 @@ export function BiometricView() {
   // the full unfiltered history (not `filtered`/`detailDayEvents`, which
   // are narrowed to a single day) so a day filter doesn't also shrink the
   // month it's counting within.
-  const referenceMonthKey = useMemo(() => {
-    if (presentDay) return presentDay.slice(0, 7);
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }, [presentDay]);
+  const referenceMonthKey = useMemo(() => (presentDay ? presentDay.slice(0, 7) : casablancaDateKey(new Date()).slice(0, 7)), [presentDay]);
   const monthEvents = useMemo(() => {
     const base = effectiveSelectedEmpCode ? eventsForEmployee(events, effectiveSelectedEmpCode) : events;
     return base.filter((e) => localMonthKey(e.punchTime) === referenceMonthKey);

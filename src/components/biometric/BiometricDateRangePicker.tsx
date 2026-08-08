@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { casablancaDateKey } from "@/lib/casablancaTime";
 
 // Mirrors CallDateRangePicker (src/components/calls/CallDateRangePicker.tsx),
 // which itself mirrors Ads' MetaDateRangePicker design — same left preset
@@ -107,7 +108,13 @@ interface BiometricDateRangePickerProps {
 }
 
 export function BiometricDateRangePicker({ open, onClose, onApply }: BiometricDateRangePickerProps) {
-  const now = new Date();
+  // Today's real Casablanca calendar date, not the viewer's own PC/browser
+  // timezone (some office PCs have theirs set wrong) — built as a local
+  // midnight Date from those Y/M/D digits so the existing calendar-day
+  // arithmetic below (which is plain calendar math, not a timezone
+  // conversion) works unchanged from there.
+  const [todayYear, todayMonth, todayDay] = casablancaDateKey(new Date()).split("-").map(Number);
+  const now = new Date(todayYear, todayMonth - 1, todayDay);
   const [selectedKey, setSelectedKey] = useState<PresetKey | "custom">("all");
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const [rangeEnd, setRangeEnd] = useState<Date | null>(null);

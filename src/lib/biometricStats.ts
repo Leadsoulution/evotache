@@ -1,4 +1,5 @@
 import { COLOR_PALETTE } from "@/config/colorPalette";
+import { casablancaDateKey, casablancaWallClockToUtc } from "@/lib/casablancaTime";
 import type { BarChartDatum } from "@/components/stats/BarChart";
 import type { BiometricEvent, BiometricSchedule } from "@/types/biometric";
 
@@ -108,11 +109,11 @@ export interface PresentEmployee extends BiometricEmployee {
  * they have no check-in on record for it). */
 export function getPresentEmployees(events: BiometricEvent[], employees: BiometricEmployee[]): PresentEmployee[] {
   const latestKey = latestLocalDate(events) ?? "";
-  const isCurrentDay = latestKey === localDateKey(new Date());
+  const isCurrentDay = latestKey === casablancaDateKey(new Date());
 
   const dayEventsByCode = new Map<string, BiometricEvent[]>();
   for (const event of events) {
-    if (localDateKey(event.punchTime) !== latestKey) continue;
+    if (casablancaDateKey(event.punchTime) !== latestKey) continue;
     if (!dayEventsByCode.has(event.empCode)) dayEventsByCode.set(event.empCode, []);
     dayEventsByCode.get(event.empCode)!.push(event);
   }
@@ -157,12 +158,8 @@ export function countByEmployee(events: BiometricEvent[], employees: BiometricEm
     .slice(0, 10);
 }
 
-function localDateKey(input: string | Date): string {
-  const d = typeof input === "string" ? new Date(input) : input;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** The most recent calendar day (browser-local) with at least one event in
+/** The most recent calendar day (Casablanca time, not the viewer's own
+ * possibly-misconfigured OS timezone) with at least one event in
  * the list, or null if there are none — the day getPresentEmployees scopes
  * itself to, and exported so the page can label the "Présents" panel
  * accordingly ("maintenant" vs "hier" vs a specific date) instead of
@@ -170,7 +167,7 @@ function localDateKey(input: string | Date): string {
 export function latestLocalDate(events: BiometricEvent[]): string | null {
   let latestKey = "";
   for (const event of events) {
-    const key = localDateKey(event.punchTime);
+    const key = casablancaDateKey(event.punchTime);
     if (key > latestKey) latestKey = key;
   }
   return latestKey || null;
@@ -180,7 +177,7 @@ export interface DailyAttendanceRow {
   empCode: string;
   name: string;
   color: string;
-  date: string; // "YYYY-MM-DD", browser-local calendar day
+  date: string; // "YYYY-MM-DD", Casablanca calendar day
   firstEntry: string | null; // ISO
   lastExit: string | null; // ISO
   isLate: boolean;
@@ -192,19 +189,23 @@ export interface DailyAttendanceRow {
  * date-range filter naturally produces one row per day per employee rather
  * than one row overall. Lateness compares that day's first check-in
  * against `schedule.startTime` — the same cutoff every day, including
- * Friday (only the lunch break differs there, not the morning start). */
+ * Friday (only the lunch break differs there, not the morning start). Both
+ * sides of that comparison are resolved as real Casablanca instants
+ * (`casablancaWallClockToUtc`, not `Date#setHours`, which reads/writes the
+ * *viewer's own* OS timezone) — a PC with its timezone set wrong used to
+ * make everyone look 2-3h late or not late at all, purely from whichever
+ * machine happened to be viewing the page. */
 export function computeDailyAttendance(events: BiometricEvent[], employees: BiometricEmployee[], schedule: BiometricSchedule): DailyAttendanceRow[] {
   const employeeByCode = new Map(employees.map((e) => [e.empCode, e]));
   const byKey = new Map<string, BiometricEvent[]>();
   for (const event of events) {
     const emp = employeeByCode.get(event.empCode);
     if (!emp || emp.hidden) continue;
-    const key = `${event.empCode}__${localDateKey(event.punchTime)}`;
+    const key = `${event.empCode}__${casablancaDateKey(event.punchTime)}`;
     if (!byKey.has(key)) byKey.set(key, []);
     byKey.get(key)!.push(event);
   }
 
-  const [startHour, startMinute] = schedule.startTime.split(":").map(Number);
   const rows: DailyAttendanceRow[] = [];
   for (const [key, dayEvents] of byKey) {
     const [empCode, date] = key.split("__");
@@ -217,10 +218,8 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
     let isLate = false;
     let lateSeconds = 0;
     if (firstEntry) {
-      const entryDate = new Date(firstEntry);
-      const expected = new Date(entryDate);
-      expected.setHours(startHour, startMinute, 0, 0);
-      const diffMs = entryDate.getTime() - expected.getTime();
+      const expected = casablancaWallClockToUtc(`${date} ${schedule.startTime}:00`);
+      const diffMs = new Date(firstEntry).getTime() - expected.getTime();
       if (diffMs > 0) {
         isLate = true;
         lateSeconds = Math.round(diffMs / 1000);
