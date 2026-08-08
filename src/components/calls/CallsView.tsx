@@ -126,7 +126,10 @@ export function CallsView() {
   const [sortField, setSortField] = useState<SortField>("startTime");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [selectedUserDn, setSelectedUserDn] = useState<string | null>(null);
-  const [unhandledOnly, setUnhandledOnly] = useState(false);
+  // The three quick-view chips are mutually exclusive — one active view at
+  // a time, not independently combinable toggles — so a single value
+  // rather than three booleans.
+  const [quickView, setQuickView] = useState<"missed" | "internal" | "unhandled" | null>(null);
 
   // Real 3CX users/extensions, derived from the synced call data itself —
   // shown as an avatar-row selector matching the Statistics page's
@@ -209,10 +212,12 @@ export function CallsView() {
         if (timeFrom && hm < timeFrom) return false;
         if (timeTo && hm > timeTo) return false;
       }
-      if (unhandledOnly && (c.direction !== "Inbound" || c.status !== "Unanswered" || handledMissedCallIds.has(c.id))) return false;
+      if (quickView === "missed" && c.status !== "Unanswered") return false;
+      if (quickView === "internal" && c.direction !== "Internal") return false;
+      if (quickView === "unhandled" && (c.direction !== "Inbound" || c.status !== "Unanswered" || handledMissedCallIds.has(c.id))) return false;
       return true;
     });
-  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedDn, unhandledOnly, handledMissedCallIds]);
+  }, [calls, search, statusFilter, directionFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedDn, quickView, handledMissedCallIds]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -226,7 +231,7 @@ export function CallsView() {
   }, [filtered, sortField, sortDirection]);
 
   const hasActiveFilter = Boolean(
-    search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedDn || unhandledOnly
+    search.trim() || statusFilter.length || directionFilter.length || dateFrom || dateTo || timeFrom || timeTo || businessHoursOnly || effectiveSelectedDn || quickView
   );
 
   function clearFilters() {
@@ -241,7 +246,7 @@ export function CallsView() {
     setBusinessHoursOnly(false);
     setTimeRangeLabel("Toute la journée");
     setSelectedUserDn(null);
-    setUnhandledOnly(false);
+    setQuickView(null);
   }
 
   // With no filter active, the tiles use the real aggregate counts from the
@@ -310,18 +315,17 @@ export function CallsView() {
 
       {!loading && (
         <>
-          {/* Quick-view shortcuts — each just toggles the same underlying
-              filter state as the dropdowns below (statusFilter/
-              directionFilter/unhandledOnly), so they stay in sync with
-              whatever's already selected there instead of being a
-              separate, disconnected view. */}
+          {/* Quick-view shortcuts — one active view at a time (clicking the
+              active one again returns to "Tous"), independent of the
+              statusFilter/directionFilter dropdowns below rather than
+              driving them. */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setStatusFilter((prev) => (prev.includes("Unanswered") ? prev.filter((v) => v !== "Unanswered") : [...prev, "Unanswered"]))}
+              onClick={() => setQuickView((v) => (v === "missed" ? null : "missed"))}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
-                statusFilter.includes("Unanswered")
+                quickView === "missed"
                   ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
                   : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               )}
@@ -331,10 +335,10 @@ export function CallsView() {
             </button>
             <button
               type="button"
-              onClick={() => setDirectionFilter((prev) => (prev.includes("Internal") ? prev.filter((v) => v !== "Internal") : [...prev, "Internal"]))}
+              onClick={() => setQuickView((v) => (v === "internal" ? null : "internal"))}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
-                directionFilter.includes("Internal")
+                quickView === "internal"
                   ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300"
                   : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               )}
@@ -344,10 +348,10 @@ export function CallsView() {
             </button>
             <button
               type="button"
-              onClick={() => setUnhandledOnly((v) => !v)}
+              onClick={() => setQuickView((v) => (v === "unhandled" ? null : "unhandled"))}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
-                unhandledOnly
+                quickView === "unhandled"
                   ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
                   : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               )}
