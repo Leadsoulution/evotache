@@ -506,19 +506,15 @@ export function BiometricView() {
               the employee ranking is the most actionable chart, so it leads
               wide, with the remaining breakdowns stacked beside it instead
               of competing for equal weight. Absents is nested into this
-              same left column (stacked below the ranking chart) rather
+              same left column (stacked above the ranking chart) rather
               than placed as its own full-width section after the grid: a
               CSS grid row is always as tall as its tallest column, so a
               section placed right after the grid would sit below empty
               space equal to however much shorter the left column was —
-              nesting it here lets it flow immediately under the chart
+              nesting it here lets it flow immediately under Absents
               instead, using that space rather than leaving it empty. */}
           <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
             <div className="flex flex-col gap-4 lg:col-span-2">
-              <ChartCard title="Pointages par employé">
-                <BarChart data={employeeChart} />
-              </ChartCard>
-
               {/* Driven by the same filtered set as the charts above —
                   unlike "présents maintenant", absence only means something
                   relative to a period, so it changes as the
@@ -549,6 +545,10 @@ export function BiometricView() {
                   <p className="mt-3 text-xs text-slate-400">Tout le monde a pointé ce jour-là.</p>
                 )}
               </section>
+
+              <ChartCard title="Pointages par employé">
+                <BarChart data={employeeChart} />
+              </ChartCard>
             </div>
             <div className="flex flex-col gap-4">
               <ChartCard title="Par statut">
