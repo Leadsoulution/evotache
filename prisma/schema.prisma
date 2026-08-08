@@ -46,6 +46,7 @@ model User {
 
   pushSubscriptions PushSubscription[]
   agentConfig       AgentConfig?
+  callFilterViews   CallFilterView[]
 
   @@map("users")
 }
@@ -487,6 +488,31 @@ model PhoneCall {
   createdAt    DateTime @default(now())
 
   @@map("phone_calls")
+}
+
+// A user's own saved filter combination for the Calls page (search/status/
+// direction/date/time/user), so a view they use often doesn't need
+// rebuilding by hand every visit — private per-user, not shared org-wide.
+model CallFilterView {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  search            String   @default("")
+  statusFilter      String[] @default([])
+  directionFilter   String[] @default([])
+  dateFrom          String   @default("")
+  dateTo            String   @default("")
+  dateRangeLabel    String   @default("Toutes les dates")
+  timeFrom          String   @default("")
+  timeTo            String   @default("")
+  businessHoursOnly Boolean  @default(false)
+  timeRangeLabel    String   @default("Toute la journée")
+  selectedUserDn    String?
+  unhandledOnly     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@map("call_filter_views")
 }
 
 // Single shared 3CX connection (like GoogleConnection/MetaConnection).
