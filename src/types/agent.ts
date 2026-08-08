@@ -58,3 +58,12 @@ export interface Agent {
   whatsappNumber: string | null;
   createdAt: string;
 }
+
+/** A standing fact/instruction this agent remembers across conversations —
+ * see AgentMemory in schema.prisma. */
+export interface AgentMemory {
+  id: string;
+  agentId: string;
+  content: string;
+  createdAt: string;
+}

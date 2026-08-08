@@ -73,17 +73,26 @@ export async function runAgentTurn({ agentId, conversationId, onReply, channel =
     const nameById = new Map(participantUsers.map((u) => [u.id, u.name]));
 
     const ctx: ToolContext = { agentId, agentName: agentUser.name, enabledTools: agentUser.agentConfig.enabledTools as AgentTool[] };
-    const availableTools = AGENT_TOOL_DEFS.filter((tool) => tool.requires.some((r) => ctx.enabledTools.includes(r)));
+    // requires: [] (remember/forget) are core capabilities available to
+    // every agent regardless of enabledTools — everything else needs at
+    // least one of its required tools explicitly enabled.
+    const availableTools = AGENT_TOOL_DEFS.filter((tool) => tool.requires.length === 0 || tool.requires.some((r) => ctx.enabledTools.includes(r)));
 
     // Casablanca's real current date, not the server process's own
     // timezone — otherwise "today"/"hier" reasoning (and the
     // get_biometric_report/get_calls_report tools' own date defaults) can
     // be a day off right around midnight.
     const today = casablancaDateKey(new Date());
+
+    const memories = await db.agentMemory.findMany({ where: { agentId }, orderBy: { createdAt: "asc" } });
+    const memoryBlock = memories.length
+      ? `\n\nLong-term memory — standing facts/instructions you have previously chosen to remember (via the remember tool) or were given directly, and must actually respect, not just note as background:\n${memories.map((m) => `- [${m.id}] ${m.content}`).join("\n")}\nUse the forget tool (with the id shown above) if one of these becomes outdated or the user asks you to forget it.`
+      : "";
+
     const chatMessages: ChatMessage[] = [
       {
         role: "system",
-        content: `${agentUser.agentConfig.systemPrompt || `You are ${agentUser.name}, an AI assistant inside EvoTasks.`}\n\nToday's date is ${today} (Casablanca time). You are chatting ${channel === "telegram" ? "with a user over Telegram" : "inside the EvoTasks app"}. Be concise and helpful. Use the available tools to look up real data before answering questions about tasks, litiges, achats, biometric attendance (présences/absents/retards), or phone calls — never guess, and never say there's no data without having actually called the matching tool. When asked to create, update, or send something (a task, litige, purchase item, reminder, etc.), you must actually call the matching tool — never reply that something was done unless the tool call for it actually succeeded. If the web_search tool is available and the question needs current or real-time information (news, prices, weather, anything you can't know from training data), call it instead of saying you don't have access to that information.\n\n${channel === "telegram" ? TELEGRAM_FORMATTING_INSTRUCTIONS : APP_FORMATTING_INSTRUCTIONS}`,
+        content: `${agentUser.agentConfig.systemPrompt || `You are ${agentUser.name}, an AI assistant inside EvoTasks.`}\n\nToday's date is ${today} (Casablanca time). You are chatting ${channel === "telegram" ? "with a user over Telegram" : "inside the EvoTasks app"}. Be concise and helpful. Use the available tools to look up real data before answering questions about tasks, litiges, achats, biometric attendance (présences/absents/retards), or phone calls — never guess, and never say there's no data without having actually called the matching tool. When asked to create, update, or send something (a task, litige, purchase item, reminder, etc.), you must actually call the matching tool — never reply that something was done unless the tool call for it actually succeeded. If the web_search tool is available and the question needs current or real-time information (news, prices, weather, anything you can't know from training data), call it instead of saying you don't have access to that information.${memoryBlock}\n\n${channel === "telegram" ? TELEGRAM_FORMATTING_INSTRUCTIONS : APP_FORMATTING_INSTRUCTIONS}`,
       },
       ...history.map((m): ChatMessage => ({
         role: m.senderId === agentId ? "assistant" : "user",

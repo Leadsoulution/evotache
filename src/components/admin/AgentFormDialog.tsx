@@ -10,10 +10,10 @@ import { ColorSwatchPicker } from "./ColorSwatchPicker";
 import { ImageIcon, XIcon } from "@/components/ui/icons";
 import { AGENT_TOOLS } from "@/types/agent";
 import { uploadFile } from "@/services/uploadApi";
-import { generateTelegramLinkCode, unlinkTelegram } from "@/services/agentApi";
+import { createAgentMemory, deleteAgentMemory, fetchAgentMemory, generateTelegramLinkCode, unlinkTelegram } from "@/services/agentApi";
 import { useToast } from "@/components/ui/Toast";
 import { CheckIcon } from "@/components/ui/icons";
-import type { Agent, AgentKind, AgentTool } from "@/types/agent";
+import type { Agent, AgentKind, AgentMemory, AgentTool } from "@/types/agent";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
@@ -53,6 +53,10 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
   const [generatingCode, setGeneratingCode] = useState(false);
   const [unlinkingTelegram, setUnlinkingTelegram] = useState<string | null>(null);
   const [botUsername, setBotUsername] = useState<string | null>(null);
+  const [memories, setMemories] = useState<AgentMemory[]>([]);
+  const [newMemory, setNewMemory] = useState("");
+  const [addingMemory, setAddingMemory] = useState(false);
+  const [deletingMemoryId, setDeletingMemoryId] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -70,12 +74,48 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       setError(null);
       setTelegramChatIds(editingAgent?.telegramChatIds ?? []);
       setTelegramCode(null);
+      setMemories([]);
+      setNewMemory("");
     }
   }
 
   useEffect(() => {
     if (open) nameRef.current?.focus();
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !editingAgent) return;
+    fetchAgentMemory(editingAgent.id).then(setMemories);
+  }, [open, editingAgent]);
+
+  async function handleAddMemory() {
+    if (!editingAgent) return;
+    const content = newMemory.trim();
+    if (!content) return;
+    setAddingMemory(true);
+    try {
+      const memory = await createAgentMemory(editingAgent.id, content);
+      setMemories((current) => [...current, memory]);
+      setNewMemory("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add memory.");
+    } finally {
+      setAddingMemory(false);
+    }
+  }
+
+  async function handleDeleteMemory(memoryId: string) {
+    if (!editingAgent) return;
+    setDeletingMemoryId(memoryId);
+    try {
+      await deleteAgentMemory(editingAgent.id, memoryId);
+      setMemories((current) => current.filter((m) => m.id !== memoryId));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete memory.");
+    } finally {
+      setDeletingMemoryId(null);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -290,6 +330,57 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
               ))}
             </div>
           </fieldset>
+
+          {editingAgent && (
+            <fieldset className="block text-sm">
+              <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">Memory</legend>
+              <p className="mb-1.5 text-xs text-slate-400">
+                Standing facts/instructions this agent respects in every conversation — written here, or by the agent itself when it learns something worth remembering.
+              </p>
+              <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+                {memories.length > 0 && (
+                  <ul className="flex flex-col gap-1.5">
+                    {memories.map((memory) => (
+                      <li key={memory.id} className="flex items-start justify-between gap-2 rounded-md bg-slate-50 px-2 py-1.5 dark:bg-slate-800">
+                        <span className="text-sm text-slate-700 dark:text-slate-200">{memory.content}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMemory(memory.id)}
+                          disabled={deletingMemoryId === memory.id}
+                          className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                        >
+                          <XIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newMemory}
+                    onChange={(event) => setNewMemory(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddMemory();
+                      }
+                    }}
+                    placeholder="e.g. Toujours répondre en français."
+                    className={cn(inputClass, "flex-1")}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddMemory}
+                    disabled={addingMemory || !newMemory.trim()}
+                    className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    {addingMemory ? "Ajout…" : "Ajouter"}
+                  </button>
+                </div>
+              </div>
+            </fieldset>
+          )}
 
           {editingAgent && kind === "external" && enabledTools.includes("telegram") && (
             <fieldset className="block text-sm">

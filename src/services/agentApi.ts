@@ -1,4 +1,4 @@
-import type { Agent, AgentKind, AgentTool } from "@/types/agent";
+import type { Agent, AgentKind, AgentMemory, AgentTool } from "@/types/agent";
 
 export class ApiError extends Error {}
 
@@ -67,5 +67,26 @@ export async function generateTelegramLinkCode(agentId: string): Promise<string>
 
 export async function unlinkTelegram(agentId: string, chatId: string): Promise<void> {
   const response = await fetch(`/api/agents/${agentId}/telegram-link-code?chatId=${encodeURIComponent(chatId)}`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
+}
+
+export async function fetchAgentMemory(agentId: string): Promise<AgentMemory[]> {
+  const response = await fetch(`/api/agents/${agentId}/memory`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function createAgentMemory(agentId: string, content: string): Promise<AgentMemory> {
+  const response = await fetch(`/api/agents/${agentId}/memory`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}
+
+export async function deleteAgentMemory(agentId: string, memoryId: string): Promise<void> {
+  const response = await fetch(`/api/agents/${agentId}/memory/${memoryId}`, { method: "DELETE" });
   if (!response.ok) return parseErrorOrThrow(response);
 }

@@ -1073,7 +1073,52 @@ const getCallsReport: ToolDef = {
   },
 };
 
+// requires: [] — these two are always available regardless of enabledTools
+// (see runAgentTurn.ts's availableTools filter), same as knowing today's
+// date: a core capability, not an optional integration.
+const rememberFact: ToolDef = {
+  name: "remember",
+  requires: [],
+  description:
+    "Save a fact or instruction to this agent's long-term memory, so it's respected in every future conversation, not just this one. Use it when the user tells you something worth persisting: a preference, a standing rule, a correction to how you should behave, an important fact about the business.",
+  parameters: {
+    type: "object",
+    properties: {
+      content: {
+        type: "string",
+        description: "The fact/instruction to remember, written clearly and self-contained — it will be read back out of context in a future conversation.",
+      },
+    },
+    required: ["content"],
+  },
+  execute: async (args, ctx) => {
+    const content = typeof args.content === "string" ? args.content.trim() : "";
+    if (!content) throw new Error("content is required.");
+    const memory = await db.agentMemory.create({ data: { agentId: ctx.agentId, content } });
+    return { id: memory.id, content: memory.content };
+  },
+};
+
+const forgetFact: ToolDef = {
+  name: "forget",
+  requires: [],
+  description: "Delete a previously remembered fact/instruction by its id (each memory listed in the system prompt is shown with its id). Use this when a memory is outdated or the user asks you to forget something.",
+  parameters: {
+    type: "object",
+    properties: { memoryId: { type: "string", description: "The id of the memory entry to delete." } },
+    required: ["memoryId"],
+  },
+  execute: async (args, ctx) => {
+    const memoryId = typeof args.memoryId === "string" ? args.memoryId : "";
+    if (!memoryId) throw new Error("memoryId is required.");
+    await db.agentMemory.deleteMany({ where: { id: memoryId, agentId: ctx.agentId } });
+    return { deleted: true };
+  },
+};
+
 export const AGENT_TOOL_DEFS: ToolDef[] = [
+  rememberFact,
+  forgetFact,
   listOverdueItems,
   getStats,
   sendReminder,

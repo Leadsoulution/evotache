@@ -53,6 +53,7 @@ model User {
   pushSubscriptions PushSubscription[]
   agentConfig       AgentConfig?
   callFilterViews   CallFilterView[]
+  agentMemories     AgentMemory[]
 
   @@map("users")
 }
@@ -263,6 +264,23 @@ model AgentConfig {
   updatedAt        DateTime  @updatedAt
 
   @@map("agent_configs")
+}
+
+// A standing fact/instruction this agent has learned or been given — either
+// self-written (via the remember/forget tools, as it learns things during
+// conversations) or admin-written directly in AgentFormDialog. Injected
+// into the system prompt on every turn as something the agent must
+// actually respect, not just background trivia — the equivalent of
+// per-agent long-term memory, since chat history alone only covers the
+// current conversation's last 30 messages.
+model AgentMemory {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     User     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@map("agent_memories")
 }
 
 model AgentSchedule {
