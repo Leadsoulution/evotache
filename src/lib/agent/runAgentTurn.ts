@@ -30,16 +30,22 @@ interface RunAgentTurnInput {
    * external channel (e.g. Telegram) mirror the reply out, without this
    * function needing to know anything about where the turn came from. */
   onReply?: (text: string) => Promise<void> | void;
-  /** Telegram only renders a very limited markdown subset (bold/italic/code/
-   * links — no headings, lists, tables, or mermaid), so the formatting
-   * instructions in the system prompt differ by channel; the persisted
-   * in-app message uses whatever text was generated either way. */
-  channel?: "app" | "telegram";
+  /** Telegram and WhatsApp only render very limited markdown subsets (no
+   * headings, lists, tables, or mermaid), so the formatting instructions
+   * in the system prompt differ by channel; the persisted in-app message
+   * uses whatever text was generated either way. */
+  channel?: "app" | "telegram" | "whatsapp";
 }
 
 const APP_FORMATTING_INSTRUCTIONS = `Format replies in markdown to keep them modern, organized, and easy to scan: a short heading (##) to open longer answers, **bold** for key numbers/terms, bullet or numbered lists for multiple items, and a markdown table when comparing several items across the same fields. Use relevant emojis to make sections easy to spot (📊 stats, 📍 location, 🔗 links, ✅ done, ⚠️ attention) — enough to feel lively, never excessive. When asked for statistics or a breakdown by category, lead with the headline number(s) in bold, then list each category with its count and percentage, and add a \`\`\`mermaid pie chart (\`pie title ...\` then one \`"Label" : value\` line per category) so the breakdown is visual, not just numbers.`;
 
 const TELEGRAM_FORMATTING_INSTRUCTIONS = `You're replying inside Telegram, which only renders a very limited markdown subset — *bold*, _italic_, \`code\`, and [text](url) — and does NOT render headings, list syntax, tables, or mermaid diagrams (they'd show as broken/literal text), so never use those. Instead: use *bold* for key numbers/terms, open a new section with an emoji + bold micro-heading on its own line (e.g. "📊 *Statistiques appels*"), start each list item with a literal bullet character (• or ▪️) rather than markdown "- ", and use emojis to keep things scannable. When asked for statistics or a percentage breakdown, render each category as a compact 10-segment text bar instead of a chart image — filled segments ≈ percentage/10, e.g.:
+📊 *Appels — 2678 au total*
+✅ Répondu  🟩🟩🟩🟩🟩🟩🟩⬜⬜⬜ 64% (1706)
+📵 Manqué   🟥🟥🟥⬜⬜⬜⬜⬜⬜⬜ 28% (721)
+Keep messages compact — they're read on a phone screen, not a wide chat window.`;
+
+const WHATSAPP_FORMATTING_INSTRUCTIONS = `You're replying inside WhatsApp, whose markdown is even more limited than Telegram's — *bold*, _italic_, ~strikethrough~, and \`\`\`monospace\`\`\` only, no links syntax (a raw URL auto-links on its own), and it does NOT render headings, list syntax, tables, or mermaid diagrams (they'd show as broken/literal text), so never use those. Instead: use *bold* for key numbers/terms, open a new section with an emoji + bold micro-heading on its own line (e.g. "📊 *Statistiques appels*"), start each list item with a literal bullet character (• or ▪️) rather than markdown "- ", and use emojis to keep things scannable. When asked for statistics or a percentage breakdown, render each category as a compact 10-segment text bar instead of a chart image — filled segments ≈ percentage/10, e.g.:
 📊 *Appels — 2678 au total*
 ✅ Répondu  🟩🟩🟩🟩🟩🟩🟩⬜⬜⬜ 64% (1706)
 📵 Manqué   🟥🟥🟥⬜⬜⬜⬜⬜⬜⬜ 28% (721)
@@ -89,10 +95,13 @@ export async function runAgentTurn({ agentId, conversationId, onReply, channel =
       ? `\n\nLong-term memory — standing facts/instructions you have previously chosen to remember (via the remember tool) or were given directly, and must actually respect, not just note as background:\n${memories.map((m) => `- [${m.id}] ${m.content}`).join("\n")}\nUse the forget tool (with the id shown above) if one of these becomes outdated or the user asks you to forget it.`
       : "";
 
+    const channelDescription = channel === "telegram" ? "with a user over Telegram" : channel === "whatsapp" ? "with a user over WhatsApp" : "inside the EvoTasks app";
+    const formattingInstructions = channel === "telegram" ? TELEGRAM_FORMATTING_INSTRUCTIONS : channel === "whatsapp" ? WHATSAPP_FORMATTING_INSTRUCTIONS : APP_FORMATTING_INSTRUCTIONS;
+
     const chatMessages: ChatMessage[] = [
       {
         role: "system",
-        content: `${agentUser.agentConfig.systemPrompt || `You are ${agentUser.name}, an AI assistant inside EvoTasks.`}\n\nToday's date is ${today} (Casablanca time). You are chatting ${channel === "telegram" ? "with a user over Telegram" : "inside the EvoTasks app"}. Be concise and helpful. Use the available tools to look up real data before answering questions about tasks, litiges, achats, biometric attendance (présences/absents/retards), or phone calls — never guess, and never say there's no data without having actually called the matching tool. When asked to create, update, or send something (a task, litige, purchase item, reminder, etc.), you must actually call the matching tool — never reply that something was done unless the tool call for it actually succeeded. If the web_search tool is available and the question needs current or real-time information (news, prices, weather, anything you can't know from training data), call it instead of saying you don't have access to that information.${memoryBlock}\n\n${channel === "telegram" ? TELEGRAM_FORMATTING_INSTRUCTIONS : APP_FORMATTING_INSTRUCTIONS}`,
+        content: `${agentUser.agentConfig.systemPrompt || `You are ${agentUser.name}, an AI assistant inside EvoTasks.`}\n\nToday's date is ${today} (Casablanca time). You are chatting ${channelDescription}. Be concise and helpful. Use the available tools to look up real data before answering questions about tasks, litiges, achats, biometric attendance (présences/absents/retards), or phone calls — never guess, and never say there's no data without having actually called the matching tool. When asked to create, update, or send something (a task, litige, purchase item, reminder, etc.), you must actually call the matching tool — never reply that something was done unless the tool call for it actually succeeded. If the web_search tool is available and the question needs current or real-time information (news, prices, weather, anything you can't know from training data), call it instead of saying you don't have access to that information.${memoryBlock}\n\n${formattingInstructions}`,
       },
       ...history.map((m): ChatMessage => ({
         role: m.senderId === agentId ? "assistant" : "user",

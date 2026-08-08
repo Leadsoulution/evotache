@@ -261,7 +261,12 @@ model AgentConfig {
   // talk to the same agent (shared conversation/context), not just one.
   telegramChatIds  String[]  @default([])
   telegramLinkCode String?
-  whatsappNumber   String?
+  // Same idea as telegramChatIds/telegramLinkCode above, but for WhatsApp —
+  // every contact's WhatsApp number ("wa_id") currently linked to this
+  // agent via the /link <code> flow, one shared WhatsApp Business number
+  // routing to whichever agent each sender is linked to.
+  whatsappChatIds  String[]  @default([])
+  whatsappLinkCode String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

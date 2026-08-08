@@ -38,7 +38,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
   { id: "calls", label: "Appels", description: "Read phone call reports from 3CX (répondus, manqués, durée, non traités).", externalOnly: false },
   { id: "email", label: "Email", description: "Send email notifications on the agent's behalf.", externalOnly: true },
   { id: "telegram", label: "Telegram", description: "Send and receive messages via a linked Telegram chat.", externalOnly: true },
-  { id: "whatsapp", label: "WhatsApp", description: "Send and receive WhatsApp messages via Twilio.", externalOnly: true },
+  { id: "whatsapp", label: "WhatsApp", description: "Send and receive WhatsApp messages via the Meta WhatsApp Cloud API.", externalOnly: true },
   { id: "websearch", label: "Web search", description: "Search the web for information.", externalOnly: true },
   { id: "gmail", label: "Gmail", description: "Send and read email through a connected Gmail account.", externalOnly: true },
   { id: "drive", label: "Google Drive", description: "List and read files from a connected Drive account.", externalOnly: true },
@@ -55,7 +55,7 @@ export interface Agent {
   systemPrompt: string;
   enabledTools: AgentTool[];
   telegramChatIds: string[];
-  whatsappNumber: string | null;
+  whatsappChatIds: string[];
   createdAt: string;
 }
 

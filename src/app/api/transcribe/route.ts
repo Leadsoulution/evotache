@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIKey } from "@/lib/apiKeyStore";
+import { transcribeAudio } from "@/lib/transcribe";
 
 // Speech-to-text for the AI Assistant's voice input. Forwards the recorded
 // clip to OpenAI Whisper server-side, so the API key never reaches the browser.
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = await getOpenAIKey();
-    if (!apiKey) {
+    if (!(await getOpenAIKey())) {
       return NextResponse.json(
         { error: "No OpenAI API key configured. Add one in Admin → Integrations, or set OPENAI_API_KEY on the server." },
         { status: 501 }
@@ -22,25 +22,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Recording is too long (max 20MB)." }, { status: 413 });
     }
 
-    const upstreamForm = new FormData();
-    upstreamForm.set("file", audio, "recording.webm");
-    upstreamForm.set("model", "whisper-1");
-
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: upstreamForm,
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      return NextResponse.json({ error: `Transcription failed (${response.status}): ${errorBody.slice(0, 300)}` }, { status: 502 });
-    }
-
-    const data = await response.json();
-    const text = typeof data?.text === "string" ? data.text.trim() : "";
+    const text = await transcribeAudio(audio, "recording.webm");
     return NextResponse.json({ text });
-  } catch {
-    return NextResponse.json({ error: "Unexpected server error." }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unexpected server error." }, { status: 502 });
   }
 }

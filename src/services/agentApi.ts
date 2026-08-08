@@ -70,6 +70,18 @@ export async function unlinkTelegram(agentId: string, chatId: string): Promise<v
   if (!response.ok) return parseErrorOrThrow(response);
 }
 
+export async function generateWhatsAppLinkCode(agentId: string): Promise<string> {
+  const response = await fetch(`/api/agents/${agentId}/whatsapp-link-code`, { method: "POST" });
+  if (!response.ok) return parseErrorOrThrow(response);
+  const data: { code: string } = await response.json();
+  return data.code;
+}
+
+export async function unlinkWhatsApp(agentId: string, chatId: string): Promise<void> {
+  const response = await fetch(`/api/agents/${agentId}/whatsapp-link-code?chatId=${encodeURIComponent(chatId)}`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
+}
+
 export async function fetchAgentMemory(agentId: string): Promise<AgentMemory[]> {
   const response = await fetch(`/api/agents/${agentId}/memory`);
   if (!response.ok) return [];

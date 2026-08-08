@@ -18,8 +18,10 @@ import {
   fetchAgentMemory,
   fetchAgentReportSchedules,
   generateTelegramLinkCode,
+  generateWhatsAppLinkCode,
   setAgentReportScheduleEnabled,
   unlinkTelegram,
+  unlinkWhatsApp,
 } from "@/services/agentApi";
 import { useUsers } from "@/hooks/useUsers";
 import { useToast } from "@/components/ui/Toast";
@@ -64,6 +66,11 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
   const [generatingCode, setGeneratingCode] = useState(false);
   const [unlinkingTelegram, setUnlinkingTelegram] = useState<string | null>(null);
   const [botUsername, setBotUsername] = useState<string | null>(null);
+  const [whatsappChatIds, setWhatsappChatIds] = useState<string[]>([]);
+  const [whatsappCode, setWhatsappCode] = useState<string | null>(null);
+  const [generatingWhatsAppCode, setGeneratingWhatsAppCode] = useState(false);
+  const [unlinkingWhatsApp, setUnlinkingWhatsApp] = useState<string | null>(null);
+  const [whatsappDisplayNumber, setWhatsappDisplayNumber] = useState<string | null>(null);
   const [memories, setMemories] = useState<AgentMemory[]>([]);
   const [newMemory, setNewMemory] = useState("");
   const [addingMemory, setAddingMemory] = useState(false);
@@ -93,6 +100,8 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       setError(null);
       setTelegramChatIds(editingAgent?.telegramChatIds ?? []);
       setTelegramCode(null);
+      setWhatsappChatIds(editingAgent?.whatsappChatIds ?? []);
+      setWhatsappCode(null);
       setMemories([]);
       setNewMemory("");
       setReportSchedules([]);
@@ -207,6 +216,10 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       .then((res) => res.json())
       .then((data: { botUsername: string | null }) => setBotUsername(data.botUsername))
       .catch(() => {});
+    fetch("/api/integrations/whatsapp/setup")
+      .then((res) => res.json())
+      .then((data: { displayPhoneNumber: string | null }) => setWhatsappDisplayNumber(data.displayPhoneNumber))
+      .catch(() => {});
   }, [open]);
 
   async function handleGenerateTelegramCode() {
@@ -232,6 +245,32 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
       toast.error(err instanceof Error ? err.message : "Failed to unlink.");
     } finally {
       setUnlinkingTelegram(null);
+    }
+  }
+
+  async function handleGenerateWhatsAppCode() {
+    if (!editingAgent) return;
+    setGeneratingWhatsAppCode(true);
+    try {
+      setWhatsappCode(await generateWhatsAppLinkCode(editingAgent.id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate a code.");
+    } finally {
+      setGeneratingWhatsAppCode(false);
+    }
+  }
+
+  async function handleUnlinkWhatsApp(chatId: string) {
+    if (!editingAgent) return;
+    setUnlinkingWhatsApp(chatId);
+    try {
+      await unlinkWhatsApp(editingAgent.id, chatId);
+      setWhatsappChatIds((current) => current.filter((c) => c !== chatId));
+      toast.success("Contact WhatsApp délié.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to unlink.");
+    } finally {
+      setUnlinkingWhatsApp(null);
     }
   }
 
@@ -621,6 +660,63 @@ export function AgentFormDialog({ open, editingAgent, onClose, onSubmit }: Agent
                       className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       {generatingCode ? "Génération…" : telegramChatIds.length > 0 ? "Ajouter un contact" : "Générer un code"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </fieldset>
+          )}
+
+          {editingAgent && kind === "external" && enabledTools.includes("whatsapp") && (
+            <fieldset className="block text-sm">
+              <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">WhatsApp</legend>
+              {!whatsappDisplayNumber && <p className="mb-1.5 text-xs text-amber-600 dark:text-amber-400">WhatsApp isn&apos;t configured on the server yet (WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID).</p>}
+              <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                {whatsappChatIds.length > 0 && (
+                  <ul className="flex flex-col gap-1.5">
+                    {whatsappChatIds.map((chatId) => (
+                      <li key={chatId} className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          <CheckIcon className="h-3.5 w-3.5" /> Numéro lié <span className="font-mono text-slate-400 dark:text-slate-500">({chatId})</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleUnlinkWhatsApp(chatId)}
+                          disabled={unlinkingWhatsApp === chatId}
+                          className="text-xs font-medium text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400"
+                        >
+                          {unlinkingWhatsApp === chatId ? "Déliaison…" : "Délier"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {whatsappCode ? (
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Envoie <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-slate-800">/link {whatsappCode}</code> à
+                    {whatsappDisplayNumber ? (
+                      <>
+                        {" "}
+                        <span className="font-medium">{whatsappDisplayNumber}</span>
+                      </>
+                    ) : (
+                      " le bot"
+                    )}{" "}
+                    sur WhatsApp pour lier ce numéro.
+                  </p>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {whatsappChatIds.length > 0 ? "Ajouter une autre personne :" : "Pas encore lié à un numéro WhatsApp."}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleGenerateWhatsAppCode}
+                      disabled={generatingWhatsAppCode}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      {generatingWhatsAppCode ? "Génération…" : whatsappChatIds.length > 0 ? "Ajouter un contact" : "Générer un code"}
                     </button>
                   </div>
                 )}

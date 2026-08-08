@@ -12,7 +12,7 @@ export function toPublicAgent(user: DbUser, config: AgentConfig): Agent {
     systemPrompt: config.systemPrompt,
     enabledTools: config.enabledTools as AgentTool[],
     telegramChatIds: config.telegramChatIds,
-    whatsappNumber: config.whatsappNumber,
+    whatsappChatIds: config.whatsappChatIds,
     createdAt: user.createdAt.toISOString(),
   };
 }
