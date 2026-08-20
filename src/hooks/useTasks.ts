@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { canManageUsers } from "@/config/roleMeta";
 import { getDescendantIds } from "@/lib/taskTree";
 import { computeNextOccurrence } from "@/lib/recurrence";
-import { fromDateInputValue, toDateInputValue } from "@/lib/date";
+import { fromDateInputValue, isOverdue, toDateInputValue } from "@/lib/date";
 import type { Assignee, Task, TaskDraft, TaskModule } from "@/types/task";
 import type { AppUser } from "@/types/user";
 import type { StatusDef, PriorityDef } from "@/types/taskMeta";
@@ -197,6 +197,76 @@ export function useTasks(module: TaskModule): UseTasksResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [toast]
   );
+
+  // A recurring task that goes overdue without being completed spawns its
+  // next occurrence too — but unlike completion, the overdue instance itself
+  // is left exactly as-is (still "todo", still showing its original date) so
+  // it keeps surfacing as late. Its recurrence is cleared once the next
+  // occurrence exists so it doesn't spawn again on every subsequent load.
+  const overdueSpawnsInFlightRef = useRef<Set<string>>(new Set());
+  const advanceOverdueOccurrence = useCallback(
+    async (source: Task) => {
+      if (!source.recurrence || !source.dueDate) return;
+      const next = computeNextOccurrence(source.recurrence, new Date(source.dueDate));
+      const y = next.getFullYear();
+      const m = String(next.getMonth() + 1).padStart(2, "0");
+      const d = String(next.getDate()).padStart(2, "0");
+      const firstId = statusesRef.current[0]?.id;
+      if (!firstId) return;
+      const siblings = tasksRef.current.filter((t) => t.parentId === source.parentId);
+      const now = new Date().toISOString();
+      const draft: TaskDraft = {
+        id: generateId(),
+        module: source.module,
+        title: source.title,
+        description: source.description,
+        status: firstId,
+        priority: source.priority,
+        assigneeIds: source.assigneeIds,
+        teamIds: source.teamIds,
+        excludedUserIds: source.excludedUserIds,
+        startDate: null,
+        dueDate: fromDateInputValue(`${y}-${m}-${d}`),
+        recurrence: source.recurrence,
+        parentId: source.parentId,
+        projectId: source.projectId,
+        customValues: source.customValues,
+        order: siblings.length ? Math.min(...siblings.map((t) => t.order)) - 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        const [created] = await Promise.all([createTaskRequest(draft), updateTaskRequest(source.id, { recurrence: null })]);
+        await tasksSWR.mutate(
+          (current) => {
+            const list = current ?? tasksRef.current;
+            const withNext = list.some((t) => t.id === created.id) ? list : [...list, created];
+            return withNext.map((t) => (t.id === source.id ? { ...t, recurrence: null } : t));
+          },
+          { revalidate: false }
+        );
+      } catch {
+        // Best-effort: source.recurrence stays set on failure, so it's retried next time tasks load.
+      } finally {
+        overdueSpawnsInFlightRef.current.delete(source.id);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  useEffect(() => {
+    const raw = tasksSWR.data;
+    const currentStatuses = statusesRef.current;
+    const doneId = currentStatuses[currentStatuses.length - 1]?.id;
+    if (!raw || !doneId) return;
+    for (const t of raw) {
+      if (!t.recurrence || !t.dueDate || t.status === doneId || !isOverdue(t.dueDate)) continue;
+      if (overdueSpawnsInFlightRef.current.has(t.id)) continue;
+      overdueSpawnsInFlightRef.current.add(t.id);
+      void advanceOverdueOccurrence(t);
+    }
+  }, [tasksSWR.data, statuses, advanceOverdueOccurrence]);
 
   const updateTask = useCallback(
     async (id: string, patch: Partial<Task>) => {

@@ -224,7 +224,7 @@ export function TaskRow({
               <span className="text-xs">{attachmentCount}</span>
             </span>
           )}
-          <div className="flex shrink-0 items-center opacity-0 group-hover:opacity-100">
+          <div className="flex shrink-0 items-center">
             <button
               type="button"
               onClick={() => onOpenDetail(task)}
@@ -309,7 +309,7 @@ export function TaskRow({
           <button
             type="button"
             onClick={() => onRequestDelete(task.id)}
-            className="rounded-md p-1.5 text-slate-400 opacity-0 hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 group-hover:opacity-100 dark:hover:bg-red-950 dark:hover:text-red-400"
+            className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-950 dark:hover:text-red-400"
             aria-label={`Delete task ${task.title}`}
           >
             <TrashIcon className="h-4 w-4" />
