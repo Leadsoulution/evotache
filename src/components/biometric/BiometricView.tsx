@@ -42,7 +42,9 @@ import {
   getAbsentEmployees,
   getPresentEmployees,
   latestLocalDate,
+  scheduledWorkdaySeconds,
 } from "@/lib/biometricStats";
+import type { DailyAttendanceRow } from "@/lib/biometricStats";
 import {
   AlertTriangleIcon,
   CalendarIcon,
@@ -61,6 +63,8 @@ import {
 import type { BiometricEvent } from "@/types/biometric";
 
 const NO_DEPARTMENT_LABEL = "Sans département";
+
+type PresenceRow = DailyAttendanceRow & { isAbsent: boolean };
 
 type SortField = "employee" | "department" | "status" | "punchTime";
 
@@ -284,6 +288,65 @@ export function BiometricView() {
     }
     return totals;
   }, [monthEvents, employees, schedule]);
+  // Absence contribution to "Temps de retard ce mois" — Monday-Saturday
+  // only (Sunday excluded: real punch activity is far lower that day,
+  // confirmed against synced data), and only days strictly before today:
+  // today is still in progress, so someone who simply hasn't arrived *yet*
+  // isn't a confirmed absence until the day is actually over (the
+  // day-detail table above already shows them as "Absent" live for today,
+  // which self-corrects the moment they badge in — this monthly total is a
+  // cumulative record, so it only counts what's actually final). Priced as
+  // a full scheduled workday, same idea as pricing a partial lateness in
+  // seconds.
+  //
+  // Also never counts a day before that employee's first-ever recorded
+  // punch: confirmed live that this device only started syncing on a
+  // certain date (nothing at all before it, for anyone) — without this
+  // guard, every employee would show a false "absence" for every workday
+  // before tracking began. The same guard protects a newly added employee
+  // from being marked absent for days before they existed in the system.
+  const monthAbsentSecondsByEmp = useMemo(() => {
+    const totals = new Map<string, number>();
+    if (!presentDay) return totals;
+    const rows = computeDailyAttendance(monthEvents, employees, schedule);
+    const presentDatesByEmp = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!presentDatesByEmp.has(row.empCode)) presentDatesByEmp.set(row.empCode, new Set());
+      presentDatesByEmp.get(row.empCode)!.add(row.date);
+    }
+    const firstPunchDateByEmp = new Map<string, string>();
+    for (const event of events) {
+      const dateKey = casablancaDateKey(event.punchTime);
+      const current = firstPunchDateByEmp.get(event.empCode);
+      if (!current || dateKey < current) firstPunchDateByEmp.set(event.empCode, dateKey);
+    }
+    const todayKey = casablancaDateKey(new Date());
+    const [refYear, refMonth] = referenceMonthKey.split("-").map(Number);
+    const lastDayOfMonth = new Date(Date.UTC(refYear, refMonth, 0)).getUTCDate();
+    const workdaySeconds = scheduledWorkdaySeconds(schedule);
+    for (const employee of employees) {
+      if (employee.hidden) continue;
+      const presentDates = presentDatesByEmp.get(employee.empCode) ?? new Set<string>();
+      const firstPunchDate = firstPunchDateByEmp.get(employee.empCode) ?? todayKey;
+      let seconds = 0;
+      for (let day = 1; day <= lastDayOfMonth; day++) {
+        const dateKey = `${referenceMonthKey}-${String(day).padStart(2, "0")}`;
+        if (dateKey >= todayKey) break;
+        if (dateKey < firstPunchDate) continue;
+        const weekday = new Date(Date.UTC(refYear, refMonth - 1, day)).getUTCDay();
+        if (weekday === 0) continue;
+        if (!presentDates.has(dateKey)) seconds += workdaySeconds;
+      }
+      if (seconds > 0) totals.set(employee.empCode, seconds);
+    }
+    return totals;
+  }, [events, monthEvents, employees, schedule, referenceMonthKey, presentDay]);
+  const monthLostSecondsByEmp = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const [code, seconds] of monthLateSecondsByEmp) totals.set(code, (totals.get(code) ?? 0) + seconds);
+    for (const [code, seconds] of monthAbsentSecondsByEmp) totals.set(code, (totals.get(code) ?? 0) + seconds);
+    return totals;
+  }, [monthLateSecondsByEmp, monthAbsentSecondsByEmp]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -358,6 +421,20 @@ export function BiometricView() {
   const lateCount = useMemo(() => periodAttendance.filter((r) => r.isLate).length, [periodAttendance]);
   const lateChart = useMemo(() => countLateByEmployee(periodAttendance), [periodAttendance]);
   const dailyAttendance = useMemo(() => computeDailyAttendance(detailDayEvents, employees, schedule), [detailDayEvents, employees, schedule]);
+
+  // "Détail des présences" lists every non-hidden employee for the
+  // reference day, not just the ones with a main-entrance punch — anyone
+  // missing one gets a synthetic row so they show up as "Absent" instead of
+  // silently disappearing from the table.
+  const presenceRows = useMemo((): PresenceRow[] => {
+    const present: PresenceRow[] = dailyAttendance.map((r) => ({ ...r, isAbsent: false }));
+    if (!presentDay) return present;
+    const withRow = new Set(present.map((r) => r.empCode));
+    const absentRows: PresenceRow[] = employees
+      .filter((e) => !e.hidden && !withRow.has(e.empCode))
+      .map((e) => ({ empCode: e.empCode, name: e.name, color: e.color, date: presentDay, firstEntry: null, lastExit: null, isLate: false, lateSeconds: 0, isAbsent: true }));
+    return [...present, ...absentRows];
+  }, [dailyAttendance, employees, presentDay]);
 
   useEffect(() => {
     if (user && !allowed) router.replace("/");
@@ -595,7 +672,7 @@ export function BiometricView() {
               )}
             </div>
 
-            {dailyAttendance.length === 0 ? (
+            {presenceRows.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-slate-400">Aucune présence sur la période / le filtre sélectionné.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -623,13 +700,13 @@ export function BiometricView() {
                       <th scope="col" className="whitespace-nowrap px-3 py-2">
                         Retards ce mois
                       </th>
-                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                      <th scope="col" className="whitespace-nowrap px-3 py-2" title="Cumul des retards et des absences (Lundi-Samedi) ce mois-ci">
                         Temps de retard ce mois
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {dailyAttendance.map((row) => (
+                    {presenceRows.map((row) => (
                       <tr key={`${row.empCode}-${row.date}`} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
                         <td className="whitespace-nowrap px-4 py-2 font-medium text-slate-800 dark:text-slate-100">{row.name}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{row.date}</td>
@@ -638,7 +715,11 @@ export function BiometricView() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{row.lastExit ? formatEventTime(row.lastExit) : "—"}</td>
                         <td className="whitespace-nowrap px-3 py-2">
-                          {row.isLate ? (
+                          {row.isAbsent ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              Absent
+                            </span>
+                          ) : row.isLate ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
                               <AlertTriangleIcon className="h-3 w-3" />
                               Oui
@@ -652,7 +733,7 @@ export function BiometricView() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{monthLateCountByEmp.get(row.empCode) ?? 0}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
-                          {monthLateSecondsByEmp.get(row.empCode) ? formatLateDuration(monthLateSecondsByEmp.get(row.empCode)!) : "—"}
+                          {monthLostSecondsByEmp.get(row.empCode) ? formatLateDuration(monthLostSecondsByEmp.get(row.empCode)!) : "—"}
                         </td>
                       </tr>
                     ))}
