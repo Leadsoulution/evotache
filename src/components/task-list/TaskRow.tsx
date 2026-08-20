@@ -203,7 +203,7 @@ export function TaskRow({
               value={task.title}
               onSubmit={(title) => onUpdate(task.id, { title })}
               ariaLabel={`Task title: ${task.title}`}
-              readOnly={!permissions.canEditFull}
+              readOnly={!permissions.canEditFull(task)}
               className={cn(task.status === "done" && "text-slate-400 line-through dark:text-slate-500")}
             />
           </div>
@@ -255,20 +255,20 @@ export function TaskRow({
                   assignees={assignees}
                   value={task.assigneeIds}
                   onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })}
-                  readOnly={!permissions.canEditFull}
+                  readOnly={!permissions.canEditFull(task)}
                 />
               </td>
             );
           case "team":
             return (
               <td key="team" className={cellClass}>
-                <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
+                <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull(task)} />
               </td>
             );
           case "dueDate":
             return (
               <td key="dueDate" className={cellClass}>
-                <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+                <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull(task)} />
               </td>
             );
           case "priority":
@@ -278,7 +278,7 @@ export function TaskRow({
                   value={task.priority}
                   priorities={priorities}
                   onChange={(priority) => onUpdate(task.id, { priority })}
-                  readOnly={!permissions.canEditFull}
+                  readOnly={!permissions.canEditFull(task)}
                 />
               </td>
             );
@@ -297,7 +297,7 @@ export function TaskRow({
                   field={field}
                   value={task.customValues[field.id] ?? ""}
                   onChange={(value) => onUpdate(task.id, { customValues: { ...task.customValues, [field.id]: value } })}
-                  readOnly={!permissions.canEditFull}
+                  readOnly={!permissions.canEditFull(task)}
                 />
               </td>
             );

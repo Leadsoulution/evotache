@@ -38,7 +38,7 @@ interface TaskListViewProps {
 
 export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
   const { user } = useAuth();
-  const permissions = getTaskPermissions(user?.role);
+  const permissions = getTaskPermissions(user ?? undefined);
   const { tasks, assignees, loadState, errorMessage, refetch, createTask, updateTask, deleteTasks, reorderTask, bulkSetParent } = useTasks(module);
   const { statuses, priorities, loadState: metaLoadState } = useTaskMeta();
   const { fields: customFields, addField, editField, removeField } = useCustomFields();
@@ -345,7 +345,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
       <header className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">{title}</h1>
-          {!permissions.canEditFull && (
+          {user && user.role !== "admin" && (
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               {permissions.canCreate ? "Limited access" : "View only"}
             </span>
@@ -428,7 +428,7 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
             onDeleteCustomField={removeField}
             attachmentCounts={attachmentCounts}
             groupField={groupField}
-            dragEnabled={sortField === "manual" && permissions.canEditFull}
+            dragEnabled={sortField === "manual" && permissions.canEditStatus}
             permissions={permissions}
             selectedIds={selectedIds}
             collapsedIds={collapsedIds}

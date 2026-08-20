@@ -106,6 +106,9 @@ model Task {
   recurrence      Json?
   order           Float
   customValues    Json       @default("{}")
+  // Non-admins get full edit rights only on tasks they created themselves
+  // (see src/lib/taskPermissions.ts); null on tasks that predate this column.
+  createdBy       String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 

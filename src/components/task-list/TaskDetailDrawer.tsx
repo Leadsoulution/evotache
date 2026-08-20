@@ -114,7 +114,7 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
       <textarea
         value={task.title}
         onChange={(event) => onUpdate(task.id, { title: event.target.value })}
-        disabled={!permissions.canEditFull}
+        disabled={!permissions.canEditFull(task)}
         rows={2}
         aria-label="Task title"
         className="resize-none rounded-lg border border-transparent bg-transparent px-1 text-lg font-semibold text-slate-900 outline-none hover:border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:opacity-70 dark:text-slate-50 dark:hover:border-slate-700 dark:focus:ring-indigo-950"
@@ -127,7 +127,7 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
         </div>
         <div>
           <p className="mb-1 text-xs font-medium text-slate-400">Priority</p>
-          <PriorityMenu value={task.priority} priorities={priorities} onChange={(priority) => onUpdate(task.id, { priority })} readOnly={!permissions.canEditFull} />
+          <PriorityMenu value={task.priority} priorities={priorities} onChange={(priority) => onUpdate(task.id, { priority })} readOnly={!permissions.canEditFull(task)} />
         </div>
         <div>
           <p className="mb-1 text-xs font-medium text-slate-400">Assignees</p>
@@ -135,7 +135,7 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
             assignees={assignees}
             value={task.assigneeIds}
             onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })}
-            readOnly={!permissions.canEditFull}
+            readOnly={!permissions.canEditFull(task)}
           />
         </div>
         <div className="col-span-2">
@@ -145,26 +145,26 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
             dueDate={task.dueDate}
             onChangeStart={(startDate) => onUpdate(task.id, { startDate })}
             onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })}
-            readOnly={!permissions.canEditFull}
+            readOnly={!permissions.canEditFull(task)}
           />
         </div>
         <div>
           <p className="mb-1 text-xs font-medium text-slate-400">Repeat</p>
-          <RecurrenceMenu value={task.recurrence} dueDate={task.dueDate} onChange={(recurrence) => onUpdate(task.id, { recurrence })} readOnly={!permissions.canEditFull} />
+          <RecurrenceMenu value={task.recurrence} dueDate={task.dueDate} onChange={(recurrence) => onUpdate(task.id, { recurrence })} readOnly={!permissions.canEditFull(task)} />
         </div>
       </div>
 
       {projects.length > 0 && (
         <div>
           <p className="mb-1 text-xs font-medium text-slate-400">Project</p>
-          <ProjectMenu projects={projects} value={task.projectId} onChange={(projectId) => onUpdate(task.id, { projectId })} readOnly={!permissions.canEditFull} />
+          <ProjectMenu projects={projects} value={task.projectId} onChange={(projectId) => onUpdate(task.id, { projectId })} readOnly={!permissions.canEditFull(task)} />
         </div>
       )}
 
       {teams.length > 0 && (
         <div>
           <p className="mb-1 text-xs font-medium text-slate-400">Departments</p>
-          <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
+          <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull(task)} />
         </div>
       )}
 
@@ -174,7 +174,7 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
           users={assignees}
           value={task.excludedUserIds ?? []}
           onChange={(excludedUserIds) => onUpdate(task.id, { excludedUserIds })}
-          readOnly={!permissions.canEditFull}
+          readOnly={!permissions.canEditFull(task)}
         />
         <p className="mt-1 text-xs text-slate-400">Hides this task from that person even if they&apos;d normally see it as a manager.</p>
       </div>
@@ -191,7 +191,7 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           onBlur={commitDescription}
-          disabled={!permissions.canEditFull}
+          disabled={!permissions.canEditFull(task)}
           rows={5}
           placeholder="Add more detail..."
           aria-label="Task description"
@@ -211,7 +211,7 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
                     field={field}
                     value={task.customValues[field.id] ?? ""}
                     onChange={(value) => onUpdate(task.id, { customValues: { ...task.customValues, [field.id]: value } })}
-                    readOnly={!permissions.canEditFull}
+                    readOnly={!permissions.canEditFull(task)}
                   />
                 </div>
               </div>
@@ -222,12 +222,12 @@ function TaskDetailContent({ task, assignees, statuses, priorities, customFields
 
       <div>
         <p className="mb-1.5 text-xs font-medium text-slate-400">Attachments</p>
-        {permissions.canEditFull && (
+        {permissions.canEditFull(task) && (
           <div className="mb-2">
             <AttachmentUploader onUploadFile={(file) => uploadFile(file, currentUserId)} onAddLink={(name, url) => addLink(name, url, currentUserId)} />
           </div>
         )}
-        <AttachmentList attachments={attachments} onDelete={removeAttachment} readOnly={!permissions.canEditFull} />
+        <AttachmentList attachments={attachments} onDelete={removeAttachment} readOnly={!permissions.canEditFull(task)} />
       </div>
     </div>
   );

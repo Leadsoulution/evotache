@@ -19,6 +19,7 @@ export function toPublicTask(task: DbTask): Task {
     parentId: task.parentId,
     projectId: task.projectId,
     customValues: (task.customValues as Record<string, string>) ?? {},
+    createdBy: task.createdBy,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
   };

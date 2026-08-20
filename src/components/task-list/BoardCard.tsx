@@ -77,12 +77,12 @@ export function BoardCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <PriorityMenu value={task.priority} priorities={priorities} onChange={(priority) => onUpdate(task.id, { priority })} readOnly={!permissions.canEditFull} />
-        <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+        <PriorityMenu value={task.priority} priorities={priorities} onChange={(priority) => onUpdate(task.id, { priority })} readOnly={!permissions.canEditFull(task)} />
+        <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull(task)} />
       </div>
 
       <div className="flex items-center gap-2">
-        <AssigneeMenu assignees={assignees} value={task.assigneeIds} onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })} readOnly={!permissions.canEditFull} />
+        <AssigneeMenu assignees={assignees} value={task.assigneeIds} onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })} readOnly={!permissions.canEditFull(task)} />
         <div className="ml-auto flex items-center gap-1.5">
           {attachmentCount > 0 && (
             <span className="flex items-center gap-0.5 text-slate-400">

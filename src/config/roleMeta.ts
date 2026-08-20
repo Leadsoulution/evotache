@@ -49,7 +49,7 @@ export interface Capability {
 export const CAPABILITIES: Capability[] = [
   { key: "tasks:view", label: "View tasks" },
   { key: "tasks:create", label: "Create tasks" },
-  { key: "tasks:edit", label: "Edit all task fields" },
+  { key: "tasks:edit", label: "Edit tasks they created (admins: any task)" },
   { key: "tasks:edit_status", label: "Change task status" },
   { key: "tasks:delete", label: "Delete tasks" },
   { key: "workflow:manage", label: "Manage statuses, priorities & custom fields" },
@@ -59,7 +59,7 @@ export const CAPABILITIES: Capability[] = [
 const ROLE_CAPABILITIES: Record<Role, ReadonlySet<string>> = {
   admin: new Set(["tasks:view", "tasks:create", "tasks:edit", "tasks:edit_status", "tasks:delete", "workflow:manage", "users:manage"]),
   member: new Set(["tasks:view", "tasks:create", "tasks:edit", "tasks:edit_status", "tasks:delete", "workflow:manage"]),
-  member_limited: new Set(["tasks:view", "tasks:create", "tasks:edit_status"]),
+  member_limited: new Set(["tasks:view", "tasks:create", "tasks:edit", "tasks:edit_status"]),
   viewer: new Set(["tasks:view", "tasks:edit_status"]),
 };
 
@@ -69,10 +69,6 @@ export function hasCapability(role: Role, capability: string): boolean {
 
 export function canCreateTasks(role: Role): boolean {
   return hasCapability(role, "tasks:create");
-}
-
-export function canEditTasksFull(role: Role): boolean {
-  return hasCapability(role, "tasks:edit");
 }
 
 export function canEditTaskStatus(role: Role): boolean {

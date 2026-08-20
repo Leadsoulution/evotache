@@ -42,6 +42,7 @@ export interface Task {
   parentId: string | null;
   projectId: string | null;
   customValues: Record<string, string>;
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }

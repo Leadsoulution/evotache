@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canCreateTasks(sessionUser.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let draft: TaskDraft;
+  let draft: TaskDraft & { continuesTaskId?: string };
   try {
     draft = await request.json();
   } catch {
@@ -45,6 +45,17 @@ export async function POST(request: NextRequest) {
   if (order === undefined) {
     const maxOrder = await db.task.aggregate({ where: { module: draft.module ?? "task" }, _max: { order: true } });
     order = (maxOrder._max.order ?? -1) + 1;
+  }
+
+  // Ownership is never taken from the client body — either it's a fresh
+  // manual creation (owned by whoever's making the request), or it's the
+  // next occurrence of a recurring task, which inherits the original
+  // series' owner so permissions don't shift to whichever browser happened
+  // to be open when the occurrence was spawned.
+  let createdBy = sessionUser.id;
+  if (draft.continuesTaskId) {
+    const source = await db.task.findUnique({ where: { id: draft.continuesTaskId }, select: { createdBy: true } });
+    if (source?.createdBy) createdBy = source.createdBy;
   }
 
   const task = await db.task.create({
@@ -65,6 +76,7 @@ export async function POST(request: NextRequest) {
       parentId: draft.parentId ?? null,
       projectId: draft.projectId ?? null,
       customValues: draft.customValues ?? {},
+      createdBy,
     },
   });
 

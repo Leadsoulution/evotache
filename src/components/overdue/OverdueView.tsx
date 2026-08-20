@@ -24,7 +24,7 @@ const noop = () => {};
 
 export function OverdueView() {
   const { user } = useAuth();
-  const permissions = getTaskPermissions(user?.role);
+  const permissions = getTaskPermissions(user ?? undefined);
   const tasksHook = useTasks("task");
   const disputesHook = useTasks("dispute");
   const { statuses, priorities, loadState: metaLoadState } = useTaskMeta();

@@ -121,22 +121,22 @@ export function TaskCard({
             value={task.priority}
             priorities={priorities}
             onChange={(priority) => onUpdate(task.id, { priority })}
-            readOnly={!permissions.canEditFull}
+            readOnly={!permissions.canEditFull(task)}
           />
         )}
         {visibleColumns.dueDate && (
-          <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull} />
+          <DueDateMenu dueDate={task.dueDate} onChangeDue={(dueDate) => onUpdate(task.id, { dueDate })} readOnly={!permissions.canEditFull(task)} />
         )}
         {visibleColumns.assignees && (
           <AssigneeMenu
             assignees={assignees}
             value={task.assigneeIds}
             onChange={(assigneeIds) => onUpdate(task.id, { assigneeIds })}
-            readOnly={!permissions.canEditFull}
+            readOnly={!permissions.canEditFull(task)}
           />
         )}
         {visibleColumns.team && (
-          <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull} />
+          <TeamMenu teams={teams} value={task.teamIds ?? []} onChange={(teamIds) => onUpdate(task.id, { teamIds })} readOnly={!permissions.canEditFull(task)} />
         )}
         {(permissions.canCreate || permissions.canDelete) && (
           <div className="ml-auto flex items-center gap-1">

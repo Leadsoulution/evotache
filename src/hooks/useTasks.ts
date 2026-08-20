@@ -121,6 +121,7 @@ export function useTasks(module: TaskModule): UseTasksResult {
         parentId,
         projectId: null,
         customValues: {},
+        createdBy: user.id,
         order: siblings.length ? Math.max(...siblings.map((t) => t.order)) + 1 : 0,
         createdAt: now,
         updatedAt: now,
@@ -177,7 +178,7 @@ export function useTasks(module: TaskModule): UseTasksResult {
         updatedAt: now,
       };
       try {
-        const created = await createTaskRequest(draft);
+        const created = await createTaskRequest(draft, source.id);
         // Dedupe by id rather than blindly appending — a concurrent
         // revalidation of this same SWR key could otherwise already have
         // picked up the newly created row by the time this resolves,
@@ -236,7 +237,7 @@ export function useTasks(module: TaskModule): UseTasksResult {
         updatedAt: now,
       };
       try {
-        const [created] = await Promise.all([createTaskRequest(draft), updateTaskRequest(source.id, { recurrence: null })]);
+        const [created] = await Promise.all([createTaskRequest(draft, source.id), updateTaskRequest(source.id, { recurrence: null })]);
         await tasksSWR.mutate(
           (current) => {
             const list = current ?? tasksRef.current;

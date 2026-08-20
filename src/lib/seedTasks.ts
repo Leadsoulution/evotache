@@ -226,6 +226,7 @@ export function createSeedTasks(): Task[] {
     projectId: row.projectId ?? null,
     order: index,
     customValues: {},
+    createdBy: null,
     createdAt: now,
     updatedAt: now,
   }));
@@ -270,6 +271,7 @@ export function createSeedDisputes(): Task[] {
     projectId: row.projectId ?? null,
     order: index,
     customValues: {},
+    createdBy: null,
     createdAt: now,
     updatedAt: now,
   }));
