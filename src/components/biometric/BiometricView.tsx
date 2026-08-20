@@ -273,6 +273,17 @@ export function BiometricView() {
     }
     return counts;
   }, [monthEvents, employees, schedule]);
+  // Total late duration for the month, not just how many days — same rows
+  // as monthLateCountByEmp, just summing lateSeconds instead of counting.
+  const monthLateSecondsByEmp = useMemo(() => {
+    const rows = computeDailyAttendance(monthEvents, employees, schedule);
+    const totals = new Map<string, number>();
+    for (const row of rows) {
+      if (!row.isLate) continue;
+      totals.set(row.empCode, (totals.get(row.empCode) ?? 0) + row.lateSeconds);
+    }
+    return totals;
+  }, [monthEvents, employees, schedule]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -588,7 +599,7 @@ export function BiometricView() {
               <p className="px-4 py-6 text-center text-sm text-slate-400">Aucune présence sur la période / le filtre sélectionné.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-sm">
+                <table className="w-full min-w-[900px] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                       <th scope="col" className="whitespace-nowrap px-4 py-2">
@@ -611,6 +622,9 @@ export function BiometricView() {
                       </th>
                       <th scope="col" className="whitespace-nowrap px-3 py-2">
                         Retards ce mois
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        Temps de retard ce mois
                       </th>
                     </tr>
                   </thead>
@@ -637,6 +651,9 @@ export function BiometricView() {
                           {row.isLate ? formatLateDuration(row.lateSeconds) : "—"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{monthLateCountByEmp.get(row.empCode) ?? 0}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
+                          {monthLateSecondsByEmp.get(row.empCode) ? formatLateDuration(monthLateSecondsByEmp.get(row.empCode)!) : "—"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

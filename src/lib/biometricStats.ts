@@ -14,6 +14,20 @@ import type { BiometricEvent, BiometricSchedule } from "@/types/biometric";
 export const STATUS_CHECK_IN = "Enregistrement";
 export const STATUS_CHECK_OUT = "Départ";
 
+// The building has two badge readers at the front: the main entrance and a
+// second one just inside at the office door. Someone can badge at the office
+// reader right after walking in, so counting both would double-count/blur
+// arrival time. Entry/exit and lateness are anchored to the main entrance
+// only — confirmed live against synced data as "Porte d'entre" (ZKBio
+// Time's sync strips the accent), distinct from "Porte d'entre bureau".
+// Punch-count/status charts elsewhere in this file intentionally still use
+// every terminal — this restriction is specific to attendance timing.
+const MAIN_ENTRANCE_TERMINAL_ALIAS = "Porte d'entre";
+
+function atMainEntrance(events: BiometricEvent[]): BiometricEvent[] {
+  return events.filter((e) => e.terminalAlias === MAIN_ENTRANCE_TERMINAL_ALIAS);
+}
+
 export const STATUS_LABEL: Record<string, string> = {
   [STATUS_CHECK_IN]: "Entrée",
   [STATUS_CHECK_OUT]: "Sortie",
@@ -112,7 +126,7 @@ export function getPresentEmployees(events: BiometricEvent[], employees: Biometr
   const isCurrentDay = latestKey === casablancaDateKey(new Date());
 
   const dayEventsByCode = new Map<string, BiometricEvent[]>();
-  for (const event of events) {
+  for (const event of atMainEntrance(events)) {
     if (casablancaDateKey(event.punchTime) !== latestKey) continue;
     if (!dayEventsByCode.has(event.empCode)) dayEventsByCode.set(event.empCode, []);
     dayEventsByCode.get(event.empCode)!.push(event);
@@ -198,7 +212,7 @@ export interface DailyAttendanceRow {
 export function computeDailyAttendance(events: BiometricEvent[], employees: BiometricEmployee[], schedule: BiometricSchedule): DailyAttendanceRow[] {
   const employeeByCode = new Map(employees.map((e) => [e.empCode, e]));
   const byKey = new Map<string, BiometricEvent[]>();
-  for (const event of events) {
+  for (const event of atMainEntrance(events)) {
     const emp = employeeByCode.get(event.empCode);
     if (!emp || emp.hidden) continue;
     const key = `${event.empCode}__${casablancaDateKey(event.punchTime)}`;
