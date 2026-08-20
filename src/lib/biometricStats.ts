@@ -13,6 +13,17 @@ import type { BiometricEvent, BiometricSchedule } from "@/types/biometric";
 // 3CX's Direction handling.
 export const STATUS_CHECK_IN = "Enregistrement";
 export const STATUS_CHECK_OUT = "Départ";
+// ZKBio Time also reports a separate pair of "overtime" punch states (raw
+// punch_state 4/5) whenever someone badges in/out again after their regular
+// session — confirmed live these make up over a third of all punches, not a
+// rare edge case. They're still a genuine arrival/departure, so anywhere
+// "present" or "first entry"/"last exit" is judged from punch state, both
+// pairs count — without this, someone whose latest punch today was an
+// overtime check-in reads as "gone" instead of "still here".
+export const STATUS_OVERTIME_IN = "Heures supplémentaires Entrée";
+export const STATUS_OVERTIME_OUT = "Heures supplémentaires Sortie";
+const ENTRY_STATES = new Set([STATUS_CHECK_IN, STATUS_OVERTIME_IN]);
+const EXIT_STATES = new Set([STATUS_CHECK_OUT, STATUS_OVERTIME_OUT]);
 
 // The building has two badge readers at the front: the main entrance and a
 // second one just inside at the office door. Someone can badge at the office
@@ -31,11 +42,15 @@ function atMainEntrance(events: BiometricEvent[]): BiometricEvent[] {
 export const STATUS_LABEL: Record<string, string> = {
   [STATUS_CHECK_IN]: "Entrée",
   [STATUS_CHECK_OUT]: "Sortie",
+  [STATUS_OVERTIME_IN]: "Entrée (heures sup.)",
+  [STATUS_OVERTIME_OUT]: "Sortie (heures sup.)",
 };
 
 export const STATUS_BADGE: Record<string, string> = {
   [STATUS_CHECK_IN]: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   [STATUS_CHECK_OUT]: "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+  [STATUS_OVERTIME_IN]: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  [STATUS_OVERTIME_OUT]: "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 };
 
 export interface BiometricEmployee {
@@ -140,10 +155,10 @@ export function getPresentEmployees(events: BiometricEvent[], employees: Biometr
 
     if (isCurrentDay) {
       const latest = dayEvents.reduce((a, b) => (b.punchTime > a.punchTime ? b : a));
-      if (latest.punchStateLabel !== STATUS_CHECK_IN) continue;
+      if (!ENTRY_STATES.has(latest.punchStateLabel)) continue;
       present.push({ ...employee, lastPunchTime: latest.punchTime });
     } else {
-      const checkIns = dayEvents.filter((e) => e.punchStateLabel === STATUS_CHECK_IN);
+      const checkIns = dayEvents.filter((e) => ENTRY_STATES.has(e.punchStateLabel));
       const anchor = checkIns.length
         ? checkIns.reduce((a, b) => (b.punchTime < a.punchTime ? b : a))
         : dayEvents.reduce((a, b) => (b.punchTime < a.punchTime ? b : a));
@@ -224,8 +239,8 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
   for (const [key, dayEvents] of byKey) {
     const [empCode, date] = key.split("__");
     const emp = employeeByCode.get(empCode)!;
-    const checkIns = dayEvents.filter((e) => e.punchStateLabel === STATUS_CHECK_IN).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
-    const checkOuts = dayEvents.filter((e) => e.punchStateLabel === STATUS_CHECK_OUT).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
+    const checkIns = dayEvents.filter((e) => ENTRY_STATES.has(e.punchStateLabel)).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
+    const checkOuts = dayEvents.filter((e) => EXIT_STATES.has(e.punchStateLabel)).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
     const firstEntry = checkIns[0]?.punchTime ?? null;
     const lastExit = checkOuts.length ? checkOuts[checkOuts.length - 1].punchTime : null;
 
