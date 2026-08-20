@@ -253,13 +253,6 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
   });
 }
 
-/** Seconds in one scheduled workday (`schedule.endTime` − `schedule.startTime`, both "HH:mm") — used to price a full absence day the same way a partial lateness is priced in seconds. */
-export function scheduledWorkdaySeconds(schedule: BiometricSchedule): number {
-  const [startHour, startMinute] = schedule.startTime.split(":").map(Number);
-  const [endHour, endMinute] = schedule.endTime.split(":").map(Number);
-  return endHour * 3600 + endMinute * 60 - (startHour * 3600 + startMinute * 60);
-}
-
 export function formatLateDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
