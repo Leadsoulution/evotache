@@ -173,6 +173,15 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     if (shouldHideDone) {
       result = result.map((g) => ({ ...g, rows: g.rows.filter((r) => r.task.status !== doneStatusId) })).filter((g) => g.rows.length > 0);
     }
+    // filterTopLevelTasks keeps a matching task's whole subtree visible for
+    // context (so you can still see a matched task's subtasks) — but that
+    // means a subtask with a *different* status than the active status
+    // filter stays in the list too, and then lands in its own status
+    // group/column. Prune those out here so "Todo" never shows an
+    // "In Progress" row/column just because it's a subtask of a Todo task.
+    if (statusFilter.length) {
+      result = result.map((g) => ({ ...g, rows: g.rows.filter((r) => statusFilter.includes(r.task.status)) })).filter((g) => g.rows.length > 0);
+    }
     return result;
   }, [
     tasks,
@@ -211,7 +220,11 @@ export function TaskListView({ module, title, subtitle }: TaskListViewProps) {
     };
     const topLevel = tasks.filter((t) => t.parentId === null);
     const filteredTopLevel = filterTopLevelTasks(topLevel, tasks, filters, assigneeNameById);
-    return flattenVisibleTree(filteredTopLevel, tasks, new Set()).map((row) => row.task);
+    const visible = flattenVisibleTree(filteredTopLevel, tasks, new Set()).map((row) => row.task);
+    // Same subtree-leak fix as the list/grouped view above — a subtask with
+    // a different status than the active filter would otherwise still show
+    // up in its own board column.
+    return statusFilter.length ? visible.filter((t) => statusFilter.includes(t.status)) : visible;
   }, [tasks, debouncedSearch, statusFilter, priorityFilter, assigneeFilter, projectFilter, teamFilter, taskTypeFilter, myTasksOnly, user, assigneeNameById]);
 
   const allRowIds = useMemo(() => groups.flatMap((g) => g.rows.map((r) => r.task.id)), [groups]);
