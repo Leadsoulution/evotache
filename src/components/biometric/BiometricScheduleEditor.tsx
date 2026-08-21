@@ -57,7 +57,7 @@ export function BiometricScheduleEditor({ open, schedule, onClose, onSave }: Bio
           </button>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Un employé est marqué en retard si sa première entrée de la journée est après l&apos;heure de début, ci-dessous.
+          Un employé est marqué en retard si sa première entrée de la journée (dans la plage horaire du jour, ci-dessous) est après l&apos;heure de début. Lundi-jeudi utilisent l&apos;heure de fin ; vendredi est coupé en deux par la pause ; samedi a sa propre heure de fin ; dimanche n&apos;est pas compté.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -76,6 +76,10 @@ export function BiometricScheduleEditor({ open, schedule, onClose, onSave }: Bio
           <label className="text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Pause vendredi — fin</span>
             <input type="time" value={draft.fridayBreakEnd} onChange={(e) => setDraft({ ...draft, fridayBreakEnd: e.target.value })} className={inputClass} />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Samedi — heure de fin</span>
+            <input type="time" value={draft.saturdayEndTime} onChange={(e) => setDraft({ ...draft, saturdayEndTime: e.target.value })} className={inputClass} />
           </label>
         </div>
 

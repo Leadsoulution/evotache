@@ -1,5 +1,5 @@
 import { COLOR_PALETTE } from "@/config/colorPalette";
-import { casablancaDateKey, casablancaWallClockToUtc } from "@/lib/casablancaTime";
+import { casablancaDateKey, casablancaHourMinute, casablancaWallClockToUtc, casablancaWeekday } from "@/lib/casablancaTime";
 import type { BarChartDatum } from "@/components/stats/BarChart";
 import type { BiometricEvent, BiometricSchedule } from "@/types/biometric";
 
@@ -37,6 +37,29 @@ const MAIN_ENTRANCE_TERMINAL_ALIAS = "Porte d'entre";
 
 function atMainEntrance(events: BiometricEvent[]): BiometricEvent[] {
   return events.filter((e) => e.terminalAlias === MAIN_ENTRANCE_TERMINAL_ALIAS);
+}
+
+/** Whether `iso` falls inside that calendar day's real work-hours window
+ * (Casablanca time): Monday-Thursday `startTime`-`endTime`, Friday split
+ * around the lunch break, Saturday `startTime`-`saturdayEndTime`, Sunday
+ * never. Confirmed live that the device's own "Enregistrement"/"Heures
+ * supplémentaires" labelling doesn't line up with the business's actual
+ * hours (e.g. an ordinary mid-afternoon arrival can get logged as
+ * "overtime") — this checks the real clock time instead of trusting that
+ * label, so a stray punch genuinely outside real hours doesn't get treated
+ * as a normal arrival for lateness purposes, and a normal arrival mislabeled
+ * as "overtime" doesn't get wrongly excluded. */
+export function isWithinWorkHours(iso: string, schedule: BiometricSchedule): boolean {
+  const weekday = casablancaWeekday(iso);
+  if (weekday === 0) return false;
+  const hm = casablancaHourMinute(iso);
+  if (weekday === 5) {
+    return (hm >= schedule.startTime && hm <= schedule.fridayBreakStart) || (hm >= schedule.fridayBreakEnd && hm <= schedule.endTime);
+  }
+  if (weekday === 6) {
+    return hm >= schedule.startTime && hm <= schedule.saturdayEndTime;
+  }
+  return hm >= schedule.startTime && hm <= schedule.endTime;
 }
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -216,14 +239,19 @@ export interface DailyAttendanceRow {
 /** One row per (employee, calendar day) present in the given event set —
  * driven by the page's filtered events (same as getAbsentEmployees), so a
  * date-range filter naturally produces one row per day per employee rather
- * than one row overall. Lateness compares that day's first check-in
- * against `schedule.startTime` — the same cutoff every day, including
- * Friday (only the lunch break differs there, not the morning start). Both
- * sides of that comparison are resolved as real Casablanca instants
- * (`casablancaWallClockToUtc`, not `Date#setHours`, which reads/writes the
- * *viewer's own* OS timezone) — a PC with its timezone set wrong used to
- * make everyone look 2-3h late or not late at all, purely from whichever
- * machine happened to be viewing the page. */
+ * than one row overall. "First entry" is simply the earliest entry-type
+ * punch of the day, whatever time it occurs — it must NOT be bounded by
+ * `isWithinWorkHours` (that's for the Heures d'ouverture filter only):
+ * someone who arrives early is exactly the case lateness must recognize as
+ * *not* late, so excluding early punches would hide the real arrival behind
+ * a later one and make an on-time employee look hours late. Lateness then
+ * compares that first entry against `schedule.startTime` — the same cutoff
+ * every workday, including Friday (only the lunch break differs there, not
+ * the morning start). Both sides of that comparison are resolved as real
+ * Casablanca instants (`casablancaWallClockToUtc`, not `Date#setHours`,
+ * which reads/writes the *viewer's own* OS timezone) — a PC with its
+ * timezone set wrong used to make everyone look 2-3h late or not late at
+ * all, purely from whichever machine happened to be viewing the page. */
 export function computeDailyAttendance(events: BiometricEvent[], employees: BiometricEmployee[], schedule: BiometricSchedule): DailyAttendanceRow[] {
   const employeeByCode = new Map(employees.map((e) => [e.empCode, e]));
   const byKey = new Map<string, BiometricEvent[]>();
@@ -234,6 +262,19 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
     if (!byKey.has(key)) byKey.set(key, []);
     byKey.get(key)!.push(event);
   }
+  // Earliest punch of the day at ANY terminal (not just the main entrance),
+  // per employee+day — sanity-checks a main-entrance "first entry"
+  // candidate below: if the employee was already active elsewhere (almost
+  // always the office-door reader) before that candidate, it isn't really
+  // their first arrival — more likely a mid-day exit/return through the
+  // main entrance instead (e.g. a lunch outing) — so it can't be judged
+  // for lateness.
+  const earliestAnyTerminalByKey = new Map<string, string>();
+  for (const event of events) {
+    const key = `${event.empCode}__${casablancaDateKey(event.punchTime)}`;
+    const current = earliestAnyTerminalByKey.get(key);
+    if (!current || event.punchTime < current) earliestAnyTerminalByKey.set(key, event.punchTime);
+  }
 
   const rows: DailyAttendanceRow[] = [];
   for (const [key, dayEvents] of byKey) {
@@ -241,7 +282,9 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
     const emp = employeeByCode.get(empCode)!;
     const checkIns = dayEvents.filter((e) => ENTRY_STATES.has(e.punchStateLabel)).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
     const checkOuts = dayEvents.filter((e) => EXIT_STATES.has(e.punchStateLabel)).sort((a, b) => a.punchTime.localeCompare(b.punchTime));
-    const firstEntry = checkIns[0]?.punchTime ?? null;
+    const firstEntryCandidate = checkIns[0]?.punchTime ?? null;
+    const earliestAnyTerminal = earliestAnyTerminalByKey.get(key);
+    const firstEntry = firstEntryCandidate && earliestAnyTerminal && earliestAnyTerminal < firstEntryCandidate ? null : firstEntryCandidate;
     const lastExit = checkOuts.length ? checkOuts[checkOuts.length - 1].punchTime : null;
 
     let isLate = false;

@@ -26,7 +26,7 @@ import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDueDate } from "@/lib/date";
 import { cn } from "@/lib/cn";
-import { addCalendarDays, casablancaDateKey, casablancaHourMinute, casablancaTimeString, casablancaWeekday } from "@/lib/casablancaTime";
+import { addCalendarDays, casablancaDateKey, casablancaHourMinute, casablancaTimeString } from "@/lib/casablancaTime";
 import {
   STATUS_BADGE,
   STATUS_CHECK_IN,
@@ -41,6 +41,7 @@ import {
   formatLateDuration,
   getAbsentEmployees,
   getPresentEmployees,
+  isWithinWorkHours,
   latestLocalDate,
 } from "@/lib/biometricStats";
 import {
@@ -114,14 +115,6 @@ function dayLabel(dayKey: string | null, todayWord: string): string {
   if (dayKey === addCalendarDays(todayKey, -1)) return "hier";
   const [, month, day] = dayKey.split("-");
   return `le ${day}/${month}`;
-}
-
-// Real opening hours: 09:30–19:00 every day, except Friday which splits
-// around the midday break (09:30–13:00, then 15:00–19:00).
-function isWithinBusinessHours(iso: string): boolean {
-  const hm = eventHourMinute(iso);
-  const windows = casablancaWeekday(iso) === 5 ? [["09:30", "13:00"], ["15:00", "19:00"]] : [["09:30", "19:00"]];
-  return windows.some(([from, to]) => hm >= from && hm <= to);
 }
 
 export function BiometricView() {
@@ -226,7 +219,7 @@ export function BiometricView() {
       if (dateFrom && e.punchTime < dateFrom) return false;
       if (dateTo && e.punchTime > `${dateTo}T23:59:59`) return false;
       if (businessHoursOnly) {
-        if (!isWithinBusinessHours(e.punchTime)) return false;
+        if (!isWithinWorkHours(e.punchTime, schedule)) return false;
       } else if (timeFrom || timeTo) {
         const hm = eventHourMinute(e.punchTime);
         if (timeFrom && hm < timeFrom) return false;
@@ -234,7 +227,7 @@ export function BiometricView() {
       }
       return true;
     });
-  }, [events, search, statusFilter, departmentFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedEmpCode]);
+  }, [events, search, statusFilter, departmentFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedEmpCode, schedule]);
 
   // Driven by the filtered set (not the raw events) so search/statut/
   // département/date/heure narrow down who can show up here too — someone
