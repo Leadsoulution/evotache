@@ -55,8 +55,20 @@ try {
     # 2. Time window: since the last successful run, or the last 24h on
     #    first run. ZKBio Time expects naive "YYYY-MM-DD HH:mm:ss" — its own
     #    local wall-clock, no timezone conversion needed on this end.
+    #
+    #    Re-queries the last $OverlapMinutes minutes on every run (not just
+    #    "since the last checkpoint") — confirmed live that a punch can miss
+    #    a cycle entirely if it lands right on the boundary between two
+    #    back-to-back windows (clock drift between this PC and the pointeuse,
+    #    or a moment's delay before the punch becomes queryable there), and a
+    #    non-overlapping window then never revisits that moment again. Safe
+    #    to re-fetch the same punches repeatedly: EvoTasks' ingest endpoint
+    #    upserts by the pointeuse's own transaction id, so re-sending
+    #    something already synced is a harmless no-op.
+    $OverlapMinutes = 30
     $endTime = Get-Date
-    $startTime = if (Test-Path $StateFile) { [datetime](Get-Content $StateFile -Raw) } else { $endTime.AddHours(-24) }
+    $lastCheckpoint = if (Test-Path $StateFile) { [datetime](Get-Content $StateFile -Raw) } else { $endTime.AddHours(-24) }
+    $startTime = $lastCheckpoint.AddMinutes(-$OverlapMinutes)
     $startStr = $startTime.ToString("yyyy-MM-dd HH:mm:ss")
     $endStr = $endTime.ToString("yyyy-MM-dd HH:mm:ss")
 
