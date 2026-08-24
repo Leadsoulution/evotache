@@ -22,6 +22,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
     hidden?: boolean;
     startTime?: string | null;
     endTime?: string | null;
+    lunchBreakStart?: string | null;
+    lunchBreakEnd?: string | null;
     fridayBreakStart?: string | null;
     fridayBreakEnd?: string | null;
     saturdayEndTime?: string | null;
@@ -34,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
   // this employee) or null (clear the override — inherit the global
   // schedule for that field again).
   const timePattern = /^\d{2}:\d{2}$/;
-  const scheduleFields = ["startTime", "endTime", "fridayBreakStart", "fridayBreakEnd", "saturdayEndTime"] as const;
+  const scheduleFields = ["startTime", "endTime", "lunchBreakStart", "lunchBreakEnd", "fridayBreakStart", "fridayBreakEnd", "saturdayEndTime"] as const;
   for (const field of scheduleFields) {
     const value = body[field];
     if (value === null) {

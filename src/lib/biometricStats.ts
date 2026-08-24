@@ -40,15 +40,15 @@ function atMainEntrance(events: BiometricEvent[]): BiometricEvent[] {
 }
 
 /** Whether `iso` falls inside that calendar day's real work-hours window
- * (Casablanca time): Monday-Thursday `startTime`-`endTime`, Friday split
- * around the lunch break, Saturday `startTime`-`saturdayEndTime`, Sunday
- * never. Confirmed live that the device's own "Enregistrement"/"Heures
- * supplémentaires" labelling doesn't line up with the business's actual
- * hours (e.g. an ordinary mid-afternoon arrival can get logged as
- * "overtime") — this checks the real clock time instead of trusting that
- * label, so a stray punch genuinely outside real hours doesn't get treated
- * as a normal arrival for lateness purposes, and a normal arrival mislabeled
- * as "overtime" doesn't get wrongly excluded. */
+ * (Casablanca time): Monday-Thursday and Saturday split around the midday
+ * lunch break (`lunchBreakStart`-`lunchBreakEnd`), Friday split around its
+ * own (longer) prayer break instead, Sunday never. Confirmed live that the
+ * device's own "Enregistrement"/"Heures supplémentaires" labelling doesn't
+ * line up with the business's actual hours (e.g. an ordinary mid-afternoon
+ * arrival can get logged as "overtime") — this checks the real clock time
+ * instead of trusting that label, so a stray punch genuinely outside real
+ * hours doesn't get treated as a normal arrival for lateness purposes, and
+ * a normal arrival mislabeled as "overtime" doesn't get wrongly excluded. */
 export function isWithinWorkHours(iso: string, schedule: BiometricSchedule): boolean {
   const weekday = casablancaWeekday(iso);
   if (weekday === 0) return false;
@@ -56,10 +56,8 @@ export function isWithinWorkHours(iso: string, schedule: BiometricSchedule): boo
   if (weekday === 5) {
     return (hm >= schedule.startTime && hm <= schedule.fridayBreakStart) || (hm >= schedule.fridayBreakEnd && hm <= schedule.endTime);
   }
-  if (weekday === 6) {
-    return hm >= schedule.startTime && hm <= schedule.saturdayEndTime;
-  }
-  return hm >= schedule.startTime && hm <= schedule.endTime;
+  const dayEndTime = weekday === 6 ? schedule.saturdayEndTime : schedule.endTime;
+  return (hm >= schedule.startTime && hm <= schedule.lunchBreakStart) || (hm >= schedule.lunchBreakEnd && hm <= dayEndTime);
 }
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -103,6 +101,8 @@ export interface BiometricEmployeeOverride {
   hidden: boolean;
   startTime: string | null;
   endTime: string | null;
+  lunchBreakStart: string | null;
+  lunchBreakEnd: string | null;
   fridayBreakStart: string | null;
   fridayBreakEnd: string | null;
   saturdayEndTime: string | null;
@@ -127,6 +127,8 @@ export function deriveEmployees(events: BiometricEvent[], overrides: BiometricEm
       const scheduleOverride: Partial<BiometricSchedule> = {};
       if (override?.startTime) scheduleOverride.startTime = override.startTime;
       if (override?.endTime) scheduleOverride.endTime = override.endTime;
+      if (override?.lunchBreakStart) scheduleOverride.lunchBreakStart = override.lunchBreakStart;
+      if (override?.lunchBreakEnd) scheduleOverride.lunchBreakEnd = override.lunchBreakEnd;
       if (override?.fridayBreakStart) scheduleOverride.fridayBreakStart = override.fridayBreakStart;
       if (override?.fridayBreakEnd) scheduleOverride.fridayBreakEnd = override.fridayBreakEnd;
       if (override?.saturdayEndTime) scheduleOverride.saturdayEndTime = override.saturdayEndTime;
@@ -262,6 +264,7 @@ export interface DailyAttendanceRow {
   lastExit: string | null; // ISO
   isLate: boolean;
   lateSeconds: number;
+  pauseSeconds: number;
 }
 
 /** One row per (employee, calendar day) present in the given event set —
@@ -318,6 +321,28 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
     const firstEntry = firstEntryCandidate && earliestAnyTerminal && earliestAnyTerminal < firstEntryCandidate ? null : firstEntryCandidate;
     const lastExit = checkOuts.length ? checkOuts[checkOuts.length - 1].punchTime : null;
 
+    // Pause time: no dedicated "break" punch type exists on the device — a
+    // pause shows up as an ordinary exit followed later the same day by an
+    // ordinary entry (regular or "heures sup.", whichever the device
+    // happened to label it), same as anyone stepping out and coming back.
+    // The gap before the day's first arrival and after its last exit isn't
+    // a pause (nothing to return from/to), so those are excluded by only
+    // counting an exit that's later matched by a subsequent entry.
+    let pauseSeconds = 0;
+    let hasArrived = false;
+    let openExitTime: string | null = null;
+    for (const event of [...dayEvents].sort((a, b) => a.punchTime.localeCompare(b.punchTime))) {
+      if (ENTRY_STATES.has(event.punchStateLabel)) {
+        if (hasArrived && openExitTime) {
+          pauseSeconds += Math.round((new Date(event.punchTime).getTime() - new Date(openExitTime).getTime()) / 1000);
+          openExitTime = null;
+        }
+        hasArrived = true;
+      } else if (EXIT_STATES.has(event.punchStateLabel) && hasArrived) {
+        openExitTime = event.punchTime;
+      }
+    }
+
     let isLate = false;
     let lateSeconds = 0;
     if (firstEntry) {
@@ -330,7 +355,7 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
       }
     }
 
-    rows.push({ empCode, name: emp.name, color: emp.color, date, firstEntry, lastExit, isLate, lateSeconds });
+    rows.push({ empCode, name: emp.name, color: emp.color, date, firstEntry, lastExit, isLate, lateSeconds, pauseSeconds });
   }
 
   // Most recently punched first — within the same day this is entry time

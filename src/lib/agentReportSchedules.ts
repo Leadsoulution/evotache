@@ -7,7 +7,7 @@ import { computeDailyAttendance, deriveEmployees, formatLateDuration, getAbsentE
 import { casablancaDateKey, casablancaTimeString } from "@/lib/casablancaTime";
 import type { AgentReportSchedule, Conversation } from "@/generated/prisma/client";
 
-const DEFAULT_BIOMETRIC_SCHEDULE = { startTime: "09:30", endTime: "19:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
+const DEFAULT_BIOMETRIC_SCHEDULE = { startTime: "09:30", endTime: "19:00", lunchBreakStart: "13:00", lunchBreakEnd: "14:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
 // Must exceed the cron interval so a schedule can't double-fire from two
 // nearby cron ticks landing in the same window — same reasoning/values as
 // reminders.ts's REFIRE_COOLDOWN_MS/TIME_MATCH_TOLERANCE_MIN, since two

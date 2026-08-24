@@ -660,6 +660,8 @@ model BiometricEmployeeOverride {
   hidden           Boolean  @default(false)
   startTime        String?
   endTime          String?
+  lunchBreakStart  String?
+  lunchBreakEnd    String?
   fridayBreakStart String?
   fridayBreakEnd   String?
   saturdayEndTime  String?
@@ -671,13 +673,17 @@ model BiometricEmployeeOverride {
 // Single shared config (singleton, same pattern as BackupSheetConfig) for
 // the weekly work-hours window used both to flag late arrivals and to gate
 // the Heures d'ouverture filter preset (see isWithinWorkHours in
-// biometricStats.ts). Monday-Thursday and Friday's morning half all use
-// startTime; Friday's afternoon half and Saturday each get their own end
-// time since they close earlier than a normal day; Sunday isn't a workday.
+// biometricStats.ts). Monday-Thursday and Saturday use startTime/endTime
+// with a midday lunchBreakStart/End carved out; Friday uses its own
+// fridayBreakStart/End (longer, for Friday prayers) instead of the lunch
+// break, and its own end time via endTime; Saturday closes earlier via
+// saturdayEndTime; Sunday isn't a workday.
 model BiometricSchedule {
   id               String   @id @default(cuid())
   startTime        String   @default("09:30")
   endTime          String   @default("19:00")
+  lunchBreakStart  String   @default("13:00")
+  lunchBreakEnd    String   @default("14:00")
   fridayBreakStart String   @default("13:00")
   fridayBreakEnd   String   @default("15:00")
   saturdayEndTime  String   @default("18:00")

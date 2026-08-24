@@ -57,7 +57,7 @@ export function BiometricScheduleEditor({ open, schedule, onClose, onSave }: Bio
           </button>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Un employé est marqué en retard si sa première entrée de la journée (dans la plage horaire du jour, ci-dessous) est après l&apos;heure de début. Lundi-jeudi utilisent l&apos;heure de fin ; vendredi est coupé en deux par la pause ; samedi a sa propre heure de fin ; dimanche n&apos;est pas compté.
+          Un employé est marqué en retard si sa première entrée de la journée (dans la plage horaire du jour, ci-dessous) est après l&apos;heure de début. Lundi-jeudi et samedi sont coupés par la pause déjeuner ; vendredi est coupé par sa propre pause (plus longue) ; samedi a sa propre heure de fin ; dimanche n&apos;est pas compté.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -68,6 +68,14 @@ export function BiometricScheduleEditor({ open, schedule, onClose, onSave }: Bio
           <label className="text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Heure de fin</span>
             <input type="time" value={draft.endTime} onChange={(e) => setDraft({ ...draft, endTime: e.target.value })} className={inputClass} />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Pause déjeuner — début</span>
+            <input type="time" value={draft.lunchBreakStart} onChange={(e) => setDraft({ ...draft, lunchBreakStart: e.target.value })} className={inputClass} />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Pause déjeuner — fin</span>
+            <input type="time" value={draft.lunchBreakEnd} onChange={(e) => setDraft({ ...draft, lunchBreakEnd: e.target.value })} className={inputClass} />
           </label>
           <label className="text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Pause vendredi — début</span>

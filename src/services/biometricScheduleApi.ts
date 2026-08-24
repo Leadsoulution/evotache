@@ -1,6 +1,6 @@
 import type { BiometricSchedule } from "@/types/biometric";
 
-const DEFAULT_SCHEDULE: BiometricSchedule = { startTime: "09:30", endTime: "19:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
+const DEFAULT_SCHEDULE: BiometricSchedule = { startTime: "09:30", endTime: "19:00", lunchBreakStart: "13:00", lunchBreakEnd: "14:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
 
 export async function fetchBiometricSchedule(): Promise<BiometricSchedule> {
   const response = await fetch("/api/biometric/schedule");

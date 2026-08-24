@@ -968,7 +968,7 @@ const triggerN8n: ToolDef = {
   },
 };
 
-const DEFAULT_BIOMETRIC_SCHEDULE = { startTime: "09:30", endTime: "19:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
+const DEFAULT_BIOMETRIC_SCHEDULE = { startTime: "09:30", endTime: "19:00", lunchBreakStart: "13:00", lunchBreakEnd: "14:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
 
 const getBiometricReport: ToolDef = {
   name: "get_biometric_report",

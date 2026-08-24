@@ -46,12 +46,22 @@ export function BiometricEmployeeScheduleEditor({ open, employee, globalSchedule
         await onSave(employee!.empCode, {
           startTime: draft.startTime,
           endTime: draft.endTime,
+          lunchBreakStart: draft.lunchBreakStart,
+          lunchBreakEnd: draft.lunchBreakEnd,
           fridayBreakStart: draft.fridayBreakStart,
           fridayBreakEnd: draft.fridayBreakEnd,
           saturdayEndTime: draft.saturdayEndTime,
         });
       } else {
-        await onSave(employee!.empCode, { startTime: null, endTime: null, fridayBreakStart: null, fridayBreakEnd: null, saturdayEndTime: null });
+        await onSave(employee!.empCode, {
+          startTime: null,
+          endTime: null,
+          lunchBreakStart: null,
+          lunchBreakEnd: null,
+          fridayBreakStart: null,
+          fridayBreakEnd: null,
+          saturdayEndTime: null,
+        });
       }
       onClose();
     } finally {
@@ -102,6 +112,26 @@ export function BiometricEmployeeScheduleEditor({ open, employee, globalSchedule
           <label className="text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Heure de fin</span>
             <input type="time" disabled={!custom} value={draft.endTime} onChange={(e) => setDraft({ ...draft, endTime: e.target.value })} className={inputClass} />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Pause déjeuner — début</span>
+            <input
+              type="time"
+              disabled={!custom}
+              value={draft.lunchBreakStart}
+              onChange={(e) => setDraft({ ...draft, lunchBreakStart: e.target.value })}
+              className={inputClass}
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Pause déjeuner — fin</span>
+            <input
+              type="time"
+              disabled={!custom}
+              value={draft.lunchBreakEnd}
+              onChange={(e) => setDraft({ ...draft, lunchBreakEnd: e.target.value })}
+              className={inputClass}
+            />
           </label>
           <label className="text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Pause vendredi — début</span>

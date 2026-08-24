@@ -617,7 +617,7 @@ export function BiometricView() {
               <p className="px-4 py-6 text-center text-sm text-slate-400">Aucune présence sur la période / le filtre sélectionné.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] border-collapse text-sm">
+                <table className="w-full min-w-[1000px] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                       <th scope="col" className="whitespace-nowrap px-4 py-2">
@@ -631,6 +631,9 @@ export function BiometricView() {
                       </th>
                       <th scope="col" className="whitespace-nowrap px-3 py-2">
                         Sortie
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2" title="Temps entre une sortie et le retour suivant le même jour (pas de type de pointage dédié à la pause)">
+                        Temps de pause
                       </th>
                       <th scope="col" className="whitespace-nowrap px-3 py-2">
                         En retard
@@ -655,6 +658,9 @@ export function BiometricView() {
                           {row.firstEntry ? formatEventTime(row.firstEntry) : "—"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">{row.lastExit ? formatEventTime(row.lastExit) : "—"}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
+                          {row.pauseSeconds > 0 ? formatLateDuration(row.pauseSeconds) : "—"}
+                        </td>
                         <td className="whitespace-nowrap px-3 py-2">
                           {row.isLate ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">

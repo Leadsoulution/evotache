@@ -12,6 +12,8 @@ export interface BiometricEmployeeOverridePatch {
   hidden?: boolean;
   startTime?: string | null;
   endTime?: string | null;
+  lunchBreakStart?: string | null;
+  lunchBreakEnd?: string | null;
   fridayBreakStart?: string | null;
   fridayBreakEnd?: string | null;
   saturdayEndTime?: string | null;

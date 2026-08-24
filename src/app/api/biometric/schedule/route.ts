@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canAccessBiometrics, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 
-const DEFAULTS = { startTime: "09:30", endTime: "19:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
+const DEFAULTS = { startTime: "09:30", endTime: "19:00", lunchBreakStart: "13:00", lunchBreakEnd: "14:00", fridayBreakStart: "13:00", fridayBreakEnd: "15:00", saturdayEndTime: "18:00" };
 
 export async function GET() {
   const sessionUser = await getSessionUser();
@@ -25,7 +25,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => null);
   const timePattern = /^\d{2}:\d{2}$/;
-  const fields = ["startTime", "endTime", "fridayBreakStart", "fridayBreakEnd", "saturdayEndTime"] as const;
+  const fields = ["startTime", "endTime", "lunchBreakStart", "lunchBreakEnd", "fridayBreakStart", "fridayBreakEnd", "saturdayEndTime"] as const;
   const data: Record<string, string> = {};
   for (const field of fields) {
     const value = body?.[field];
