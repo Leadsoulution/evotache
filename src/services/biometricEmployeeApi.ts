@@ -6,10 +6,18 @@ export async function fetchBiometricEmployeeOverrides(): Promise<BiometricEmploy
   return response.json();
 }
 
-export async function saveBiometricEmployeeOverride(
-  empCode: string,
-  patch: { name?: string | null; color?: string | null; hidden?: boolean }
-): Promise<BiometricEmployeeOverride> {
+export interface BiometricEmployeeOverridePatch {
+  name?: string | null;
+  color?: string | null;
+  hidden?: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  fridayBreakStart?: string | null;
+  fridayBreakEnd?: string | null;
+  saturdayEndTime?: string | null;
+}
+
+export async function saveBiometricEmployeeOverride(empCode: string, patch: BiometricEmployeeOverridePatch): Promise<BiometricEmployeeOverride> {
   const response = await fetch(`/api/biometric/employees/${encodeURIComponent(empCode)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

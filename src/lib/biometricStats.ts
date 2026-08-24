@@ -82,16 +82,30 @@ export interface BiometricEmployee {
   department: string | null;
   color: string;
   hidden: boolean;
+  /** Only the fields this employee has customized — null (or a missing
+   * field) means "inherit the company-wide BiometricSchedule" for that
+   * field. Use resolveEmployeeSchedule() to get the fully-merged schedule
+   * actually in effect for this employee. */
+  scheduleOverride: Partial<BiometricSchedule> | null;
 }
 
 // Per-employee override stored via /api/biometric/employees — layered onto
 // the auto-derived name below, and the only way an employee gets excluded
-// (hidden) from the picker/charts without touching attendance history.
+// (hidden) from the picker/charts without touching attendance history. The
+// 5 schedule fields are each independently nullable: null means "inherit
+// the global schedule for this field", so setting only e.g. `endTime`
+// leaves start time, Friday break, and Saturday end all following the
+// company-wide default.
 export interface BiometricEmployeeOverride {
   empCode: string;
   name: string | null;
   color: string | null;
   hidden: boolean;
+  startTime: string | null;
+  endTime: string | null;
+  fridayBreakStart: string | null;
+  fridayBreakEnd: string | null;
+  saturdayEndTime: string | null;
 }
 
 /** Employees, derived straight from the synced punch events rather than a
@@ -110,14 +124,28 @@ export function deriveEmployees(events: BiometricEvent[], overrides: BiometricEm
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([empCode, auto], i) => {
       const override = overrideByCode.get(empCode);
+      const scheduleOverride: Partial<BiometricSchedule> = {};
+      if (override?.startTime) scheduleOverride.startTime = override.startTime;
+      if (override?.endTime) scheduleOverride.endTime = override.endTime;
+      if (override?.fridayBreakStart) scheduleOverride.fridayBreakStart = override.fridayBreakStart;
+      if (override?.fridayBreakEnd) scheduleOverride.fridayBreakEnd = override.fridayBreakEnd;
+      if (override?.saturdayEndTime) scheduleOverride.saturdayEndTime = override.saturdayEndTime;
       return {
         empCode,
         name: override?.name || auto.name,
         department: auto.department,
         color: override?.color || COLOR_PALETTE[i % COLOR_PALETTE.length],
         hidden: override?.hidden ?? false,
+        scheduleOverride: Object.keys(scheduleOverride).length ? scheduleOverride : null,
       };
     });
+}
+
+/** The work-hours schedule actually in effect for this employee — the
+ * company-wide `defaultSchedule` with any of that employee's own
+ * start/end/break customizations layered on top. */
+export function resolveEmployeeSchedule(employee: BiometricEmployee, defaultSchedule: BiometricSchedule): BiometricSchedule {
+  return employee.scheduleOverride ? { ...defaultSchedule, ...employee.scheduleOverride } : defaultSchedule;
 }
 
 export function eventsForEmployee(events: BiometricEvent[], empCode: string): BiometricEvent[] {
@@ -251,8 +279,11 @@ export interface DailyAttendanceRow {
  * Casablanca instants (`casablancaWallClockToUtc`, not `Date#setHours`,
  * which reads/writes the *viewer's own* OS timezone) — a PC with its
  * timezone set wrong used to make everyone look 2-3h late or not late at
- * all, purely from whichever machine happened to be viewing the page. */
-export function computeDailyAttendance(events: BiometricEvent[], employees: BiometricEmployee[], schedule: BiometricSchedule): DailyAttendanceRow[] {
+ * all, purely from whichever machine happened to be viewing the page.
+ * `defaultSchedule` is the company-wide fallback — an employee with their
+ * own schedule override (resolveEmployeeSchedule) is judged against their
+ * own hours instead. */
+export function computeDailyAttendance(events: BiometricEvent[], employees: BiometricEmployee[], defaultSchedule: BiometricSchedule): DailyAttendanceRow[] {
   const employeeByCode = new Map(employees.map((e) => [e.empCode, e]));
   const byKey = new Map<string, BiometricEvent[]>();
   for (const event of atMainEntrance(events)) {
@@ -290,6 +321,7 @@ export function computeDailyAttendance(events: BiometricEvent[], employees: Biom
     let isLate = false;
     let lateSeconds = 0;
     if (firstEntry) {
+      const schedule = resolveEmployeeSchedule(emp, defaultSchedule);
       const expected = casablancaWallClockToUtc(`${date} ${schedule.startTime}:00`);
       const diffMs = new Date(firstEntry).getTime() - expected.getTime();
       if (diffMs > 0) {

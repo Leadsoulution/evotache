@@ -648,12 +648,22 @@ model BiometricEvent {
 // /personnel/api/employees/ — mirrors ThreeCxUser's rename/recolor/hide
 // pattern for the Calls page. Keyed by emp_code (the device's own
 // employee identifier).
+//
+// The 5 schedule fields below let one employee's work hours differ from
+// the company-wide BiometricSchedule — each is null by default, meaning
+// "inherit the global value"; only the fields actually set here override
+// it (see resolveEmployeeSchedule in biometricStats.ts).
 model BiometricEmployeeOverride {
-  empCode   String   @id
-  name      String?
-  color     String?
-  hidden    Boolean  @default(false)
-  updatedAt DateTime @updatedAt
+  empCode          String   @id
+  name             String?
+  color            String?
+  hidden           Boolean  @default(false)
+  startTime        String?
+  endTime          String?
+  fridayBreakStart String?
+  fridayBreakEnd   String?
+  saturdayEndTime  String?
+  updatedAt        DateTime @updatedAt
 
   @@map("biometric_employee_overrides")
 }

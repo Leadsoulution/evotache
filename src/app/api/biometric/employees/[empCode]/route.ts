@@ -16,10 +16,36 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
 
   const { empCode } = await params;
   const body = await request.json();
-  const data: { name?: string | null; color?: string | null; hidden?: boolean } = {};
+  const data: {
+    name?: string | null;
+    color?: string | null;
+    hidden?: boolean;
+    startTime?: string | null;
+    endTime?: string | null;
+    fridayBreakStart?: string | null;
+    fridayBreakEnd?: string | null;
+    saturdayEndTime?: string | null;
+  } = {};
   if (typeof body.name === "string" || body.name === null) data.name = body.name;
   if (typeof body.color === "string" || body.color === null) data.color = body.color;
   if (typeof body.hidden === "boolean") data.hidden = body.hidden;
+
+  // Each schedule field is either a valid "HH:mm" string (a custom hour for
+  // this employee) or null (clear the override — inherit the global
+  // schedule for that field again).
+  const timePattern = /^\d{2}:\d{2}$/;
+  const scheduleFields = ["startTime", "endTime", "fridayBreakStart", "fridayBreakEnd", "saturdayEndTime"] as const;
+  for (const field of scheduleFields) {
+    const value = body[field];
+    if (value === null) {
+      data[field] = null;
+    } else if (value !== undefined) {
+      if (typeof value !== "string" || !timePattern.test(value)) {
+        return NextResponse.json({ error: `${field} doit être au format HH:mm ou null.` }, { status: 400 });
+      }
+      data[field] = value;
+    }
+  }
 
   const override = await db.biometricEmployeeOverride.upsert({
     where: { empCode },

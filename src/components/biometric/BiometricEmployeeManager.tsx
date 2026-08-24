@@ -6,26 +6,32 @@ import { createPortal } from "react-dom";
 import { ColorSwatchPicker } from "@/components/admin/ColorSwatchPicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
-import { EyeIcon, TrashIcon, XIcon } from "@/components/ui/icons";
+import { ClockIcon, EyeIcon, TrashIcon, XIcon } from "@/components/ui/icons";
+import { BiometricEmployeeScheduleEditor } from "./BiometricEmployeeScheduleEditor";
 import { cn } from "@/lib/cn";
 import type { BiometricEmployee } from "@/lib/biometricStats";
+import type { BiometricSchedule } from "@/types/biometric";
+import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmployeeApi";
 
 interface BiometricEmployeeManagerProps {
   open: boolean;
   employees: BiometricEmployee[];
+  globalSchedule: BiometricSchedule;
   onClose: () => void;
-  onSave: (empCode: string, patch: { name?: string; color?: string; hidden?: boolean }) => Promise<void>;
+  onSave: (empCode: string, patch: BiometricEmployeeOverridePatch) => Promise<void>;
 }
 
 /** Manage-employees modal for the Biométrie page — mirrors ThreeCxUserManager
  * (src/components/calls/ThreeCxUserManager.tsx): lets the auto-detected
  * employees be renamed, recolored, or hidden (a soft "delete": attendance
  * history stays, only the picker/charts stop showing that employee). */
-export function BiometricEmployeeManager({ open, employees, onClose, onSave }: BiometricEmployeeManagerProps) {
+export function BiometricEmployeeManager({ open, employees, globalSchedule, onClose, onSave }: BiometricEmployeeManagerProps) {
   const [pendingHideCode, setPendingHideCode] = useState<string | null>(null);
+  const [schedulingCode, setSchedulingCode] = useState<string | null>(null);
   if (!open) return null;
 
   const pendingEmployee = employees.find((e) => e.empCode === pendingHideCode) ?? null;
+  const schedulingEmployee = employees.find((e) => e.empCode === schedulingCode) ?? null;
 
   return createPortal(
     <div className="fixed inset-0 z-[90] flex animate-fade-in items-center justify-center bg-black/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -47,9 +53,17 @@ export function BiometricEmployeeManager({ open, employees, onClose, onSave }: B
         <ul className="overflow-y-auto">
           {employees.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">Aucun employé détecté pour l&apos;instant.</li>}
           {employees.map((e) => (
-            <EmployeeRow key={e.empCode} employee={e} onSave={onSave} onRequestHide={() => setPendingHideCode(e.empCode)} />
+            <EmployeeRow key={e.empCode} employee={e} onSave={onSave} onRequestHide={() => setPendingHideCode(e.empCode)} onRequestSchedule={() => setSchedulingCode(e.empCode)} />
           ))}
         </ul>
+
+        <BiometricEmployeeScheduleEditor
+          open={schedulingCode !== null}
+          employee={schedulingEmployee}
+          globalSchedule={globalSchedule}
+          onClose={() => setSchedulingCode(null)}
+          onSave={onSave}
+        />
 
         <ConfirmDialog
           open={pendingHideCode !== null}
@@ -75,11 +89,12 @@ export function BiometricEmployeeManager({ open, employees, onClose, onSave }: B
 
 interface EmployeeRowProps {
   employee: BiometricEmployee;
-  onSave: (empCode: string, patch: { name?: string; color?: string; hidden?: boolean }) => Promise<void>;
+  onSave: (empCode: string, patch: BiometricEmployeeOverridePatch) => Promise<void>;
   onRequestHide: () => void;
+  onRequestSchedule: () => void;
 }
 
-function EmployeeRow({ employee, onSave, onRequestHide }: EmployeeRowProps) {
+function EmployeeRow({ employee, onSave, onRequestHide, onRequestSchedule }: EmployeeRowProps) {
   const [name, setName] = useState(employee.name);
 
   function commit() {
@@ -112,6 +127,18 @@ function EmployeeRow({ employee, onSave, onRequestHide }: EmployeeRowProps) {
         className="flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-slate-800 hover:border-slate-200 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:ring-indigo-950"
       />
       <span className="shrink-0 text-xs text-slate-400">{employee.empCode}</span>
+      <button
+        type="button"
+        onClick={onRequestSchedule}
+        className={cn(
+          "rounded-md p-1.5 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950 dark:hover:text-indigo-400",
+          employee.scheduleOverride ? "text-indigo-500 dark:text-indigo-400" : "text-slate-400"
+        )}
+        aria-label={`Heures de travail de ${employee.name}`}
+        title={employee.scheduleOverride ? "Horaire personnalisé actif" : "Heures de travail (planning global)"}
+      >
+        <ClockIcon className="h-4 w-4" />
+      </button>
       {employee.hidden ? (
         <button
           type="button"

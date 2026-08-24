@@ -9,6 +9,7 @@ import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
 import { usePagination } from "@/hooks/usePagination";
 import { canAccessBiometrics, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
+import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmployeeApi";
 import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
@@ -45,6 +46,7 @@ import {
   getPresentEmployees,
   isWithinWorkHours,
   latestLocalDate,
+  resolveEmployeeSchedule,
 } from "@/lib/biometricStats";
 import {
   AlertTriangleIcon,
@@ -155,6 +157,7 @@ export function BiometricView() {
   // an avatar-row selector matching the Calls page's ThreeCxUserSelectorBar,
   // not fetched via a separate "list employees" API call.
   const employees = useMemo(() => deriveEmployees(events, overrides), [events, overrides]);
+  const employeeByCode = useMemo(() => new Map(employees.map((e) => [e.empCode, e])), [employees]);
 
   // If the selected employee gets hidden (this tab or another), stop
   // filtering by a code that's no longer selectable — derived at render
@@ -162,7 +165,7 @@ export function BiometricView() {
   // extra render.
   const effectiveSelectedEmpCode = selectedEmpCode && !employees.find((e) => e.empCode === selectedEmpCode)?.hidden ? selectedEmpCode : null;
 
-  async function handleSaveEmployeeOverride(empCode: string, patch: { name?: string; color?: string; hidden?: boolean }) {
+  async function handleSaveEmployeeOverride(empCode: string, patch: BiometricEmployeeOverridePatch) {
     try {
       await saveBiometricEmployeeOverride(empCode, patch);
       refetchOverrides();
@@ -222,7 +225,9 @@ export function BiometricView() {
       if (dateFrom && e.punchTime < dateFrom) return false;
       if (dateTo && e.punchTime > `${dateTo}T23:59:59`) return false;
       if (businessHoursOnly) {
-        if (!isWithinWorkHours(e.punchTime, schedule)) return false;
+        const emp = employeeByCode.get(e.empCode);
+        const effectiveSchedule = emp ? resolveEmployeeSchedule(emp, schedule) : schedule;
+        if (!isWithinWorkHours(e.punchTime, effectiveSchedule)) return false;
       } else if (timeFrom || timeTo) {
         const hm = eventHourMinute(e.punchTime);
         if (timeFrom && hm < timeFrom) return false;
@@ -230,7 +235,7 @@ export function BiometricView() {
       }
       return true;
     });
-  }, [events, search, statusFilter, departmentFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedEmpCode, schedule]);
+  }, [events, search, statusFilter, departmentFilter, dateFrom, dateTo, timeFrom, timeTo, businessHoursOnly, effectiveSelectedEmpCode, schedule, employeeByCode]);
 
   // Driven by the filtered set (not the raw events) so search/statut/
   // département/date/heure narrow down who can show up here too — someone
@@ -506,7 +511,13 @@ export function BiometricView() {
             onSelect={setSelectedEmpCode}
             onManage={isManagerOrAdmin ? () => setManagingEmployees(true) : undefined}
           />
-          <BiometricEmployeeManager open={managingEmployees} employees={employees} onClose={() => setManagingEmployees(false)} onSave={handleSaveEmployeeOverride} />
+          <BiometricEmployeeManager
+            open={managingEmployees}
+            employees={employees}
+            globalSchedule={schedule}
+            onClose={() => setManagingEmployees(false)}
+            onSave={handleSaveEmployeeOverride}
+          />
 
           <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-5 dark:bg-slate-950">
             <StatTile label="Total pointages" value={kpis.total} icon={<FingerprintIcon className="h-4.5 w-4.5" />} />
