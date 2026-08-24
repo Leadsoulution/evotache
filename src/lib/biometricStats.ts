@@ -339,3 +339,63 @@ export function countLateByEmployee(rows: DailyAttendanceRow[]): BarChartDatum[]
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 }
+
+export interface MonthlyAbsenceRow {
+  empCode: string;
+  name: string;
+  color: string;
+  dates: string[]; // "YYYY-MM-DD", ascending
+}
+
+/** One row per employee who had at least one absence in `monthKey`
+ * ("YYYY-MM") — a Monday-Saturday day (Sunday excluded: real punch
+ * activity is far lower that day, confirmed against synced data) with no
+ * punch at all, at any terminal. `events` must be the *full* unfiltered
+ * history, not just the target month: an employee's first-ever recorded
+ * punch anywhere caps how far back absences are counted for them, so a day
+ * before biometric tracking even started for them (or for the whole
+ * system) never reads as a false absence. A day still in progress (today,
+ * when `monthKey` is the current month) is never counted either — it isn't
+ * over yet, so there's nothing confirmed to count. `todayKey` is passed in
+ * rather than read from `new Date()` so this stays a pure function of its
+ * inputs (callers pass `casablancaDateKey(new Date())`). */
+export function computeMonthlyAbsences(events: BiometricEvent[], employees: BiometricEmployee[], monthKey: string, todayKey: string): MonthlyAbsenceRow[] {
+  const presentDatesByEmp = new Map<string, Set<string>>();
+  const firstPunchDateByEmp = new Map<string, string>();
+  for (const event of events) {
+    const dateKey = casablancaDateKey(event.punchTime);
+    if (!presentDatesByEmp.has(event.empCode)) presentDatesByEmp.set(event.empCode, new Set());
+    presentDatesByEmp.get(event.empCode)!.add(dateKey);
+    const firstSoFar = firstPunchDateByEmp.get(event.empCode);
+    if (!firstSoFar || dateKey < firstSoFar) firstPunchDateByEmp.set(event.empCode, dateKey);
+  }
+
+  const [year, month] = monthKey.split("-").map(Number);
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const rows: MonthlyAbsenceRow[] = [];
+  for (const employee of employees) {
+    if (employee.hidden) continue;
+    const presentDates = presentDatesByEmp.get(employee.empCode) ?? new Set<string>();
+    const firstPunchDate = firstPunchDateByEmp.get(employee.empCode) ?? todayKey;
+    const dates: string[] = [];
+    for (let day = 1; day <= lastDayOfMonth; day++) {
+      const dateKey = `${monthKey}-${String(day).padStart(2, "0")}`;
+      if (dateKey >= todayKey) break;
+      if (dateKey < firstPunchDate) continue;
+      const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+      if (weekday === 0) continue;
+      if (!presentDates.has(dateKey)) dates.push(dateKey);
+    }
+    if (dates.length > 0) rows.push({ empCode: employee.empCode, name: employee.name, color: employee.color, dates });
+  }
+  return rows.sort((a, b) => b.dates.length - a.dates.length);
+}
+
+/** "05, 06, 08 et 15" from a list of "YYYY-MM-DD" dates, day-of-month only
+ * since the month/year is already the section's active filter. */
+export function formatAbsenceDates(dates: string[]): string {
+  const days = dates.map((d) => d.slice(-2));
+  if (days.length === 1) return days[0];
+  return `${days.slice(0, -1).join(", ")} et ${days[days.length - 1]}`;
+}

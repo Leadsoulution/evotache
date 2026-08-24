@@ -33,11 +33,13 @@ import {
   STATUS_CHECK_OUT,
   STATUS_LABEL,
   computeDailyAttendance,
+  computeMonthlyAbsences,
   countByEmployee,
   countByStatus,
   countLateByEmployee,
   deriveEmployees,
   eventsForEmployee,
+  formatAbsenceDates,
   formatLateDuration,
   getAbsentEmployees,
   getPresentEmployees,
@@ -147,6 +149,7 @@ export function BiometricView() {
   const [sortField, setSortField] = useState<SortField>("punchTime");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [selectedEmpCode, setSelectedEmpCode] = useState<string | null>(null);
+  const [absenceMonthKey, setAbsenceMonthKey] = useState(() => casablancaDateKey(new Date()).slice(0, 7));
 
   // Employees, derived from the synced punch events themselves — shown as
   // an avatar-row selector matching the Calls page's ThreeCxUserSelectorBar,
@@ -351,6 +354,17 @@ export function BiometricView() {
   const lateCount = useMemo(() => periodAttendance.filter((r) => r.isLate).length, [periodAttendance]);
   const lateChart = useMemo(() => countLateByEmployee(periodAttendance), [periodAttendance]);
   const dailyAttendance = useMemo(() => computeDailyAttendance(detailDayEvents, employees, schedule), [detailDayEvents, employees, schedule]);
+
+  // "Absences" section under Détail des présences — its own month/year
+  // filter (independent of the page's other filters), built from the full
+  // unfiltered history (not `filtered`) so it always reflects the whole
+  // roster/month regardless of search/date filters set elsewhere on the
+  // page. Absence = no punch at all, any terminal — deliberately not
+  // scoped to the main entrance (see computeMonthlyAbsences's docs).
+  const monthlyAbsences = useMemo(
+    () => computeMonthlyAbsences(events, employees, absenceMonthKey, casablancaDateKey(new Date())),
+    [events, employees, absenceMonthKey]
+  );
 
   useEffect(() => {
     if (user && !allowed) router.replace("/");
@@ -647,6 +661,52 @@ export function BiometricView() {
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">
                           {monthLateSecondsByEmp.get(row.empCode) ? formatLateDuration(monthLateSecondsByEmp.get(row.empCode)!) : "—"}
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Absences</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Jours sans aucun pointage (lundi-samedi), toutes portes confondues</p>
+              </div>
+              <input
+                type="month"
+                value={absenceMonthKey}
+                onChange={(e) => e.target.value && setAbsenceMonthKey(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
+              />
+            </div>
+
+            {monthlyAbsences.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-400">Aucune absence ce mois-ci.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                      <th scope="col" className="whitespace-nowrap px-4 py-2">
+                        Salarié
+                      </th>
+                      <th scope="col" className="whitespace-nowrap px-3 py-2">
+                        Nb. absences
+                      </th>
+                      <th scope="col" className="px-3 py-2">
+                        Dates
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyAbsences.map((row) => (
+                      <tr key={row.empCode} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                        <td className="whitespace-nowrap px-4 py-2 font-medium text-slate-800 dark:text-slate-100">{row.name}</td>
+                        <td className="whitespace-nowrap px-3 py-2 tabular-nums font-medium text-red-600 dark:text-red-400">{row.dates.length}</td>
+                        <td className="px-3 py-2 tabular-nums text-slate-600 dark:text-slate-300">le {formatAbsenceDates(row.dates)}</td>
                       </tr>
                     ))}
                   </tbody>
