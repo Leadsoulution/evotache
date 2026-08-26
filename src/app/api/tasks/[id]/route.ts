@@ -42,19 +42,39 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude these server-owned fields from the update payload
   const { id: _ignoredId, createdBy: _ignoredCreatedBy, createdAt: _ignoredCreatedAt, updatedAt: _ignoredUpdatedAt, startDate, dueDate, recurrence, customValues, ...rest } = patch;
-  const task = await db.task.update({
+  await db.task.update({
     where: { id },
     data: {
       ...rest,
       ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
       ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
-      ...(recurrence !== undefined && { recurrence: recurrence === null ? Prisma.JsonNull : recurrence }),
       ...(customValues !== undefined && { customValues }),
     } as Prisma.TaskUncheckedUpdateInput,
   });
 
+  // Clearing recurrence marks "the next occurrence has been spawned" — done
+  // as its own conditional update (only applies if recurrence is still set)
+  // so two concurrent sessions racing to complete/advance the same
+  // recurring task can't both win and each spawn their own duplicate next
+  // occurrence. `recurrenceCleared` tells the caller whether *this* request
+  // was the one that actually cleared it (false means someone else already
+  // did, so the caller must not spawn a successor).
+  let recurrenceCleared: boolean | undefined;
+  if (recurrence !== undefined) {
+    if (recurrence === null) {
+      const result = await db.task.updateMany({ where: { id, recurrence: { not: Prisma.JsonNull } }, data: { recurrence: Prisma.JsonNull } });
+      recurrenceCleared = result.count > 0;
+    } else {
+      await db.task.update({ where: { id }, data: { recurrence: recurrence as unknown as Prisma.InputJsonValue } });
+      recurrenceCleared = true;
+    }
+  }
+
+  const task = await db.task.findUnique({ where: { id } });
+  if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
+
   const newlyAssigned = task.assigneeIds.filter((assigneeId) => !existing.assigneeIds.includes(assigneeId));
   void notifyTaskAssignment(newlyAssigned, task);
 
-  return NextResponse.json(toPublicTask(task));
+  return NextResponse.json({ ...toPublicTask(task), ...(recurrenceCleared !== undefined && { recurrenceCleared }) });
 }

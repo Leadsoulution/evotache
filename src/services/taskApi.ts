@@ -37,7 +37,12 @@ export async function createTaskRequest(draft: TaskDraft, continuesTaskId?: stri
   return response.json();
 }
 
-export async function updateTaskRequest(id: string, patch: Partial<Task>): Promise<Task> {
+/** `recurrenceCleared` is only present when the patch touches `recurrence`
+ * — true means this request was the one that actually cleared it, false
+ * means another concurrent request already had (see the PATCH route's
+ * race-safe conditional clear), so the caller must not spawn a duplicate
+ * next occurrence. */
+export async function updateTaskRequest(id: string, patch: Partial<Task>): Promise<Task & { recurrenceCleared?: boolean }> {
   const response = await fetch(`/api/tasks/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

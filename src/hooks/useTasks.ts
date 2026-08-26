@@ -237,7 +237,15 @@ export function useTasks(module: TaskModule): UseTasksResult {
         updatedAt: now,
       };
       try {
-        const [created] = await Promise.all([createTaskRequest(draft, source.id), updateTaskRequest(source.id, { recurrence: null })]);
+        // Claim the spawn *before* creating anything: if a concurrent
+        // session (another tab, another user viewing the same list) already
+        // cleared this task's recurrence a moment earlier, recurrenceCleared
+        // comes back false and this session must not also create a next
+        // occurrence — that would leave two duplicate copies behind, one per
+        // session that raced to advance the same overdue task.
+        const clearResult = await updateTaskRequest(source.id, { recurrence: null });
+        if (!clearResult.recurrenceCleared) return;
+        const created = await createTaskRequest(draft, source.id);
         await tasksSWR.mutate(
           (current) => {
             const list = current ?? tasksRef.current;
@@ -298,7 +306,12 @@ export function useTasks(module: TaskModule): UseTasksResult {
       try {
         const updated = await updateTaskRequest(id, finalPatch);
         await tasksSWR.mutate((current) => (current ?? previous).map((t) => (t.id === id ? updated : t)), { revalidate: false });
-        if (completesRecurrence && existingTask) await spawnNextOccurrence(existingTask);
+        // updated.recurrenceCleared is false if a concurrent session already
+        // cleared this task's recurrence first (e.g. someone else completed
+        // it, or the overdue-auto-advance effect fired at the same moment)
+        // — that session already spawned the next occurrence, so this one
+        // must not spawn a duplicate.
+        if (completesRecurrence && existingTask && updated.recurrenceCleared) await spawnNextOccurrence(existingTask);
       } catch (err) {
         await tasksSWR.mutate(previous, { revalidate: false });
         toast.error(err instanceof Error ? err.message : "Failed to update task.");
