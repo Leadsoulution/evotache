@@ -45,6 +45,7 @@ export function AdProjectDialog({ open, project, onClose, onSubmit }: AdProjectD
   const [totalBudget, setTotalBudget] = useState("");
   const [metaAdAccountId, setMetaAdAccountId] = useState<string | null>(null);
   const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccountOption[] | null>(null);
+  const [metaAdAccountsError, setMetaAdAccountsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -63,17 +64,27 @@ export function AdProjectDialog({ open, project, onClose, onSubmit }: AdProjectD
     }
   }
 
+  // A non-ok response (e.g. a 403 for a role without workflow:manage) still
+  // parses as JSON — `{ error: "Forbidden" }` — so it must be checked
+  // explicitly, not just coerced to an empty array. Without that check this
+  // silently rendered "no accounts to link" with zero indication anything
+  // went wrong, indistinguishable from Meta genuinely not being connected.
   useEffect(() => {
     if (!open) return;
     fetch("/api/integrations/meta/status")
       .then((res) => res.json())
       .then((status: { connected: boolean }) => {
         if (!status.connected) return;
-        return fetch("/api/integrations/meta/ad-accounts")
-          .then((res) => res.json())
-          .then((accounts: MetaAdAccountOption[]) => setMetaAdAccounts(Array.isArray(accounts) ? accounts : []));
+        return fetch("/api/integrations/meta/ad-accounts").then(async (res) => {
+          const data = await res.json().catch(() => null);
+          if (!res.ok) {
+            setMetaAdAccountsError(data?.error ?? "Failed to load Meta ad accounts.");
+            return;
+          }
+          setMetaAdAccounts(Array.isArray(data) ? data : []);
+        });
       })
-      .catch(() => {});
+      .catch(() => setMetaAdAccountsError("Failed to load Meta ad accounts."));
   }, [open]);
 
   useEffect(() => {
@@ -190,6 +201,12 @@ export function AdProjectDialog({ open, project, onClose, onSubmit }: AdProjectD
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Total budget ($)</span>
             <input type="number" min="0" step="0.01" value={totalBudget} onChange={(event) => setTotalBudget(event.target.value)} placeholder="0.00" className={inputClass} />
           </label>
+
+          {metaAdAccountsError && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              Couldn&apos;t load Meta ad accounts: {metaAdAccountsError}
+            </p>
+          )}
 
           {metaAdAccounts && metaAdAccounts.length > 0 && (
             <label className="block text-sm">
