@@ -23,21 +23,8 @@ export async function GET() {
     servicesByRepairId.set(service.repairId, list);
   }
 
-  // Customer-friendly ticket number: this bike's rank among every repair
-  // (any status) entered since the 1st of the current month, oldest
-  // first — derived at read time (never stored) so it can't drift out of
-  // sync, same "computed, not persisted" pattern as isWorkshopRepairLate.
-  // Kept stable across the shift as earlier tickets finish and drop off
-  // the TV: it's each bike's own entry rank, not its position in this
-  // filtered list.
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEntries = await db.workshopRepair.findMany({
-    where: { entryDate: { gte: startOfMonth } },
-    orderBy: { entryDate: "asc" },
-    select: { id: true },
-  });
-  const monthlyNumberById = new Map(monthEntries.map((r, i) => [r.id, i + 1]));
-
-  return NextResponse.json(repairs.map((repair) => toWorkshopTvRepair(repair, servicesByRepairId.get(repair.id) ?? [], monthlyNumberById.get(repair.id) ?? null)));
+  // displayNumber is just this repair's 1-based rank in this very list
+  // (already sorted oldest-first above) — plain "1st, 2nd, 3rd" for
+  // whatever's on screen right now, not a persisted ticket number.
+  return NextResponse.json(repairs.map((repair, i) => toWorkshopTvRepair(repair, servicesByRepairId.get(repair.id) ?? [], i + 1)));
 }

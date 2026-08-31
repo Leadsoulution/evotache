@@ -76,9 +76,9 @@ export function toPublicWorkshopStatusHistoryEntry(entry: DbWorkshopStatusHistor
  * unauthenticated /api/workshop/tv route can never leak more than this
  * even if the TV page's own code changes. `services` carries only job
  * names, sorted by their display order — never status/date/chrono.
- * `monthlyNumber` is computed by the route (rank among this month's
- * entries), not derived from anything on the repair row itself. */
-export function toWorkshopTvRepair(repair: DbWorkshopRepair, services: DbWorkshopService[], monthlyNumber: number | null): WorkshopTvRepair {
+ * `displayNumber` is just this repair's 1-based position in the list the
+ * route is building (the route passes it in, having already sorted). */
+export function toWorkshopTvRepair(repair: DbWorkshopRepair, services: DbWorkshopService[], displayNumber: number): WorkshopTvRepair {
   return {
     id: repair.id,
     brand: repair.brand,
@@ -89,6 +89,6 @@ export function toWorkshopTvRepair(repair: DbWorkshopRepair, services: DbWorksho
       .slice()
       .sort((a, b) => a.order - b.order)
       .map((s) => s.description),
-    monthlyNumber,
+    displayNumber,
   };
 }
