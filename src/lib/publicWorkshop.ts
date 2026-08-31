@@ -74,8 +74,10 @@ export function toPublicWorkshopStatusHistoryEntry(entry: DbWorkshopStatusHistor
  * number, year, customer name, phone, price, internal notes, lateness, or
  * mechanic chrono. Built here (not just hidden client-side) so the
  * unauthenticated /api/workshop/tv route can never leak more than this
- * even if the TV page's own code changes. `services` carries only job
- * names, sorted by their display order — never status/date/chrono.
+ * even if the TV page's own code changes. `services` carries only the
+ * names of prestations still to do (a completed one is dropped entirely
+ * — a customer doesn't need to see a finished job listed), sorted by
+ * their display order, and never carries status/date/chrono.
  * `displayNumber` is just this repair's 1-based position in the list the
  * route is building (the route passes it in, having already sorted). */
 export function toWorkshopTvRepair(repair: DbWorkshopRepair, services: DbWorkshopService[], displayNumber: number): WorkshopTvRepair {
@@ -86,7 +88,7 @@ export function toWorkshopTvRepair(repair: DbWorkshopRepair, services: DbWorksho
     engineCc: repair.engineCc,
     status: repair.status as WorkshopStatus,
     services: services
-      .slice()
+      .filter((s) => s.status !== "done")
       .sort((a, b) => a.order - b.order)
       .map((s) => s.description),
     displayNumber,
