@@ -7,7 +7,7 @@ export const WORKSHOP_STATUS_LABEL: Record<WorkshopStatus, string> = {
   in_progress: "En cours",
   waiting_part: "En attente de pièce",
   waiting_client: "En attente client",
-  ready: "Prête",
+  ready: "Terminé",
   picked_up: "Récupérée",
   cancelled: "Réservation annulée",
 };

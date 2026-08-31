@@ -12,7 +12,9 @@ import { toWorkshopTvRepair } from "@/lib/publicWorkshop";
 // itself renders.
 export async function GET() {
   const repairs = await db.workshopRepair.findMany({
-    where: { status: { notIn: ["picked_up", "cancelled"] } },
+    // A repair marked "ready" (labeled "Terminé" — see WORKSHOP_STATUS_LABEL)
+    // is done and rolls off the TV the same way picked_up/cancelled ones do.
+    where: { status: { notIn: ["ready", "picked_up", "cancelled"] } },
     orderBy: { entryDate: "asc" },
   });
   const services = await db.workshopService.findMany({ where: { repairId: { in: repairs.map((r) => r.id) } } });
