@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkshopRepairs } from "@/hooks/useWorkshopRepairs";
+import { useTvCast } from "@/hooks/useTvCast";
 import { fetchUsers } from "@/services/userApi";
 import { canCreateWorkshopRepairs, canDeleteWorkshopRepairs, canEditWorkshopStatus } from "@/config/roleMeta";
 import { WorkshopMechanicCard } from "./WorkshopMechanicCard";
@@ -12,7 +13,8 @@ import { WorkshopRepairDialog } from "./WorkshopRepairDialog";
 import { WorkshopDetailDrawer } from "./WorkshopDetailDrawer";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
-import { PlusIcon, TvIcon } from "@/components/ui/icons";
+import { useToast } from "@/components/ui/Toast";
+import { CastIcon, PlusIcon, TvIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { WORKSHOP_STATUS_LABEL, WORKSHOP_STATUS_ORDER } from "@/lib/workshopStats";
 import type { AppUser } from "@/types/user";
@@ -22,6 +24,8 @@ type Tab = "mine" | "board";
 
 export function WorkshopView() {
   const { user } = useAuth();
+  const toast = useToast();
+  const { isCasting, startCasting, stopCasting } = useTvCast();
   const { data: usersData } = useSWR<AppUser[]>(user ? "users" : null, fetchUsers);
   const mechanics = useMemo(
     () => (usersData ?? []).filter((u) => u.status === "active" && !u.isAgent).map((u) => ({ id: u.id, name: u.name, color: u.color, photoDataUrl: u.photoDataUrl })),
@@ -73,6 +77,21 @@ export function WorkshopView() {
   // whatever it looked like the moment it was opened.
   const openRepair = detailRepair ? (repairs.find((r) => r.id === detailRepair.id) ?? detailRepair) : null;
 
+  async function handleCastClick() {
+    if (isCasting) {
+      stopCasting();
+      toast.info("Diffusion arrêtée.");
+      return;
+    }
+    const result = await startCasting(`${window.location.origin}/atelier/tv`);
+    if (result.ok) {
+      toast.success("Diffusion démarrée sur la TV sélectionnée.");
+    } else if (result.reason === "unsupported") {
+      toast.info('Votre navigateur ne permet pas de rechercher une TV disponible. Utilisez le bouton "Caster" de Chrome, ou ouvrez "Écran TV" sur un appareil déjà connecté à la TV.');
+    }
+    // "cancelled" (device picker closed with no selection) — nothing to say.
+  }
+
   if (!user) return null;
 
   return (
@@ -92,6 +111,20 @@ export function WorkshopView() {
             <TvIcon className="h-4 w-4" />
             Écran TV
           </a>
+          <button
+            type="button"
+            onClick={handleCastClick}
+            title="Rechercher une TV disponible sur le réseau et y diffuser l'écran"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium",
+              isCasting
+                ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300"
+                : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            )}
+          >
+            <CastIcon className="h-4 w-4" />
+            {isCasting ? "Diffusion en cours…" : "Diffuser sur une TV"}
+          </button>
           {canCreate && (
             <button
               type="button"

@@ -648,3 +648,14 @@ export function TvIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function CastIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+      <path d="M2 12a6 6 0 0 1 6 6" />
+      <path d="M2 16a2 2 0 0 1 2 2" />
+      <circle cx="3" cy="19" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
