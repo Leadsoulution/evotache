@@ -716,7 +716,6 @@ model WorkshopRepair {
   year                   Int?
   engineCc               Int?
   registration           String?
-  workDescription        String         @default("")
   mechanicId             String?
   status                 WorkshopStatus @default(waiting)
   entryDate              DateTime       @default(now())
@@ -726,14 +725,47 @@ model WorkshopRepair {
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
-  sessions      WorkshopSession[]
+  services      WorkshopService[]
   statusHistory WorkshopStatusHistory[]
 
   @@map("workshop_repairs")
 }
 
-// One row per continuous DÉMARRER→TERMINER chrono lifecycle (a repair can
-// have several across its life, e.g. reopened after being marked ready).
+// A repair is broken into one or more concrete jobs (e.g. "Plaquettes" +
+// "Pneus"), each independently scheduled/timed by the mechanic — this is
+// what workDescription used to be (a single free-text field) before it
+// became clear a bike can need several distinct services in parallel.
+// `scheduledDate` is the mechanic's own "réalisation prévue" entry, not the
+// repair-wide expectedCompletionDate; lateness is judged per service
+// against it (see isWorkshopServiceLate), for internal use only — the
+// public TV never sees this.
+enum WorkshopServiceStatus {
+  waiting // EN ATTENTE
+  in_progress // EN COURS
+  done // TERMINÉ
+
+  @@map("workshop_service_status")
+}
+
+model WorkshopService {
+  id            String                @id @default(cuid())
+  repairId      String
+  repair        WorkshopRepair        @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  description   String
+  scheduledDate DateTime?
+  status        WorkshopServiceStatus @default(waiting)
+  completedAt   DateTime?
+  order         Int                   @default(0)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  sessions WorkshopSession[]
+
+  @@map("workshop_services")
+}
+
+// One row per continuous DÉMARRER→TERMINER chrono lifecycle for one
+// service (a service can have several across its life, e.g. reopened).
 // Pause/resume within that lifecycle don't create new rows — they toggle
 // `runningSince` and bank the elapsed segment into `accumulatedSeconds` —
 // so live elapsed time is always `accumulatedSeconds + (runningSince ? now
@@ -741,13 +773,13 @@ model WorkshopRepair {
 // refresh reads the same two fields and gets the same answer, which is the
 // whole point: the chrono lives in the database, not in browser state.
 model WorkshopSession {
-  id                 String         @id @default(cuid())
-  repairId           String
-  repair             WorkshopRepair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  id                 String          @id @default(cuid())
+  serviceId          String
+  service            WorkshopService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   mechanicId         String
-  startedAt          DateTime       @default(now())
+  startedAt          DateTime        @default(now())
   runningSince       DateTime? // non-null while actively counting; null while paused or after ending
-  accumulatedSeconds Int            @default(0) // banked seconds from segments already paused
+  accumulatedSeconds Int             @default(0) // banked seconds from segments already paused
   pausedAt           DateTime?
   endedAt            DateTime?
   totalWorkSeconds   Int? // final total, set once when ended

@@ -5,9 +5,10 @@ import { toWorkshopTvRepair } from "@/lib/publicWorkshop";
 // Deliberately public — no getSessionUser check. This feeds the client-
 // facing TV display (/atelier/tv), meant to run unattended in the shop's
 // waiting area with no login. toWorkshopTvRepair() is what actually
-// enforces the safe-fields allowlist (no customer name/phone/price/notes/
-// mechanic chrono) — this route can never leak more than that shape,
-// independent of whatever the TV page itself renders.
+// enforces the safe-fields allowlist (brand/model/cc/status only — no
+// order number, year, customer name/phone/price/notes, mechanic chrono, or
+// lateness, which is an internal-only signal) — this route can never leak
+// more than that shape, independent of whatever the TV page itself renders.
 export async function GET() {
   const repairs = await db.workshopRepair.findMany({
     where: { status: { notIn: ["picked_up", "cancelled"] } },

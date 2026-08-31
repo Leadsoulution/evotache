@@ -4,20 +4,35 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import useSWR from "swr";
 import {
   createWorkshopRepairRequest,
+  createWorkshopServiceRequest,
   deleteWorkshopRepairRequest,
+  deleteWorkshopServiceRequest,
   fetchWorkshopRepairs,
   updateWorkshopRepairRequest,
-  workshopSessionActionRequest,
+  updateWorkshopServiceRequest,
+  workshopServiceSessionActionRequest,
 } from "@/services/workshopApi";
 import type { WorkshopSessionAction } from "@/services/workshopApi";
 import { useToast } from "@/components/ui/Toast";
-import type { WorkshopRepair, WorkshopRepairDraft } from "@/types/workshop";
+import type { WorkshopRepair, WorkshopRepairDraft, WorkshopService } from "@/types/workshop";
 
 // Polled every 15s — same "reuse the app's existing convention" approach
 // as chat/biometrics (SWR refreshInterval), not a new WebSocket/SSE layer.
 // Short enough that the board and the TV display both feel live without
 // needing every client action to also broadcast an update itself.
 const REFRESH_MS = 15_000;
+
+/** Replaces one service within its parent repair, wherever it is in the
+ * list — every service mutation (edit/delete/chrono action) is really "one
+ * repair's nested services array changed", so this one helper covers all
+ * of them. */
+function replaceService(repairs: WorkshopRepair[], serviceId: string, next: WorkshopService | null): WorkshopRepair[] {
+  return repairs.map((repair) => {
+    if (!repair.services.some((s) => s.id === serviceId)) return repair;
+    const services = next ? repair.services.map((s) => (s.id === serviceId ? next : s)) : repair.services.filter((s) => s.id !== serviceId);
+    return { ...repair, services };
+  });
+}
 
 export function useWorkshopRepairs() {
   const toast = useToast();
@@ -77,11 +92,60 @@ export function useWorkshopRepairs() {
     [mutate, toast]
   );
 
-  const runSessionAction = useCallback(
-    async (id: string, action: WorkshopSessionAction) => {
+  const createService = useCallback(
+    async (repairId: string, description: string, scheduledDate: string | null) => {
       try {
-        const updated = await workshopSessionActionRequest(id, action);
-        await mutate((current) => (current ?? repairsRef.current).map((r) => (r.id === id ? updated : r)), { revalidate: false });
+        const created = await createWorkshopServiceRequest(repairId, description, scheduledDate);
+        await mutate(
+          (current) => (current ?? repairsRef.current).map((r) => (r.id === repairId ? { ...r, services: [...r.services, created] } : r)),
+          { revalidate: false }
+        );
+        return created;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to add the service.");
+        return null;
+      }
+    },
+    [mutate, toast]
+  );
+
+  const updateService = useCallback(
+    async (id: string, patch: Partial<WorkshopService>) => {
+      const previous = repairsRef.current;
+      await mutate(replaceService(previous, id, { ...previous.flatMap((r) => r.services).find((s) => s.id === id)!, ...patch }), { revalidate: false });
+      try {
+        const updated = await updateWorkshopServiceRequest(id, patch);
+        await mutate((current) => replaceService(current ?? previous, id, updated), { revalidate: false });
+      } catch (err) {
+        await mutate(previous, { revalidate: false });
+        toast.error(err instanceof Error ? err.message : "Failed to update the service.");
+      }
+    },
+    [mutate, toast]
+  );
+
+  const deleteService = useCallback(
+    async (id: string) => {
+      const previous = repairsRef.current;
+      await mutate(replaceService(previous, id, null), { revalidate: false });
+      try {
+        await deleteWorkshopServiceRequest(id);
+      } catch (err) {
+        await mutate(previous, { revalidate: false });
+        toast.error(err instanceof Error ? err.message : "Failed to delete the service.");
+      }
+    },
+    [mutate, toast]
+  );
+
+  const runServiceSessionAction = useCallback(
+    async (serviceId: string, action: WorkshopSessionAction) => {
+      try {
+        const updated = await workshopServiceSessionActionRequest(serviceId, action);
+        // A "start" also flips the parent repair to in_progress server-side
+        // — cheapest way to keep that in sync client-side is a background
+        // revalidation rather than reconstructing repair-level state here.
+        await mutate((current) => replaceService(current ?? repairsRef.current, serviceId, updated), { revalidate: action === "start" });
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to update the chrono.");
       }
@@ -95,7 +159,10 @@ export function useWorkshopRepairs() {
     createRepair,
     updateRepair,
     deleteRepair,
-    runSessionAction,
+    createService,
+    updateService,
+    deleteService,
+    runServiceSessionAction,
     refetch: () => mutate(),
   };
 }

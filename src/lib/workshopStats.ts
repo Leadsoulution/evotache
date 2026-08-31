@@ -1,4 +1,4 @@
-import type { WorkshopRepair, WorkshopSession, WorkshopStatus } from "@/types/workshop";
+import type { WorkshopRepair, WorkshopService, WorkshopSession, WorkshopStatus } from "@/types/workshop";
 
 export const WORKSHOP_STATUS_ORDER: WorkshopStatus[] = ["waiting", "in_progress", "waiting_part", "waiting_client", "ready", "picked_up", "cancelled"];
 
@@ -24,6 +24,12 @@ export const WORKSHOP_STATUS_COLOR: Record<WorkshopStatus, string> = {
   cancelled: "#ef4444",
 };
 
+export const WORKSHOP_SERVICE_STATUS_LABEL: Record<WorkshopService["status"], string> = {
+  waiting: "En attente",
+  in_progress: "En cours",
+  done: "Terminé",
+};
+
 /** Board columns — "late" isn't a stored status, it's an overlay on top of
  * one of these (see isWorkshopRepairLate), so it's not listed here as a
  * column of its own; late repairs still show in their real column, just
@@ -33,11 +39,20 @@ export const WORKSHOP_BOARD_STATUSES: WorkshopStatus[] = ["waiting", "in_progres
 /** A repair reads as "late" once its expected completion date has passed
  * and it hasn't reached a terminal state yet — computed, not stored, same
  * idea as Task's isOverdue, so nothing has to manually move it in/out of
- * that state as work continues or the date changes. */
+ * that state as work continues or the date changes. Internal use only
+ * (Board/mechanic view) — the public TV never shows this. */
 export function isWorkshopRepairLate(repair: Pick<WorkshopRepair, "status" | "expectedCompletionDate">): boolean {
   if (!repair.expectedCompletionDate) return false;
   if (repair.status === "ready" || repair.status === "picked_up" || repair.status === "cancelled") return false;
   return new Date(repair.expectedCompletionDate).getTime() < Date.now();
+}
+
+/** Same idea, per service: late once its own scheduledDate (the mechanic's
+ * own "réalisation prévue" entry) has passed and it isn't done yet.
+ * Internal only, never shown to the customer on the TV. */
+export function isWorkshopServiceLate(service: Pick<WorkshopService, "status" | "scheduledDate">): boolean {
+  if (!service.scheduledDate || service.status === "done") return false;
+  return new Date(service.scheduledDate).getTime() < Date.now();
 }
 
 /** Live elapsed seconds for a chrono session, purely derived from

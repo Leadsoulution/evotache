@@ -1,11 +1,15 @@
-import type { WorkshopRepair as DbWorkshopRepair, WorkshopSession as DbWorkshopSession, WorkshopStatusHistory as DbWorkshopStatusHistory } from "@/generated/prisma/client";
-import type { WorkshopRepair, WorkshopSession, WorkshopStatus, WorkshopStatusHistoryEntry, WorkshopTvRepair } from "@/types/workshop";
-import { isWorkshopRepairLate } from "@/lib/workshopStats";
+import type {
+  WorkshopRepair as DbWorkshopRepair,
+  WorkshopService as DbWorkshopService,
+  WorkshopSession as DbWorkshopSession,
+  WorkshopStatusHistory as DbWorkshopStatusHistory,
+} from "@/generated/prisma/client";
+import type { WorkshopRepair, WorkshopService, WorkshopServiceStatus, WorkshopSession, WorkshopStatus, WorkshopStatusHistoryEntry, WorkshopTvRepair } from "@/types/workshop";
 
 export function toPublicWorkshopSession(session: DbWorkshopSession): WorkshopSession {
   return {
     id: session.id,
-    repairId: session.repairId,
+    serviceId: session.serviceId,
     mechanicId: session.mechanicId,
     startedAt: session.startedAt.toISOString(),
     runningSince: session.runningSince ? session.runningSince.toISOString() : null,
@@ -16,11 +20,25 @@ export function toPublicWorkshopSession(session: DbWorkshopSession): WorkshopSes
   };
 }
 
-/** `activeSession` is the repair's most recent chrono session (running,
- * paused, or already ended) — whichever the UI needs to show current/last
- * elapsed time, so callers don't have to fetch sessions separately for the
- * common case of "one session per repair". */
-export function toPublicWorkshopRepair(repair: DbWorkshopRepair, activeSession: DbWorkshopSession | null): WorkshopRepair {
+/** `activeSession` is the service's most recent chrono session (running,
+ * paused, or already ended) — whichever the UI needs for current/last
+ * elapsed time. */
+export function toPublicWorkshopService(service: DbWorkshopService, activeSession: DbWorkshopSession | null): WorkshopService {
+  return {
+    id: service.id,
+    repairId: service.repairId,
+    description: service.description,
+    scheduledDate: service.scheduledDate ? service.scheduledDate.toISOString() : null,
+    status: service.status as WorkshopServiceStatus,
+    completedAt: service.completedAt ? service.completedAt.toISOString() : null,
+    order: service.order,
+    createdAt: service.createdAt.toISOString(),
+    updatedAt: service.updatedAt.toISOString(),
+    activeSession: activeSession ? toPublicWorkshopSession(activeSession) : null,
+  };
+}
+
+export function toPublicWorkshopRepair(repair: DbWorkshopRepair, services: WorkshopService[]): WorkshopRepair {
   return {
     id: repair.id,
     orderNumber: repair.orderNumber,
@@ -29,7 +47,6 @@ export function toPublicWorkshopRepair(repair: DbWorkshopRepair, activeSession: 
     year: repair.year,
     engineCc: repair.engineCc,
     registration: repair.registration,
-    workDescription: repair.workDescription,
     mechanicId: repair.mechanicId,
     status: repair.status as WorkshopStatus,
     entryDate: repair.entryDate.toISOString(),
@@ -38,7 +55,7 @@ export function toPublicWorkshopRepair(repair: DbWorkshopRepair, activeSession: 
     createdBy: repair.createdBy,
     createdAt: repair.createdAt.toISOString(),
     updatedAt: repair.updatedAt.toISOString(),
-    activeSession: activeSession ? toPublicWorkshopSession(activeSession) : null,
+    services: services.sort((a, b) => a.order - b.order),
   };
 }
 
@@ -53,20 +70,17 @@ export function toPublicWorkshopStatusHistoryEntry(entry: DbWorkshopStatusHistor
   };
 }
 
-/** Only the fields the public TV display is allowed to show — no customer
- * name, phone, price, internal notes, or mechanic chrono. Built here (not
- * just hidden client-side) so the unauthenticated /api/workshop/tv route
- * can never leak more than this even if the TV page's own code changes. */
+/** Only the fields the public TV display is allowed to show — no order
+ * number, year, customer name, phone, price, internal notes, lateness, or
+ * mechanic chrono. Built here (not just hidden client-side) so the
+ * unauthenticated /api/workshop/tv route can never leak more than this
+ * even if the TV page's own code changes. */
 export function toWorkshopTvRepair(repair: DbWorkshopRepair): WorkshopTvRepair {
-  const status = repair.status as WorkshopStatus;
   return {
     id: repair.id,
-    orderNumber: repair.orderNumber,
     brand: repair.brand,
     model: repair.model,
-    year: repair.year,
     engineCc: repair.engineCc,
-    status,
-    isLate: isWorkshopRepairLate({ status, expectedCompletionDate: repair.expectedCompletionDate ? repair.expectedCompletionDate.toISOString() : null }),
+    status: repair.status as WorkshopStatus,
   };
 }

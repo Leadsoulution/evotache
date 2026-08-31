@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { XIcon, TrashIcon } from "@/components/ui/icons";
+import { XIcon, TrashIcon, PlusIcon } from "@/components/ui/icons";
 import { fetchWorkshopStatusHistory } from "@/services/workshopApi";
-import { useWorkshopChrono } from "@/hooks/useWorkshopChrono";
-import { formatWorkshopChrono, WORKSHOP_STATUS_LABEL } from "@/lib/workshopStats";
+import { WORKSHOP_STATUS_LABEL } from "@/lib/workshopStats";
 import { WorkshopStatusBadge } from "./WorkshopStatusBadge";
 import { WorkshopStatusMenu } from "./WorkshopStatusMenu";
 import { WorkshopMechanicMenu } from "./WorkshopMechanicMenu";
-import { formatDueDate } from "@/lib/date";
+import { WorkshopServiceRow } from "./WorkshopServiceRow";
+import { formatDueDate, fromDateTimeInputValue } from "@/lib/date";
+import type { WorkshopSessionAction } from "@/services/workshopApi";
 import type { Assignee } from "@/types/task";
 import type { WorkshopRepair, WorkshopStatus, WorkshopStatusHistoryEntry } from "@/types/workshop";
 
@@ -17,15 +18,32 @@ interface WorkshopDetailDrawerProps {
   repair: WorkshopRepair | null;
   mechanics: Assignee[];
   canEditStatus: boolean;
+  canEditRepair: boolean;
   canDelete: boolean;
   onClose: () => void;
   onUpdate: (id: string, patch: Partial<WorkshopRepair>) => void;
   onDelete: (id: string) => void;
+  onSessionAction: (serviceId: string, action: WorkshopSessionAction) => void;
+  onAddService: (repairId: string, description: string, scheduledDate: string | null) => void;
+  onDeleteService: (serviceId: string) => void;
 }
 
-export function WorkshopDetailDrawer({ repair, mechanics, canEditStatus, canDelete, onClose, onUpdate, onDelete }: WorkshopDetailDrawerProps) {
+export function WorkshopDetailDrawer({
+  repair,
+  mechanics,
+  canEditStatus,
+  canEditRepair,
+  canDelete,
+  onClose,
+  onUpdate,
+  onDelete,
+  onSessionAction,
+  onAddService,
+  onDeleteService,
+}: WorkshopDetailDrawerProps) {
   const [history, setHistory] = useState<WorkshopStatusHistoryEntry[]>([]);
-  const elapsedSeconds = useWorkshopChrono(repair?.activeSession ?? null);
+  const [newServiceDescription, setNewServiceDescription] = useState("");
+  const [newServiceDate, setNewServiceDate] = useState("");
 
   useEffect(() => {
     if (!repair) return;
@@ -44,6 +62,14 @@ export function WorkshopDetailDrawer({ repair, mechanics, canEditStatus, canDele
   if (!repair) return null;
 
   const mechanicById = new Map(mechanics.map((m) => [m.id, m]));
+
+  function handleAddService() {
+    const description = newServiceDescription.trim();
+    if (!description || !repair) return;
+    onAddService(repair.id, description, fromDateTimeInputValue(newServiceDate));
+    setNewServiceDescription("");
+    setNewServiceDate("");
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[80] flex justify-end">
@@ -76,24 +102,8 @@ export function WorkshopDetailDrawer({ repair, mechanics, canEditStatus, canDele
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Mécanicien</span>
-            <WorkshopMechanicMenu mechanics={mechanics} value={repair.mechanicId} onChange={(mechanicId) => onUpdate(repair.id, { mechanicId })} readOnly={!canEditStatus} />
+            <WorkshopMechanicMenu mechanics={mechanics} value={repair.mechanicId} onChange={(mechanicId) => onUpdate(repair.id, { mechanicId })} readOnly={!canEditRepair} />
           </div>
-
-          {repair.activeSession && (
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Temps travaillé</span>
-              <span className="font-mono text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100">
-                {formatWorkshopChrono(repair.activeSession.endedAt ? (repair.activeSession.totalWorkSeconds ?? 0) : elapsedSeconds)}
-              </span>
-            </div>
-          )}
-
-          {repair.workDescription && (
-            <div>
-              <p className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Travail demandé</p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">{repair.workDescription}</p>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
@@ -104,6 +114,58 @@ export function WorkshopDetailDrawer({ repair, mechanics, canEditStatus, canDele
               <p className="text-slate-400">Date prévue</p>
               <p className="text-slate-700 dark:text-slate-300">{formatDueDate(repair.expectedCompletionDate)}</p>
             </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Prestations</p>
+            {repair.services.length === 0 ? (
+              <p className="mb-2 text-xs text-slate-400">Aucune prestation pour l&apos;instant.</p>
+            ) : (
+              <div className="mb-2 flex flex-col gap-2">
+                {repair.services.map((service) => (
+                  <div key={service.id} className="relative">
+                    <WorkshopServiceRow service={service} onSessionAction={onSessionAction} readOnly={!canEditStatus} />
+                    {canEditRepair && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteService(service.id)}
+                        className="absolute right-2 top-2 rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+                        aria-label="Supprimer cette prestation"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {canEditRepair && (
+              <div className="flex flex-col gap-2 rounded-lg border border-dashed border-slate-200 p-3 dark:border-slate-700">
+                <input
+                  value={newServiceDescription}
+                  onChange={(e) => setNewServiceDescription(e.target.value)}
+                  placeholder="Nouvelle prestation (ex: Changement des pneus)"
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={newServiceDate}
+                    onChange={(e) => setNewServiceDate(e.target.value)}
+                    className="flex-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddService}
+                    disabled={!newServiceDescription.trim()}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    Ajouter
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

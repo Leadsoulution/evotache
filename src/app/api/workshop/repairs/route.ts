@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs } from "@/config/roleMeta";
-import { toPublicWorkshopRepair } from "@/lib/publicWorkshop";
+import { toPublicWorkshopRepair, toPublicWorkshopService } from "@/lib/publicWorkshop";
 import type { WorkshopRepairDraft } from "@/types/workshop";
 
 export async function GET() {
@@ -10,16 +10,23 @@ export async function GET() {
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const repairs = await db.workshopRepair.findMany({ orderBy: { createdAt: "desc" } });
+  const services = await db.workshopService.findMany({ where: { repairId: { in: repairs.map((r) => r.id) } } });
   const sessions = await db.workshopSession.findMany({
-    where: { repairId: { in: repairs.map((r) => r.id) } },
+    where: { serviceId: { in: services.map((s) => s.id) } },
     orderBy: { startedAt: "desc" },
   });
-  const latestSessionByRepairId = new Map<string, (typeof sessions)[number]>();
+  const latestSessionByServiceId = new Map<string, (typeof sessions)[number]>();
   for (const session of sessions) {
-    if (!latestSessionByRepairId.has(session.repairId)) latestSessionByRepairId.set(session.repairId, session);
+    if (!latestSessionByServiceId.has(session.serviceId)) latestSessionByServiceId.set(session.serviceId, session);
+  }
+  const servicesByRepairId = new Map<string, ReturnType<typeof toPublicWorkshopService>[]>();
+  for (const service of services) {
+    const list = servicesByRepairId.get(service.repairId) ?? [];
+    list.push(toPublicWorkshopService(service, latestSessionByServiceId.get(service.id) ?? null));
+    servicesByRepairId.set(service.repairId, list);
   }
 
-  return NextResponse.json(repairs.map((repair) => toPublicWorkshopRepair(repair, latestSessionByRepairId.get(repair.id) ?? null)));
+  return NextResponse.json(repairs.map((repair) => toPublicWorkshopRepair(repair, servicesByRepairId.get(repair.id) ?? [])));
 }
 
 export async function POST(request: Request) {
@@ -45,7 +52,6 @@ export async function POST(request: Request) {
       year: draft.year ?? null,
       engineCc: draft.engineCc ?? null,
       registration: draft.registration?.trim() || null,
-      workDescription: draft.workDescription ?? "",
       mechanicId: draft.mechanicId ?? null,
       status: "waiting",
       expectedCompletionDate: draft.expectedCompletionDate ? new Date(draft.expectedCompletionDate) : null,
@@ -57,5 +63,16 @@ export async function POST(request: Request) {
     data: { repairId: repair.id, oldStatus: null, newStatus: "waiting", changedBy: sessionUser.id },
   });
 
-  return NextResponse.json(toPublicWorkshopRepair(repair, null), { status: 201 });
+  const serviceDrafts = (draft.services ?? []).filter((s) => s.description?.trim());
+  const createdServices = [];
+  for (let i = 0; i < serviceDrafts.length; i++) {
+    const s = serviceDrafts[i];
+    createdServices.push(
+      await db.workshopService.create({
+        data: { repairId: repair.id, description: s.description.trim(), scheduledDate: s.scheduledDate ? new Date(s.scheduledDate) : null, order: i },
+      })
+    );
+  }
+
+  return NextResponse.json(toPublicWorkshopRepair(repair, createdServices.map((s) => toPublicWorkshopService(s, null))), { status: 201 });
 }

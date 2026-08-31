@@ -1,4 +1,4 @@
-import type { WorkshopRepair, WorkshopRepairDraft, WorkshopStatusHistoryEntry, WorkshopTvRepair } from "@/types/workshop";
+import type { WorkshopRepair, WorkshopRepairDraft, WorkshopService, WorkshopStatusHistoryEntry, WorkshopTvRepair } from "@/types/workshop";
 
 export class ApiError extends Error {}
 
@@ -38,10 +38,35 @@ export async function deleteWorkshopRepairRequest(id: string): Promise<void> {
   if (!response.ok) return parseErrorOrThrow(response);
 }
 
+export async function createWorkshopServiceRequest(repairId: string, description: string, scheduledDate: string | null): Promise<WorkshopService> {
+  const response = await fetch("/api/workshop/services", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repairId, description, scheduledDate }),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}
+
+export async function updateWorkshopServiceRequest(id: string, patch: Partial<WorkshopService>): Promise<WorkshopService> {
+  const response = await fetch(`/api/workshop/services/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) return parseErrorOrThrow(response);
+  return response.json();
+}
+
+export async function deleteWorkshopServiceRequest(id: string): Promise<void> {
+  const response = await fetch(`/api/workshop/services/${id}`, { method: "DELETE" });
+  if (!response.ok) return parseErrorOrThrow(response);
+}
+
 export type WorkshopSessionAction = "start" | "pause" | "resume" | "end";
 
-export async function workshopSessionActionRequest(id: string, action: WorkshopSessionAction): Promise<WorkshopRepair> {
-  const response = await fetch(`/api/workshop/repairs/${id}/session`, {
+export async function workshopServiceSessionActionRequest(serviceId: string, action: WorkshopSessionAction): Promise<WorkshopService> {
+  const response = await fetch(`/api/workshop/services/${serviceId}/session`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action }),

@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { fetchWorkshopTvRepairs } from "@/services/workshopApi";
 import { WORKSHOP_STATUS_COLOR, WORKSHOP_STATUS_LABEL } from "@/lib/workshopStats";
 import { WrenchIcon } from "@/components/ui/icons";
+import { WorkshopFlagCard } from "./WorkshopFlagCard";
 import type { WorkshopTvRepair } from "@/types/workshop";
 
 const REFRESH_MS = 8_000;
@@ -64,36 +65,28 @@ export function WorkshopTvView() {
 // Matches the reference image's principle: a small flag-shaped tab (angled
 // cut on its right edge, like a ticket stub) overlapping the top-left
 // corner of a thick-bordered, heavily-rounded card — not a full-width
-// colored header bar. The tab carries the status (the reference's own
-// "STEP 01" text was just its placeholder content, not part of the shape
-// to keep) instead of a step number.
+// colored header bar. The tab carries the real status only — never "En
+// retard" (that's an internal-only signal, see isWorkshopRepairLate's
+// docs) and never the order number/year (internal reference numbers, not
+// customer-facing) — just what a customer actually needs to see.
 function WorkshopTvCard({ repair }: { repair: WorkshopTvRepair }) {
-  const color = repair.isLate ? "#ef4444" : WORKSHOP_STATUS_COLOR[repair.status];
-  const label = repair.isLate ? "En retard" : WORKSHOP_STATUS_LABEL[repair.status];
+  const color = WORKSHOP_STATUS_COLOR[repair.status];
+  const label = WORKSHOP_STATUS_LABEL[repair.status];
 
   return (
-    <div className="relative pt-5">
-      <div
-        className="absolute left-8 top-0 z-10 px-6 py-2.5 text-lg font-bold uppercase tracking-wide text-white shadow-md"
-        style={{ backgroundColor: color, clipPath: "polygon(0 0, 100% 0, calc(100% - 22px) 100%, 0 100%)" }}
-      >
-        {label}
-      </div>
-      <div className="flex items-center gap-6 rounded-[2rem] border-[3px] bg-white px-8 py-7 shadow-lg" style={{ borderColor: color }}>
+    <WorkshopFlagCard tabLabel={label} tabColor={color} bodyClassName="bg-white px-8 py-7">
+      <div className="flex items-center gap-6">
         <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${color}1f`, color }}>
           <WrenchIcon className="h-7 w-7" />
         </span>
         <span className="h-14 w-px shrink-0 bg-slate-200" />
-        <div className="flex flex-1 flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-          <span className="text-3xl font-bold tracking-tight text-slate-800">{repair.orderNumber}</span>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-slate-900">
-              {repair.brand} {repair.model}
-            </p>
-            <p className="text-lg text-slate-500">{[repair.year, repair.engineCc ? `${repair.engineCc} cc` : null].filter(Boolean).join(" • ")}</p>
-          </div>
+        <div className="flex-1">
+          <p className="text-3xl font-bold uppercase tracking-tight text-slate-900">
+            {repair.brand} {repair.model}
+          </p>
+          {repair.engineCc && <p className="text-lg text-slate-500">{repair.engineCc} cc</p>}
         </div>
       </div>
-    </div>
+    </WorkshopFlagCard>
   );
 }

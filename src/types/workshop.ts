@@ -1,5 +1,36 @@
 export type WorkshopStatus = "waiting" | "in_progress" | "waiting_part" | "waiting_client" | "ready" | "picked_up" | "cancelled";
 
+export type WorkshopServiceStatus = "waiting" | "in_progress" | "done";
+
+export interface WorkshopSession {
+  id: string;
+  serviceId: string;
+  mechanicId: string;
+  startedAt: string;
+  runningSince: string | null;
+  accumulatedSeconds: number;
+  pausedAt: string | null;
+  endedAt: string | null;
+  totalWorkSeconds: number | null;
+}
+
+/** One concrete job within a repair (e.g. "Plaquettes", "Pneus") — its own
+ * description, mechanic-set scheduled date/time, status, and chrono. A
+ * repair can have several running independently. */
+export interface WorkshopService {
+  id: string;
+  repairId: string;
+  description: string;
+  scheduledDate: string | null;
+  status: WorkshopServiceStatus;
+  completedAt: string | null;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  /** This service's own chrono session, if one has ever been started. */
+  activeSession: WorkshopSession | null;
+}
+
 export interface WorkshopRepair {
   id: string;
   orderNumber: string;
@@ -8,7 +39,6 @@ export interface WorkshopRepair {
   year: number | null;
   engineCc: number | null;
   registration: string | null;
-  workDescription: string;
   mechanicId: string | null;
   status: WorkshopStatus;
   entryDate: string;
@@ -17,20 +47,7 @@ export interface WorkshopRepair {
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
-  /** The repair's own chrono session, if one has ever been started — null until DÉMARRER is first clicked. */
-  activeSession: WorkshopSession | null;
-}
-
-export interface WorkshopSession {
-  id: string;
-  repairId: string;
-  mechanicId: string;
-  startedAt: string;
-  runningSince: string | null;
-  accumulatedSeconds: number;
-  pausedAt: string | null;
-  endedAt: string | null;
-  totalWorkSeconds: number | null;
+  services: WorkshopService[];
 }
 
 export interface WorkshopStatusHistoryEntry {
@@ -44,18 +61,22 @@ export interface WorkshopStatusHistoryEntry {
   changedAt: string;
 }
 
-export type WorkshopRepairDraft = Partial<Omit<WorkshopRepair, "brand" | "model" | "orderNumber">> &
-  Pick<WorkshopRepair, "brand" | "model" | "orderNumber">;
+export interface WorkshopServiceDraft {
+  description: string;
+  scheduledDate: string | null;
+}
+
+export type WorkshopRepairDraft = Partial<Omit<WorkshopRepair, "brand" | "model" | "orderNumber" | "services">> &
+  Pick<WorkshopRepair, "brand" | "model" | "orderNumber"> & { services?: WorkshopServiceDraft[] };
 
 /** Public-facing shape served to the unauthenticated TV display — only
- * the fields explicitly allowed to be shown to a customer in the shop. */
+ * what a customer in the shop is meant to see. No order number (internal
+ * reference), no year, no lateness (that's an internal signal only), no
+ * mechanic/price/notes/chrono. */
 export interface WorkshopTvRepair {
   id: string;
-  orderNumber: string;
   brand: string;
   model: string;
-  year: number | null;
   engineCc: number | null;
   status: WorkshopStatus;
-  isLate: boolean;
 }

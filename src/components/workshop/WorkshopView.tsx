@@ -28,7 +28,7 @@ export function WorkshopView() {
     [usersData]
   );
 
-  const { repairs, loadState, createRepair, updateRepair, deleteRepair, runSessionAction } = useWorkshopRepairs();
+  const { repairs, loadState, createRepair, updateRepair, deleteRepair, createService, deleteService, runServiceSessionAction } = useWorkshopRepairs();
 
   const myRepairs = useMemo(
     () => repairs.filter((r) => r.mechanicId === user?.id && r.status !== "picked_up" && r.status !== "cancelled"),
@@ -55,6 +55,7 @@ export function WorkshopView() {
 
   const canCreate = user ? canCreateWorkshopRepairs(user.role) : false;
   const canEditStatus = user ? canEditWorkshopStatus(user.role) : false;
+  const canEditRepair = canCreate; // same role set — see roleMeta.ts comment on canCreateWorkshopRepairs reuse
   const canDelete = user ? canDeleteWorkshopRepairs(user.role) : false;
 
   // Selected repair for the drawer needs to stay in sync with the polled
@@ -128,7 +129,7 @@ export function WorkshopView() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {myRepairs.map((repair) => (
-                <WorkshopMechanicCard key={repair.id} repair={repair} onSessionAction={runSessionAction} onOpenDetail={setDetailRepair} />
+                <WorkshopMechanicCard key={repair.id} repair={repair} onSessionAction={runServiceSessionAction} onOpenDetail={setDetailRepair} />
               ))}
             </div>
           )}
@@ -188,10 +189,14 @@ export function WorkshopView() {
         repair={openRepair}
         mechanics={mechanics}
         canEditStatus={canEditStatus}
+        canEditRepair={canEditRepair}
         canDelete={canDelete}
         onClose={() => setDetailRepair(null)}
         onUpdate={updateRepair}
         onDelete={(id) => setPendingDeleteId(id)}
+        onSessionAction={runServiceSessionAction}
+        onAddService={(repairId, description, scheduledDate) => createService(repairId, description, scheduledDate)}
+        onDeleteService={deleteService}
       />
 
       <ConfirmDialog

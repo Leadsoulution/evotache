@@ -2,11 +2,24 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs, canDeleteWorkshopRepairs, canEditWorkshopStatus } from "@/config/roleMeta";
-import { toPublicWorkshopRepair } from "@/lib/publicWorkshop";
+import { toPublicWorkshopRepair, toPublicWorkshopService } from "@/lib/publicWorkshop";
 import type { WorkshopRepair } from "@/types/workshop";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
+}
+
+async function loadPublicRepair(id: string) {
+  const repair = await db.workshopRepair.findUnique({ where: { id } });
+  if (!repair) return null;
+  const services = await db.workshopService.findMany({ where: { repairId: id } });
+  const sessions = await db.workshopSession.findMany({ where: { serviceId: { in: services.map((s) => s.id) } }, orderBy: { startedAt: "desc" } });
+  const latestByServiceId = new Map<string, (typeof sessions)[number]>();
+  for (const session of sessions) if (!latestByServiceId.has(session.serviceId)) latestByServiceId.set(session.serviceId, session);
+  return toPublicWorkshopRepair(
+    repair,
+    services.map((s) => toPublicWorkshopService(s, latestByServiceId.get(s.id) ?? null))
+  );
 }
 
 export async function PATCH(request: Request, { params }: RouteContext) {
@@ -35,7 +48,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude these server-owned/derived fields from the update payload
-  const { id: _id, createdBy: _createdBy, createdAt: _createdAt, updatedAt: _updatedAt, activeSession: _activeSession, expectedCompletionDate, completedDate, ...rest } = patch;
+  const { id: _id, createdBy: _createdBy, createdAt: _createdAt, updatedAt: _updatedAt, services: _services, expectedCompletionDate, completedDate, ...rest } = patch;
 
   const data: Record<string, unknown> = { ...rest };
   if (expectedCompletionDate !== undefined) data.expectedCompletionDate = expectedCompletionDate ? new Date(expectedCompletionDate) : null;
@@ -51,10 +64,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
   }
 
-  const repair = await db.workshopRepair.update({ where: { id }, data });
-  const activeSession = await db.workshopSession.findFirst({ where: { repairId: id }, orderBy: { startedAt: "desc" } });
-
-  return NextResponse.json(toPublicWorkshopRepair(repair, activeSession));
+  await db.workshopRepair.update({ where: { id }, data });
+  const publicRepair = await loadPublicRepair(id);
+  return NextResponse.json(publicRepair);
 }
 
 export async function DELETE(_request: Request, { params }: RouteContext) {

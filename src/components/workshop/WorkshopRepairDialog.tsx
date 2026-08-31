@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { XIcon } from "@/components/ui/icons";
-import { fromDateInputValue } from "@/lib/date";
+import { XIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { fromDateInputValue, fromDateTimeInputValue } from "@/lib/date";
 import { WorkshopMechanicMenu } from "./WorkshopMechanicMenu";
 import type { Assignee } from "@/types/task";
 import type { WorkshopRepairDraft } from "@/types/workshop";
@@ -16,12 +16,21 @@ interface WorkshopRepairDialogProps {
   onSubmit: (draft: WorkshopRepairDraft) => Promise<boolean>;
 }
 
+interface ServiceDraftRow {
+  description: string;
+  scheduledDate: string; // datetime-local value
+}
+
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
 const labelClass = "mb-1 block font-medium text-slate-700 dark:text-slate-300";
 
+const EMPTY_SERVICE: ServiceDraftRow = { description: "", scheduledDate: "" };
+
 /** The commercial's creation form — "AJOUTER À L'ATELIER". Entry date is
- * server-set (Task.createdAt-style @default(now())), never a field here. */
+ * server-set (Task.createdAt-style @default(now())), never a field here.
+ * A bike can need several distinct jobs (e.g. "Plaquettes" + "Pneus"), so
+ * the form takes a list of them instead of one free-text field. */
 export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: WorkshopRepairDialogProps) {
   const [orderNumber, setOrderNumber] = useState("");
   const [brand, setBrand] = useState("");
@@ -29,7 +38,7 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
   const [year, setYear] = useState("");
   const [engineCc, setEngineCc] = useState("");
   const [registration, setRegistration] = useState("");
-  const [workDescription, setWorkDescription] = useState("");
+  const [services, setServices] = useState<ServiceDraftRow[]>([EMPTY_SERVICE]);
   const [mechanicId, setMechanicId] = useState<string | null>(null);
   const [expectedCompletionDate, setExpectedCompletionDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -44,13 +53,17 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
       setYear("");
       setEngineCc("");
       setRegistration("");
-      setWorkDescription("");
+      setServices([EMPTY_SERVICE]);
       setMechanicId(null);
       setExpectedCompletionDate("");
     }
   }
 
   if (!open) return null;
+
+  function updateService(index: number, patch: Partial<ServiceDraftRow>) {
+    setServices((current) => current.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,9 +75,11 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
       year: year ? Number(year) : null,
       engineCc: engineCc ? Number(engineCc) : null,
       registration: registration.trim() || null,
-      workDescription: workDescription.trim(),
       mechanicId,
       expectedCompletionDate: fromDateInputValue(expectedCompletionDate),
+      services: services
+        .filter((s) => s.description.trim())
+        .map((s) => ({ description: s.description.trim(), scheduledDate: fromDateTimeInputValue(s.scheduledDate) })),
     });
     setSubmitting(false);
     if (success) onClose();
@@ -119,16 +134,46 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
             </label>
           </div>
 
-          <label className="block text-sm">
-            <span className={labelClass}>Travail demandé</span>
-            <textarea
-              value={workDescription}
-              onChange={(e) => setWorkDescription(e.target.value)}
-              rows={3}
-              placeholder="Révision + vidange"
-              className={inputClass}
-            />
-          </label>
+          <div>
+            <span className={labelClass}>Prestations demandées</span>
+            <div className="flex flex-col gap-2">
+              {services.map((service, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    value={service.description}
+                    onChange={(e) => updateService(index, { description: e.target.value })}
+                    placeholder={index === 0 ? "Révision + vidange" : "Changement des pneus"}
+                    className={inputClass}
+                  />
+                  <input
+                    type="datetime-local"
+                    value={service.scheduledDate}
+                    onChange={(e) => updateService(index, { scheduledDate: e.target.value })}
+                    title="Date et heure prévues"
+                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  {services.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setServices((current) => current.filter((_, i) => i !== index))}
+                      className="shrink-0 rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+                      aria-label="Retirer cette prestation"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setServices((current) => [...current, { ...EMPTY_SERVICE }])}
+              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              Ajouter une prestation
+            </button>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="block text-sm">
@@ -138,7 +183,7 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
               </div>
             </div>
             <label className="block text-sm">
-              <span className={labelClass}>Date prévue</span>
+              <span className={labelClass}>Date prévue (globale)</span>
               <input type="date" value={expectedCompletionDate} onChange={(e) => setExpectedCompletionDate(e.target.value)} className={inputClass} />
             </label>
           </div>
