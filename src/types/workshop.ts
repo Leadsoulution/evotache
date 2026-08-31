@@ -73,7 +73,11 @@ export type WorkshopRepairDraft = Partial<Omit<WorkshopRepair, "brand" | "model"
  * what a customer in the shop is meant to see. No order number (internal
  * reference), no year, no lateness (that's an internal signal only), no
  * mechanic/price/notes/chrono. `services` is just the list of job names
- * (e.g. "Changement des pneus") — never their status, date, or chrono. */
+ * (e.g. "Changement des pneus") — never their status, date, or chrono.
+ * `monthlyNumber` is a customer-friendly ticket number (this bike's rank
+ * among every repair entered this calendar month) — null for a repair
+ * that entered before the current month (still on the TV, just without a
+ * number since it isn't "this month"'s). */
 export interface WorkshopTvRepair {
   id: string;
   brand: string;
@@ -81,4 +85,5 @@ export interface WorkshopTvRepair {
   engineCc: number | null;
   status: WorkshopStatus;
   services: string[];
+  monthlyNumber: number | null;
 }

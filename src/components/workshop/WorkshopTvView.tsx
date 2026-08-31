@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { fetchWorkshopTvRepairs } from "@/services/workshopApi";
 import { WORKSHOP_STATUS_COLOR, WORKSHOP_STATUS_LABEL } from "@/lib/workshopStats";
-import { WrenchIcon } from "@/components/ui/icons";
-import { WorkshopFlagCard } from "./WorkshopFlagCard";
 import type { WorkshopTvRepair } from "@/types/workshop";
 
 const REFRESH_MS = 8_000;
@@ -62,34 +60,41 @@ export function WorkshopTvView() {
   );
 }
 
-// Matches the reference image's principle: a small flag-shaped tab (angled
-// cut on its right edge, like a ticket stub) overlapping the top-left
-// corner of a thick-bordered, heavily-rounded card — not a full-width
-// colored header bar. The tab carries the real status only — never "En
-// retard" (that's an internal-only signal, see isWorkshopRepairLate's
-// docs) and never the order number/year (internal reference numbers, not
-// customer-facing) — just what a customer actually needs to see.
+// Three-zone layout, thick-bordered and heavily-rounded: the monthly
+// ticket number on the left, the bike + its prestations (as bullets) in
+// the middle, and the status pill all the way on the right — no order
+// number/year (internal reference numbers, not customer-facing) and no
+// "En retard" (that's an internal-only signal, see isWorkshopRepairLate's
+// docs) — just what a customer actually needs to see.
 function WorkshopTvCard({ repair }: { repair: WorkshopTvRepair }) {
   const color = WORKSHOP_STATUS_COLOR[repair.status];
   const label = WORKSHOP_STATUS_LABEL[repair.status];
 
   return (
-    <WorkshopFlagCard tabLabel={label} tabColor={color} bodyClassName="bg-white px-8 py-7">
-      <div className="flex items-center gap-6">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${color}1f`, color }}>
-          <WrenchIcon className="h-7 w-7" />
-        </span>
-        <span className="h-14 w-px shrink-0 bg-slate-200" />
-        <div className="min-w-0 flex-1">
-          <p className="text-3xl font-bold uppercase tracking-tight text-slate-900">
-            {repair.brand} {repair.model}
-          </p>
-          {repair.engineCc && <p className="text-lg text-slate-500">{repair.engineCc} cc</p>}
-          {repair.services.length > 0 && (
-            <p className="mt-1 truncate text-lg text-slate-600">{repair.services.join(" • ")}</p>
-          )}
-        </div>
+    <div className="flex items-center gap-6 rounded-[1.75rem] border-[3px] bg-white px-8 py-7 shadow-lg" style={{ borderColor: color }}>
+      <span
+        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-2xl font-bold tabular-nums"
+        style={{ backgroundColor: `${color}1f`, color }}
+      >
+        {repair.monthlyNumber ?? "–"}
+      </span>
+      <span className="h-14 w-px shrink-0 bg-slate-200" />
+      <div className="min-w-0 flex-1">
+        <p className="text-3xl font-bold uppercase tracking-tight text-slate-900">
+          {repair.brand} {repair.model}
+        </p>
+        {repair.engineCc && <p className="text-lg text-slate-500">{repair.engineCc} cc</p>}
+        {repair.services.length > 0 && (
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-lg text-slate-600">
+            {repair.services.map((name, i) => (
+              <li key={i}>{name}</li>
+            ))}
+          </ul>
+        )}
       </div>
-    </WorkshopFlagCard>
+      <span className="shrink-0 rounded-full px-5 py-2 text-lg font-bold uppercase tracking-wide text-white" style={{ backgroundColor: color }}>
+        {label}
+      </span>
+    </div>
   );
 }
