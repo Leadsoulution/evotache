@@ -12,7 +12,7 @@ import { WorkshopServiceRow } from "./WorkshopServiceRow";
 import { formatDueDate, fromDateTimeInputValue } from "@/lib/date";
 import type { WorkshopSessionAction } from "@/services/workshopApi";
 import type { Assignee } from "@/types/task";
-import type { WorkshopRepair, WorkshopStatus, WorkshopStatusHistoryEntry } from "@/types/workshop";
+import type { WorkshopRepair, WorkshopService, WorkshopStatus, WorkshopStatusHistoryEntry } from "@/types/workshop";
 
 interface WorkshopDetailDrawerProps {
   repair: WorkshopRepair | null;
@@ -24,6 +24,7 @@ interface WorkshopDetailDrawerProps {
   onUpdate: (id: string, patch: Partial<WorkshopRepair>) => void;
   onDelete: (id: string) => void;
   onSessionAction: (serviceId: string, action: WorkshopSessionAction) => void;
+  onToggleServiceDone: (service: WorkshopService, done: boolean) => void;
   onAddService: (repairId: string, description: string, scheduledDate: string | null) => void;
   onDeleteService: (serviceId: string) => void;
 }
@@ -38,6 +39,7 @@ export function WorkshopDetailDrawer({
   onUpdate,
   onDelete,
   onSessionAction,
+  onToggleServiceDone,
   onAddService,
   onDeleteService,
 }: WorkshopDetailDrawerProps) {
@@ -127,6 +129,7 @@ export function WorkshopDetailDrawer({
                     key={service.id}
                     service={service}
                     onSessionAction={onSessionAction}
+                    onToggleDone={canEditStatus ? (done) => onToggleServiceDone(service, done) : undefined}
                     onDelete={canEditRepair ? () => onDeleteService(service.id) : undefined}
                     readOnly={!canEditStatus}
                   />

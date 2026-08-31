@@ -4,20 +4,21 @@ import { WorkshopFlagCard } from "./WorkshopFlagCard";
 import { WorkshopServiceRow } from "./WorkshopServiceRow";
 import { WORKSHOP_STATUS_COLOR, WORKSHOP_STATUS_LABEL, isWorkshopRepairLate } from "@/lib/workshopStats";
 import type { WorkshopSessionAction } from "@/services/workshopApi";
-import type { WorkshopRepair } from "@/types/workshop";
+import type { WorkshopRepair, WorkshopService } from "@/types/workshop";
 
 interface WorkshopMechanicCardProps {
   repair: WorkshopRepair;
   onSessionAction: (serviceId: string, action: WorkshopSessionAction) => void;
+  onToggleServiceDone?: (service: WorkshopService, done: boolean) => void;
   onOpenDetail: (repair: WorkshopRepair) => void;
   onDeleteService?: (serviceId: string) => void;
 }
 
-/** "Mes réparations" card — same flag-tab visual language as the TV
- * display (per request: same look for the team, but with everything a
- * mechanic actually needs — BC, full dates, and every prestation with its
- * own chrono, unlike the customer-facing TV which shows none of that). */
-export function WorkshopMechanicCard({ repair, onSessionAction, onOpenDetail, onDeleteService }: WorkshopMechanicCardProps) {
+/** "Mes réparations" card — flag-tab header for the moto (per request:
+ * same look for the team as the TV's outer card), with every prestation
+ * listed underneath like the rest of the app's task lists — a checkbox
+ * plus title, unlike the customer-facing TV which shows none of that. */
+export function WorkshopMechanicCard({ repair, onSessionAction, onToggleServiceDone, onOpenDetail, onDeleteService }: WorkshopMechanicCardProps) {
   const late = isWorkshopRepairLate(repair);
   const color = late ? "#ef4444" : WORKSHOP_STATUS_COLOR[repair.status];
   const label = late ? "En retard" : WORKSHOP_STATUS_LABEL[repair.status];
@@ -43,6 +44,7 @@ export function WorkshopMechanicCard({ repair, onSessionAction, onOpenDetail, on
               key={service.id}
               service={service}
               onSessionAction={onSessionAction}
+              onToggleDone={onToggleServiceDone ? (done) => onToggleServiceDone(service, done) : undefined}
               onDelete={onDeleteService ? () => onDeleteService(service.id) : undefined}
             />
           ))}

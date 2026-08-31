@@ -16,7 +16,7 @@ import { PlusIcon, TvIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { WORKSHOP_STATUS_LABEL, WORKSHOP_STATUS_ORDER } from "@/lib/workshopStats";
 import type { AppUser } from "@/types/user";
-import type { WorkshopRepair, WorkshopStatus } from "@/types/workshop";
+import type { WorkshopRepair, WorkshopService, WorkshopStatus } from "@/types/workshop";
 
 type Tab = "mine" | "board";
 
@@ -28,7 +28,17 @@ export function WorkshopView() {
     [usersData]
   );
 
-  const { repairs, loadState, createRepair, updateRepair, deleteRepair, createService, deleteService, runServiceSessionAction } = useWorkshopRepairs();
+  const { repairs, loadState, createRepair, updateRepair, deleteRepair, createService, updateService, deleteService, runServiceSessionAction } = useWorkshopRepairs();
+
+  // Checking a prestation off (like any other checklist in the app) also
+  // banks whatever chrono is still running on it, so a done job never
+  // leaves a dangling session with no totalWorkSeconds.
+  const toggleServiceDone = (service: WorkshopService, done: boolean) => {
+    if (done && service.activeSession && !service.activeSession.endedAt) {
+      runServiceSessionAction(service.id, "end");
+    }
+    updateService(service.id, { status: done ? "done" : "waiting" });
+  };
 
   const myRepairs = useMemo(
     () => repairs.filter((r) => r.mechanicId === user?.id && r.status !== "picked_up" && r.status !== "cancelled"),
@@ -133,6 +143,7 @@ export function WorkshopView() {
                   key={repair.id}
                   repair={repair}
                   onSessionAction={runServiceSessionAction}
+                  onToggleServiceDone={canEditStatus ? toggleServiceDone : undefined}
                   onOpenDetail={setDetailRepair}
                   onDeleteService={canEditRepair ? deleteService : undefined}
                 />
@@ -201,6 +212,7 @@ export function WorkshopView() {
         onUpdate={updateRepair}
         onDelete={(id) => setPendingDeleteId(id)}
         onSessionAction={runServiceSessionAction}
+        onToggleServiceDone={toggleServiceDone}
         onAddService={(repairId, description, scheduledDate) => createService(repairId, description, scheduledDate)}
         onDeleteService={deleteService}
       />
