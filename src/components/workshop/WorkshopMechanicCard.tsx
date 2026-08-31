@@ -1,6 +1,7 @@
 "use client";
 
 import { WorkshopFlagCard } from "./WorkshopFlagCard";
+import { WorkshopRepairHeader } from "./WorkshopRepairHeader";
 import { WorkshopServiceRow } from "./WorkshopServiceRow";
 import { WORKSHOP_STATUS_COLOR, WORKSHOP_STATUS_LABEL, isWorkshopRepairLate } from "@/lib/workshopStats";
 import type { WorkshopSessionAction } from "@/services/workshopApi";
@@ -14,10 +15,10 @@ interface WorkshopMechanicCardProps {
   onDeleteService?: (serviceId: string) => void;
 }
 
-/** "Mes réparations" card — flag-tab header for the moto (per request:
- * same look for the team as the TV's outer card), with every prestation
- * listed underneath like the rest of the app's task lists — a checkbox
- * plus title, unlike the customer-facing TV which shows none of that. */
+/** "Mes réparations" card — same icon-and-divider flag-tab style as the
+ * TV display, with every prestation listed underneath like the rest of
+ * the app's task lists — a checkbox plus title, unlike the customer-
+ * facing TV which shows none of that. */
 export function WorkshopMechanicCard({ repair, onSessionAction, onToggleServiceDone, onOpenDetail, onDeleteService }: WorkshopMechanicCardProps) {
   const late = isWorkshopRepairLate(repair);
   const color = late ? "#ef4444" : WORKSHOP_STATUS_COLOR[repair.status];
@@ -25,15 +26,16 @@ export function WorkshopMechanicCard({ repair, onSessionAction, onToggleServiceD
 
   return (
     <WorkshopFlagCard tabLabel={label} tabColor={color} bodyClassName="bg-white p-5 dark:bg-slate-900">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <button type="button" onClick={() => onOpenDetail(repair)} className="min-w-0 text-left hover:opacity-80">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{repair.orderNumber}</p>
-          <p className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
-            {repair.brand} {repair.model}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{[repair.year, repair.engineCc ? `${repair.engineCc} cc` : null].filter(Boolean).join(" • ")}</p>
-        </button>
-      </div>
+      <button type="button" onClick={() => onOpenDetail(repair)} className="mb-3 block w-full text-left hover:opacity-80">
+        <WorkshopRepairHeader
+          color={color}
+          orderNumber={repair.orderNumber}
+          brand={repair.brand}
+          model={repair.model}
+          engineCc={repair.engineCc}
+          services={repair.services.map((s) => s.description)}
+        />
+      </button>
 
       {repair.services.length === 0 ? (
         <p className="text-xs text-slate-400">Aucune prestation définie.</p>

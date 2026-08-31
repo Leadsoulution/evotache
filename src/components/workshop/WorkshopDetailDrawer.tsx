@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon, TrashIcon, PlusIcon } from "@/components/ui/icons";
 import { fetchWorkshopStatusHistory } from "@/services/workshopApi";
-import { WORKSHOP_STATUS_LABEL } from "@/lib/workshopStats";
+import { WORKSHOP_STATUS_COLOR, WORKSHOP_STATUS_LABEL, isWorkshopRepairLate } from "@/lib/workshopStats";
 import { WorkshopStatusBadge } from "./WorkshopStatusBadge";
 import { WorkshopStatusMenu } from "./WorkshopStatusMenu";
 import { WorkshopMechanicMenu } from "./WorkshopMechanicMenu";
+import { WorkshopRepairHeader } from "./WorkshopRepairHeader";
 import { WorkshopServiceRow } from "./WorkshopServiceRow";
 import { formatDueDate, fromDateTimeInputValue } from "@/lib/date";
 import type { WorkshopSessionAction } from "@/services/workshopApi";
@@ -86,11 +87,16 @@ export function WorkshopDetailDrawer({
 
         <div className="flex flex-col gap-4 px-4 py-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{repair.orderNumber}</p>
-            <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {repair.brand} {repair.model}
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{[repair.year, repair.engineCc ? `${repair.engineCc} cc` : null, repair.registration].filter(Boolean).join(" • ")}</p>
+            <WorkshopRepairHeader
+              color={isWorkshopRepairLate(repair) ? "#ef4444" : WORKSHOP_STATUS_COLOR[repair.status]}
+              orderNumber={repair.orderNumber}
+              brand={repair.brand}
+              model={repair.model}
+              engineCc={repair.engineCc}
+            />
+            {(repair.year || repair.registration) && (
+              <p className="mt-1 pl-[4.5rem] text-sm text-slate-500 dark:text-slate-400">{[repair.year, repair.registration].filter(Boolean).join(" • ")}</p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
