@@ -123,19 +123,13 @@ export function WorkshopDetailDrawer({
             ) : (
               <div className="mb-2 flex flex-col gap-2">
                 {repair.services.map((service) => (
-                  <div key={service.id} className="relative">
-                    <WorkshopServiceRow service={service} onSessionAction={onSessionAction} readOnly={!canEditStatus} />
-                    {canEditRepair && (
-                      <button
-                        type="button"
-                        onClick={() => onDeleteService(service.id)}
-                        className="absolute right-2 top-2 rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
-                        aria-label="Supprimer cette prestation"
-                      >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
+                  <WorkshopServiceRow
+                    key={service.id}
+                    service={service}
+                    onSessionAction={onSessionAction}
+                    onDelete={canEditRepair ? () => onDeleteService(service.id) : undefined}
+                    readOnly={!canEditStatus}
+                  />
                 ))}
               </div>
             )}

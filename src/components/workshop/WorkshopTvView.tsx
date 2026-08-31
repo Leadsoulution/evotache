@@ -80,11 +80,14 @@ function WorkshopTvCard({ repair }: { repair: WorkshopTvRepair }) {
           <WrenchIcon className="h-7 w-7" />
         </span>
         <span className="h-14 w-px shrink-0 bg-slate-200" />
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <p className="text-3xl font-bold uppercase tracking-tight text-slate-900">
             {repair.brand} {repair.model}
           </p>
           {repair.engineCc && <p className="text-lg text-slate-500">{repair.engineCc} cc</p>}
+          {repair.services.length > 0 && (
+            <p className="mt-1 truncate text-lg text-slate-600">{repair.services.join(" • ")}</p>
+          )}
         </div>
       </div>
     </WorkshopFlagCard>

@@ -72,11 +72,13 @@ export type WorkshopRepairDraft = Partial<Omit<WorkshopRepair, "brand" | "model"
 /** Public-facing shape served to the unauthenticated TV display — only
  * what a customer in the shop is meant to see. No order number (internal
  * reference), no year, no lateness (that's an internal signal only), no
- * mechanic/price/notes/chrono. */
+ * mechanic/price/notes/chrono. `services` is just the list of job names
+ * (e.g. "Changement des pneus") — never their status, date, or chrono. */
 export interface WorkshopTvRepair {
   id: string;
   brand: string;
   model: string;
   engineCc: number | null;
   status: WorkshopStatus;
+  services: string[];
 }

@@ -129,7 +129,13 @@ export function WorkshopView() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {myRepairs.map((repair) => (
-                <WorkshopMechanicCard key={repair.id} repair={repair} onSessionAction={runServiceSessionAction} onOpenDetail={setDetailRepair} />
+                <WorkshopMechanicCard
+                  key={repair.id}
+                  repair={repair}
+                  onSessionAction={runServiceSessionAction}
+                  onOpenDetail={setDetailRepair}
+                  onDeleteService={canEditRepair ? deleteService : undefined}
+                />
               ))}
             </div>
           )}

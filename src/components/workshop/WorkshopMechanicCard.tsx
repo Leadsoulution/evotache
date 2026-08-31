@@ -10,13 +10,14 @@ interface WorkshopMechanicCardProps {
   repair: WorkshopRepair;
   onSessionAction: (serviceId: string, action: WorkshopSessionAction) => void;
   onOpenDetail: (repair: WorkshopRepair) => void;
+  onDeleteService?: (serviceId: string) => void;
 }
 
 /** "Mes réparations" card — same flag-tab visual language as the TV
  * display (per request: same look for the team, but with everything a
  * mechanic actually needs — BC, full dates, and every prestation with its
  * own chrono, unlike the customer-facing TV which shows none of that). */
-export function WorkshopMechanicCard({ repair, onSessionAction, onOpenDetail }: WorkshopMechanicCardProps) {
+export function WorkshopMechanicCard({ repair, onSessionAction, onOpenDetail, onDeleteService }: WorkshopMechanicCardProps) {
   const late = isWorkshopRepairLate(repair);
   const color = late ? "#ef4444" : WORKSHOP_STATUS_COLOR[repair.status];
   const label = late ? "En retard" : WORKSHOP_STATUS_LABEL[repair.status];
@@ -38,7 +39,12 @@ export function WorkshopMechanicCard({ repair, onSessionAction, onOpenDetail }: 
       ) : (
         <div className="flex flex-col gap-2">
           {repair.services.map((service) => (
-            <WorkshopServiceRow key={service.id} service={service} onSessionAction={onSessionAction} />
+            <WorkshopServiceRow
+              key={service.id}
+              service={service}
+              onSessionAction={onSessionAction}
+              onDelete={onDeleteService ? () => onDeleteService(service.id) : undefined}
+            />
           ))}
         </div>
       )}

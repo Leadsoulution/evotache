@@ -74,13 +74,18 @@ export function toPublicWorkshopStatusHistoryEntry(entry: DbWorkshopStatusHistor
  * number, year, customer name, phone, price, internal notes, lateness, or
  * mechanic chrono. Built here (not just hidden client-side) so the
  * unauthenticated /api/workshop/tv route can never leak more than this
- * even if the TV page's own code changes. */
-export function toWorkshopTvRepair(repair: DbWorkshopRepair): WorkshopTvRepair {
+ * even if the TV page's own code changes. `services` carries only job
+ * names, sorted by their display order — never status/date/chrono. */
+export function toWorkshopTvRepair(repair: DbWorkshopRepair, services: DbWorkshopService[]): WorkshopTvRepair {
   return {
     id: repair.id,
     brand: repair.brand,
     model: repair.model,
     engineCc: repair.engineCc,
     status: repair.status as WorkshopStatus,
+    services: services
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((s) => s.description),
   };
 }
