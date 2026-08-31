@@ -691,3 +691,78 @@ model BiometricSchedule {
 
   @@map("biometric_schedule")
 }
+
+// ATELIER — motorcycle repair-shop workflow tracker. "En retard" is
+// deliberately not a stored status: it's derived (expectedCompletionDate
+// passed, status not yet ready/pickedUp/cancelled), same idea as Task's
+// isOverdue, so nothing has to manually move a repair in/out of it.
+enum WorkshopStatus {
+  waiting // EN ATTENTE
+  in_progress // EN COURS
+  waiting_part // EN ATTENTE DE PIÈCE
+  waiting_client // EN ATTENTE CLIENT
+  ready // PRÊTE
+  picked_up // RÉCUPÉRÉE / TERMINÉE
+  cancelled // RÉSERVATION ANNULÉE
+
+  @@map("workshop_status")
+}
+
+model WorkshopRepair {
+  id                     String         @id @default(cuid())
+  orderNumber            String // N° bon de commande
+  brand                  String
+  model                  String
+  year                   Int?
+  engineCc               Int?
+  registration           String?
+  workDescription        String         @default("")
+  mechanicId             String?
+  status                 WorkshopStatus @default(waiting)
+  entryDate              DateTime       @default(now())
+  expectedCompletionDate DateTime?
+  completedDate          DateTime?
+  createdBy              String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  sessions      WorkshopSession[]
+  statusHistory WorkshopStatusHistory[]
+
+  @@map("workshop_repairs")
+}
+
+// One row per continuous DÉMARRER→TERMINER chrono lifecycle (a repair can
+// have several across its life, e.g. reopened after being marked ready).
+// Pause/resume within that lifecycle don't create new rows — they toggle
+// `runningSince` and bank the elapsed segment into `accumulatedSeconds` —
+// so live elapsed time is always `accumulatedSeconds + (runningSince ? now
+// - runningSince : 0)`, computed from persisted fields alone. A page
+// refresh reads the same two fields and gets the same answer, which is the
+// whole point: the chrono lives in the database, not in browser state.
+model WorkshopSession {
+  id                 String         @id @default(cuid())
+  repairId           String
+  repair             WorkshopRepair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  mechanicId         String
+  startedAt          DateTime       @default(now())
+  runningSince       DateTime? // non-null while actively counting; null while paused or after ending
+  accumulatedSeconds Int            @default(0) // banked seconds from segments already paused
+  pausedAt           DateTime?
+  endedAt            DateTime?
+  totalWorkSeconds   Int? // final total, set once when ended
+
+  @@map("workshop_sessions")
+}
+
+model WorkshopStatusHistory {
+  id         String         @id @default(cuid())
+  repairId   String
+  repair     WorkshopRepair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  oldStatus  String?
+  newStatus  String
+  changedBy  String?
+  changedAt  DateTime       @default(now())
+
+  @@map("workshop_status_history")
+}

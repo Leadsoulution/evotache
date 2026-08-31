@@ -54,13 +54,37 @@ export const CAPABILITIES: Capability[] = [
   { key: "tasks:delete", label: "Delete tasks" },
   { key: "workflow:manage", label: "Manage statuses, priorities & custom fields" },
   { key: "users:manage", label: "Manage users & roles" },
+  { key: "workshop:create", label: "Add a repair to Atelier" },
+  { key: "workshop:edit_status", label: "Change repair status & run the chrono" },
+  { key: "workshop:delete", label: "Delete a repair" },
 ];
 
 const ROLE_CAPABILITIES: Record<Role, ReadonlySet<string>> = {
-  admin: new Set(["tasks:view", "tasks:create", "tasks:edit", "tasks:edit_status", "tasks:delete", "workflow:manage", "users:manage"]),
-  member: new Set(["tasks:view", "tasks:create", "tasks:edit", "tasks:edit_status", "tasks:delete", "workflow:manage"]),
-  member_limited: new Set(["tasks:view", "tasks:create", "tasks:edit", "tasks:edit_status"]),
-  viewer: new Set(["tasks:view", "tasks:edit_status"]),
+  admin: new Set([
+    "tasks:view",
+    "tasks:create",
+    "tasks:edit",
+    "tasks:edit_status",
+    "tasks:delete",
+    "workflow:manage",
+    "users:manage",
+    "workshop:create",
+    "workshop:edit_status",
+    "workshop:delete",
+  ]),
+  member: new Set([
+    "tasks:view",
+    "tasks:create",
+    "tasks:edit",
+    "tasks:edit_status",
+    "tasks:delete",
+    "workflow:manage",
+    "workshop:create",
+    "workshop:edit_status",
+    "workshop:delete",
+  ]),
+  member_limited: new Set(["tasks:view", "tasks:create", "tasks:edit", "tasks:edit_status", "workshop:create", "workshop:edit_status"]),
+  viewer: new Set(["tasks:view", "tasks:edit_status", "workshop:edit_status"]),
 };
 
 export function hasCapability(role: Role, capability: string): boolean {
@@ -85,6 +109,18 @@ export function canManageWorkflow(role: Role): boolean {
 
 export function canManageUsers(role: Role): boolean {
   return hasCapability(role, "users:manage");
+}
+
+export function canCreateWorkshopRepairs(role: Role): boolean {
+  return hasCapability(role, "workshop:create");
+}
+
+export function canEditWorkshopStatus(role: Role): boolean {
+  return hasCapability(role, "workshop:edit_status");
+}
+
+export function canDeleteWorkshopRepairs(role: Role): boolean {
+  return hasCapability(role, "workshop:delete");
 }
 
 interface AccessCheckUser {

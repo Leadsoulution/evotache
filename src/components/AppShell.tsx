@@ -9,7 +9,9 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { OverdueAlertPopup } from "@/components/notifications/OverdueAlertPopup";
 
-const PUBLIC_ROUTES = new Set(["/login"]);
+// /atelier/tv is the unattended client-facing TV display — no login on
+// that screen, no sidebar/header chrome, full-bleed.
+const PUBLIC_ROUTES = new Set(["/login", "/atelier/tv"]);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();

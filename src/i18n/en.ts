@@ -16,6 +16,7 @@ export const en = {
   "nav.library": "Library",
   "nav.aiAssistant": "AI Assistant",
   "nav.statistics": "Statistics",
+  "nav.workshop": "Workshop",
   "nav.calls": "Calls",
   "nav.biometrics": "Biometrics",
   "nav.admin": "Settings",

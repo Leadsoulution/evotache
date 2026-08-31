@@ -15,6 +15,7 @@ import {
   ShoppingBagIcon,
   SparklesIcon,
   UsersIcon,
+  WrenchIcon,
 } from "@/components/ui/icons";
 import { canAccessBiometrics, canAccessCalls, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import type { TranslationKey } from "@/i18n/en";
@@ -34,6 +35,7 @@ export const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/social", label: "nav.socialMedia", icon: MegaphoneIcon },
   { href: "/teams", label: "nav.departments", icon: UsersIcon },
   { href: "/disputes", label: "nav.litiges", icon: ScaleIcon },
+  { href: "/atelier", label: "nav.workshop", icon: WrenchIcon },
   { href: "/achats", label: "nav.achats", icon: ShoppingBagIcon },
   { href: "/overdue", label: "nav.overdue", icon: AlertTriangleIcon },
   { href: "/reminders", label: "nav.reminders", icon: BellIcon },
