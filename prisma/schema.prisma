@@ -716,6 +716,7 @@ model WorkshopRepair {
   year                   Int?
   engineCc               Int?
   registration           String?
+  customerPhone          String? // internal only — never sent to the public TV route
   mechanicId             String?
   status                 WorkshopStatus @default(waiting)
   entryDate              DateTime       @default(now())

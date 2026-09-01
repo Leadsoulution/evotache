@@ -47,6 +47,7 @@ export function toPublicWorkshopRepair(repair: DbWorkshopRepair, services: Works
     year: repair.year,
     engineCc: repair.engineCc,
     registration: repair.registration,
+    customerPhone: repair.customerPhone,
     mechanicId: repair.mechanicId,
     status: repair.status as WorkshopStatus,
     entryDate: repair.entryDate.toISOString(),

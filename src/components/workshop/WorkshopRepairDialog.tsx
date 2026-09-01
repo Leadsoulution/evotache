@@ -38,6 +38,7 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
   const [year, setYear] = useState("");
   const [engineCc, setEngineCc] = useState("");
   const [registration, setRegistration] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [services, setServices] = useState<ServiceDraftRow[]>([EMPTY_SERVICE]);
   const [mechanicId, setMechanicId] = useState<string | null>(null);
   const [expectedCompletionDate, setExpectedCompletionDate] = useState("");
@@ -53,6 +54,7 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
       setYear("");
       setEngineCc("");
       setRegistration("");
+      setCustomerPhone("");
       setServices([EMPTY_SERVICE]);
       setMechanicId(null);
       setExpectedCompletionDate("");
@@ -75,6 +77,7 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
       year: year ? Number(year) : null,
       engineCc: engineCc ? Number(engineCc) : null,
       registration: registration.trim() || null,
+      customerPhone: customerPhone.trim() || null,
       mechanicId,
       expectedCompletionDate: fromDateInputValue(expectedCompletionDate),
       services: services
@@ -133,6 +136,17 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
               <input value={registration} onChange={(e) => setRegistration(e.target.value)} className={inputClass} />
             </label>
           </div>
+
+          <label className="block text-sm">
+            <span className={labelClass}>Téléphone client</span>
+            <input
+              type="tel"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="06 12 34 56 78"
+              className={inputClass}
+            />
+          </label>
 
           <div>
             <span className={labelClass}>Prestations demandées</span>

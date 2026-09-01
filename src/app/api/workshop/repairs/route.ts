@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       year: draft.year ?? null,
       engineCc: draft.engineCc ?? null,
       registration: draft.registration?.trim() || null,
+      customerPhone: draft.customerPhone?.trim() || null,
       mechanicId: draft.mechanicId ?? null,
       status: "waiting",
       expectedCompletionDate: draft.expectedCompletionDate ? new Date(draft.expectedCompletionDate) : null,

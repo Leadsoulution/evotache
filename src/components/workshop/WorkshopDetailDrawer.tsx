@@ -97,6 +97,7 @@ export function WorkshopDetailDrawer({
             {(repair.year || repair.registration) && (
               <p className="mt-1 pl-[4.5rem] text-sm text-slate-500 dark:text-slate-400">{[repair.year, repair.registration].filter(Boolean).join(" • ")}</p>
             )}
+            {repair.customerPhone && <p className="pl-[4.5rem] text-sm text-slate-500 dark:text-slate-400">Tél. client : {repair.customerPhone}</p>}
           </div>
 
           <div className="flex items-center justify-between">

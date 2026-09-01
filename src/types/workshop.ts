@@ -39,6 +39,8 @@ export interface WorkshopRepair {
   year: number | null;
   engineCc: number | null;
   registration: string | null;
+  /** Internal only — never sent to the public TV route (see WorkshopTvRepair). */
+  customerPhone: string | null;
   mechanicId: string | null;
   status: WorkshopStatus;
   entryDate: string;
