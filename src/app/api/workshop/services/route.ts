@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs } from "@/config/roleMeta";
 import { toPublicWorkshopService } from "@/lib/publicWorkshop";
 import { computeNextServiceStart } from "@/lib/workshopScheduling";
+import { notifyMechanicNewService } from "@/lib/workshopNotify";
 
 // Adds one more service (job) to an existing repair — same capability as
 // creating the repair itself, since this is still "defining what work is
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
       order: (maxOrder._max.order ?? -1) + 1,
     },
   });
+
+  notifyMechanicNewService(repair.mechanicId, repair, description);
 
   return NextResponse.json(toPublicWorkshopService(service, null), { status: 201 });
 }

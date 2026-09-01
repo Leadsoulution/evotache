@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs } from "@/config/roleMeta";
 import { toPublicWorkshopRepair, toPublicWorkshopService } from "@/lib/publicWorkshop";
 import { computeNextServiceStart } from "@/lib/workshopScheduling";
+import { notifyMechanicNewService } from "@/lib/workshopNotify";
 import type { WorkshopRepairDraft } from "@/types/workshop";
 
 export async function GET() {
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
         data: { repairId: repair.id, description: s.description.trim(), durationMinutes: s.durationMinutes ?? null, scheduledDate, order: i },
       })
     );
+    notifyMechanicNewService(repair.mechanicId, repair, s.description.trim());
   }
 
   return NextResponse.json(toPublicWorkshopRepair(repair, createdServices.map((s) => toPublicWorkshopService(s, null))), { status: 201 });

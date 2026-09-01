@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs, canDeleteWorkshopRepairs, canEditWorkshopStatus } from "@/config/roleMeta";
 import { toPublicWorkshopRepair, toPublicWorkshopService } from "@/lib/publicWorkshop";
+import { notifyCommercialReady, notifyCommercialWaitingClient, notifyGhassanMissingPart } from "@/lib/workshopNotify";
 import type { WorkshopRepair } from "@/types/workshop";
 
 interface RouteContext {
@@ -62,6 +63,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (patch.status === "picked_up" && !existing.completedDate && completedDate === undefined) {
       data.completedDate = new Date();
     }
+    // In-app "alarm" pings instead of a real phone call — see
+    // workshopNotify.ts for why (3CX's Call Control API is Enterprise-only,
+    // unavailable on this Pro license).
+    if (patch.status === "waiting_part") notifyGhassanMissingPart(existing);
+    if (patch.status === "waiting_client") notifyCommercialWaitingClient(existing.createdBy, existing);
+    if (patch.status === "ready") notifyCommercialReady(existing.createdBy, existing);
   }
 
   await db.workshopRepair.update({ where: { id }, data });

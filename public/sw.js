@@ -16,6 +16,10 @@ self.addEventListener("push", (event) => {
     icon: "/pwa-icon-192.png",
     badge: "/pwa-icon-192.png",
     data: { url: payload.url || "/" },
+    // Stickier, alarm-style notifications (e.g. Atelier status pings) —
+    // stays on screen until dismissed and vibrates in a distinct pattern,
+    // instead of the default auto-clearing behavior used everywhere else.
+    ...(payload.alarm ? { requireInteraction: true, vibrate: [300, 100, 300, 100, 300] } : {}),
   };
 
   event.waitUntil(self.registration.showNotification(payload.title || "EvoTasks", options));
