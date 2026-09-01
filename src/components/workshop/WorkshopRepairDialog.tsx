@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { XIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
-import { fromDateInputValue, fromDateTimeInputValue } from "@/lib/date";
+import { fromDateInputValue } from "@/lib/date";
 import { WorkshopMechanicMenu } from "./WorkshopMechanicMenu";
 import type { Assignee } from "@/types/task";
 import type { WorkshopRepairDraft } from "@/types/workshop";
@@ -18,26 +18,28 @@ interface WorkshopRepairDialogProps {
 
 interface ServiceDraftRow {
   description: string;
-  scheduledDate: string; // datetime-local value
+  durationMinutes: string; // number input value, kept as a string while editing
 }
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-indigo-950";
 const labelClass = "mb-1 block font-medium text-slate-700 dark:text-slate-300";
 
-const EMPTY_SERVICE: ServiceDraftRow = { description: "", scheduledDate: "" };
+const EMPTY_SERVICE: ServiceDraftRow = { description: "", durationMinutes: "" };
 
 /** The commercial's creation form — "AJOUTER À L'ATELIER". Entry date is
  * server-set (Task.createdAt-style @default(now())), never a field here.
  * A bike can need several distinct jobs (e.g. "Plaquettes" + "Pneus"), so
- * the form takes a list of them instead of one free-text field. */
+ * the form takes a list of them instead of one free-text field — each
+ * with an estimated duration, not a manually-picked date: the server
+ * computes the actual scheduled start from the assigned mechanic's queue
+ * (see workshopScheduling.ts). */
 export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: WorkshopRepairDialogProps) {
   const [orderNumber, setOrderNumber] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [engineCc, setEngineCc] = useState("");
-  const [registration, setRegistration] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [services, setServices] = useState<ServiceDraftRow[]>([EMPTY_SERVICE]);
   const [mechanicId, setMechanicId] = useState<string | null>(null);
@@ -53,7 +55,6 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
       setModel("");
       setYear("");
       setEngineCc("");
-      setRegistration("");
       setCustomerPhone("");
       setServices([EMPTY_SERVICE]);
       setMechanicId(null);
@@ -76,13 +77,12 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
       model: model.trim(),
       year: year ? Number(year) : null,
       engineCc: engineCc ? Number(engineCc) : null,
-      registration: registration.trim() || null,
       customerPhone: customerPhone.trim() || null,
       mechanicId,
       expectedCompletionDate: fromDateInputValue(expectedCompletionDate),
       services: services
         .filter((s) => s.description.trim())
-        .map((s) => ({ description: s.description.trim(), scheduledDate: fromDateTimeInputValue(s.scheduledDate) })),
+        .map((s) => ({ description: s.description.trim(), durationMinutes: s.durationMinutes ? Number(s.durationMinutes) : null })),
     });
     setSubmitting(false);
     if (success) onClose();
@@ -122,7 +122,7 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
             </label>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">
               <span className={labelClass}>Année</span>
               <input type="number" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024" className={inputClass} />
@@ -130,10 +130,6 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
             <label className="block text-sm">
               <span className={labelClass}>Cylindrée / CC</span>
               <input type="number" value={engineCc} onChange={(e) => setEngineCc(e.target.value)} placeholder="650" className={inputClass} />
-            </label>
-            <label className="block text-sm">
-              <span className={labelClass}>Immatriculation</span>
-              <input value={registration} onChange={(e) => setRegistration(e.target.value)} className={inputClass} />
             </label>
           </div>
 
@@ -160,11 +156,13 @@ export function WorkshopRepairDialog({ open, mechanics, onClose, onSubmit }: Wor
                     className={inputClass}
                   />
                   <input
-                    type="datetime-local"
-                    value={service.scheduledDate}
-                    onChange={(e) => updateService(index, { scheduledDate: e.target.value })}
-                    title="Date et heure prévues"
-                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    type="number"
+                    min={1}
+                    value={service.durationMinutes}
+                    onChange={(e) => updateService(index, { durationMinutes: e.target.value })}
+                    placeholder="Durée (min)"
+                    title="Durée estimée — sert à calculer automatiquement l'heure de début"
+                    className="w-28 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
                   {services.length > 1 && (
                     <button

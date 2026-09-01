@@ -12,14 +12,14 @@ import { WorkshopStatusMenu } from "./WorkshopStatusMenu";
 import { WorkshopMechanicMenu } from "./WorkshopMechanicMenu";
 import { WorkshopRepairHeader } from "./WorkshopRepairHeader";
 import { WorkshopServiceRow } from "./WorkshopServiceRow";
-import { formatDueDate, fromDateTimeInputValue } from "@/lib/date";
+import { formatDueDate } from "@/lib/date";
+import type { WorkshopSessionAction } from "@/services/workshopApi";
+import type { Assignee } from "@/types/task";
+import type { WorkshopRepair, WorkshopService, WorkshopStatus, WorkshopStatusHistoryEntry } from "@/types/workshop";
 
 // Fixed to this shop's actual 3CX numbering plan (see the removed
 // workshopCallAutomation.ts note) — Ghassan handles parts, extension 105.
 const GHASSAN_DN = "105";
-import type { WorkshopSessionAction } from "@/services/workshopApi";
-import type { Assignee } from "@/types/task";
-import type { WorkshopRepair, WorkshopService, WorkshopStatus, WorkshopStatusHistoryEntry } from "@/types/workshop";
 
 interface WorkshopDetailDrawerProps {
   repair: WorkshopRepair | null;
@@ -32,7 +32,7 @@ interface WorkshopDetailDrawerProps {
   onDelete: (id: string) => void;
   onSessionAction: (serviceId: string, action: WorkshopSessionAction) => void;
   onToggleServiceDone: (service: WorkshopService, done: boolean) => void;
-  onAddService: (repairId: string, description: string, scheduledDate: string | null) => void;
+  onAddService: (repairId: string, description: string, durationMinutes: number | null) => void;
   onDeleteService: (serviceId: string) => void;
 }
 
@@ -52,7 +52,7 @@ export function WorkshopDetailDrawer({
 }: WorkshopDetailDrawerProps) {
   const [history, setHistory] = useState<WorkshopStatusHistoryEntry[]>([]);
   const [newServiceDescription, setNewServiceDescription] = useState("");
-  const [newServiceDate, setNewServiceDate] = useState("");
+  const [newServiceDuration, setNewServiceDuration] = useState("");
   const pbxUrl = useThreeCxPbxUrl();
 
   useEffect(() => {
@@ -81,9 +81,9 @@ export function WorkshopDetailDrawer({
   function handleAddService() {
     const description = newServiceDescription.trim();
     if (!description || !repair) return;
-    onAddService(repair.id, description, fromDateTimeInputValue(newServiceDate));
+    onAddService(repair.id, description, newServiceDuration ? Number(newServiceDuration) : null);
     setNewServiceDescription("");
-    setNewServiceDate("");
+    setNewServiceDuration("");
   }
 
   return createPortal(
@@ -106,9 +106,7 @@ export function WorkshopDetailDrawer({
               model={repair.model}
               engineCc={repair.engineCc}
             />
-            {(repair.year || repair.registration) && (
-              <p className="mt-1 pl-[4.5rem] text-sm text-slate-500 dark:text-slate-400">{[repair.year, repair.registration].filter(Boolean).join(" • ")}</p>
-            )}
+            {repair.year && <p className="mt-1 pl-[4.5rem] text-sm text-slate-500 dark:text-slate-400">{repair.year}</p>}
             {repair.customerPhone && <p className="pl-[4.5rem] text-sm text-slate-500 dark:text-slate-400">Tél. client : {repair.customerPhone}</p>}
           </div>
 
@@ -197,10 +195,13 @@ export function WorkshopDetailDrawer({
                 />
                 <div className="flex items-center gap-2">
                   <input
-                    type="datetime-local"
-                    value={newServiceDate}
-                    onChange={(e) => setNewServiceDate(e.target.value)}
-                    className="flex-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    type="number"
+                    min={1}
+                    value={newServiceDuration}
+                    onChange={(e) => setNewServiceDuration(e.target.value)}
+                    placeholder="Durée (min)"
+                    title="Durée estimée — sert à calculer automatiquement l'heure de début"
+                    className="w-28 shrink-0 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
                   <button
                     type="button"

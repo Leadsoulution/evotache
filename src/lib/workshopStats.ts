@@ -2,6 +2,15 @@ import type { WorkshopRepair, WorkshopService, WorkshopSession, WorkshopStatus }
 
 export const WORKSHOP_STATUS_ORDER: WorkshopStatus[] = ["waiting", "in_progress", "waiting_part", "waiting_client", "ready", "picked_up", "cancelled"];
 
+// Only these two can be assigned as a repair's mechanic — fixed by the
+// shop owner, not a general "who's a mechanic" role in the app. Real user
+// ids (confirmed against the live DB), not name matching, so a display
+// name change doesn't silently break this.
+export const WORKSHOP_ALLOWED_MECHANIC_IDS = [
+  "cms7iggbz00045e4kzjrh6q5z", // Farid
+  "cmt1o5plj0008q44ktlemr3wp", // B.Yassine
+];
+
 export const WORKSHOP_STATUS_LABEL: Record<WorkshopStatus, string> = {
   waiting: "En attente",
   in_progress: "En cours",

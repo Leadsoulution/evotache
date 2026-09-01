@@ -715,7 +715,6 @@ model WorkshopRepair {
   model                  String
   year                   Int?
   engineCc               Int?
-  registration           String?
   customerPhone          String? // internal only — never sent to the public TV route
   mechanicId             String?
   status                 WorkshopStatus @default(waiting)
@@ -736,10 +735,15 @@ model WorkshopRepair {
 // "Pneus"), each independently scheduled/timed by the mechanic — this is
 // what workDescription used to be (a single free-text field) before it
 // became clear a bike can need several distinct services in parallel.
-// `scheduledDate` is the mechanic's own "réalisation prévue" entry, not the
-// repair-wide expectedCompletionDate; lateness is judged per service
-// against it (see isWorkshopServiceLate), for internal use only — the
-// public TV never sees this.
+// `durationMinutes` is the estimate given at creation; `scheduledDate` is
+// computed from it (see workshopScheduling.ts), never entered directly —
+// each mechanic has one running queue across all their repairs, so a new
+// service starts 5 minutes after that mechanic's current queue end (or at
+// the repair's own entryDate if they're free). It's computed once and
+// never recalculated even if the real work over/underruns the estimate.
+// Lateness is judged per service against scheduledDate (see
+// isWorkshopServiceLate), for internal use only — the public TV never
+// sees any of this.
 enum WorkshopServiceStatus {
   waiting // EN ATTENTE
   in_progress // EN COURS
@@ -749,16 +753,17 @@ enum WorkshopServiceStatus {
 }
 
 model WorkshopService {
-  id            String                @id @default(cuid())
-  repairId      String
-  repair        WorkshopRepair        @relation(fields: [repairId], references: [id], onDelete: Cascade)
-  description   String
-  scheduledDate DateTime?
-  status        WorkshopServiceStatus @default(waiting)
-  completedAt   DateTime?
-  order         Int                   @default(0)
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  id              String                @id @default(cuid())
+  repairId        String
+  repair          WorkshopRepair        @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  description     String
+  durationMinutes Int?
+  scheduledDate   DateTime?
+  status          WorkshopServiceStatus @default(waiting)
+  completedAt     DateTime?
+  order           Int                   @default(0)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   sessions WorkshopSession[]
 

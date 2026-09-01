@@ -15,7 +15,7 @@ import { TaskListSkeleton } from "@/components/task-list/TaskListSkeleton";
 import { useToast } from "@/components/ui/Toast";
 import { CastIcon, PlusIcon, TvIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { WORKSHOP_STATUS_LABEL, WORKSHOP_STATUS_ORDER } from "@/lib/workshopStats";
+import { WORKSHOP_ALLOWED_MECHANIC_IDS, WORKSHOP_STATUS_LABEL, WORKSHOP_STATUS_ORDER } from "@/lib/workshopStats";
 import type { AppUser } from "@/types/user";
 import type { WorkshopRepair, WorkshopService, WorkshopStatus } from "@/types/workshop";
 
@@ -26,7 +26,10 @@ export function WorkshopView() {
   const toast = useToast();
   const { data: usersData } = useSWR<AppUser[]>(user ? "users" : null, fetchUsers);
   const mechanics = useMemo(
-    () => (usersData ?? []).filter((u) => u.status === "active" && !u.isAgent).map((u) => ({ id: u.id, name: u.name, color: u.color, photoDataUrl: u.photoDataUrl })),
+    () =>
+      (usersData ?? [])
+        .filter((u) => u.status === "active" && !u.isAgent && WORKSHOP_ALLOWED_MECHANIC_IDS.includes(u.id))
+        .map((u) => ({ id: u.id, name: u.name, color: u.color, photoDataUrl: u.photoDataUrl })),
     [usersData]
   );
 
@@ -228,7 +231,7 @@ export function WorkshopView() {
         onDelete={(id) => setPendingDeleteId(id)}
         onSessionAction={runServiceSessionAction}
         onToggleServiceDone={toggleServiceDone}
-        onAddService={(repairId, description, scheduledDate) => createService(repairId, description, scheduledDate)}
+        onAddService={(repairId, description, durationMinutes) => createService(repairId, description, durationMinutes)}
         onDeleteService={deleteService}
       />
 

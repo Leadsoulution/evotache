@@ -38,11 +38,11 @@ export async function deleteWorkshopRepairRequest(id: string): Promise<void> {
   if (!response.ok) return parseErrorOrThrow(response);
 }
 
-export async function createWorkshopServiceRequest(repairId: string, description: string, scheduledDate: string | null): Promise<WorkshopService> {
+export async function createWorkshopServiceRequest(repairId: string, description: string, durationMinutes: number | null): Promise<WorkshopService> {
   const response = await fetch("/api/workshop/services", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repairId, description, scheduledDate }),
+    body: JSON.stringify({ repairId, description, durationMinutes }),
   });
   if (!response.ok) return parseErrorOrThrow(response);
   return response.json();

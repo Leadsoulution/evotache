@@ -93,9 +93,9 @@ export function useWorkshopRepairs() {
   );
 
   const createService = useCallback(
-    async (repairId: string, description: string, scheduledDate: string | null) => {
+    async (repairId: string, description: string, durationMinutes: number | null) => {
       try {
-        const created = await createWorkshopServiceRequest(repairId, description, scheduledDate);
+        const created = await createWorkshopServiceRequest(repairId, description, durationMinutes);
         await mutate(
           (current) => (current ?? repairsRef.current).map((r) => (r.id === repairId ? { ...r, services: [...r.services, created] } : r)),
           { revalidate: false }

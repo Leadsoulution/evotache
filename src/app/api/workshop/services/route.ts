@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs } from "@/config/roleMeta";
 import { toPublicWorkshopService } from "@/lib/publicWorkshop";
+import { computeNextServiceStart } from "@/lib/workshopScheduling";
 
 // Adds one more service (job) to an existing repair — same capability as
 // creating the repair itself, since this is still "defining what work is
@@ -20,12 +21,15 @@ export async function POST(request: Request) {
   const repair = await db.workshopRepair.findUnique({ where: { id: repairId } });
   if (!repair) return NextResponse.json({ error: "Repair not found." }, { status: 404 });
 
+  const durationMinutes = typeof body?.durationMinutes === "number" ? body.durationMinutes : null;
   const maxOrder = await db.workshopService.aggregate({ where: { repairId }, _max: { order: true } });
+  const scheduledDate = await computeNextServiceStart(repair.mechanicId, repair.entryDate);
   const service = await db.workshopService.create({
     data: {
       repairId,
       description,
-      scheduledDate: body?.scheduledDate ? new Date(body.scheduledDate) : null,
+      durationMinutes,
+      scheduledDate,
       order: (maxOrder._max.order ?? -1) + 1,
     },
   });

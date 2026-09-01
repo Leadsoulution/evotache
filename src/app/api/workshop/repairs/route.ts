@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs } from "@/config/roleMeta";
 import { toPublicWorkshopRepair, toPublicWorkshopService } from "@/lib/publicWorkshop";
+import { computeNextServiceStart } from "@/lib/workshopScheduling";
 import type { WorkshopRepairDraft } from "@/types/workshop";
 
 export async function GET() {
@@ -51,7 +52,6 @@ export async function POST(request: Request) {
       model: draft.model.trim(),
       year: draft.year ?? null,
       engineCc: draft.engineCc ?? null,
-      registration: draft.registration?.trim() || null,
       customerPhone: draft.customerPhone?.trim() || null,
       mechanicId: draft.mechanicId ?? null,
       status: "waiting",
@@ -68,9 +68,10 @@ export async function POST(request: Request) {
   const createdServices = [];
   for (let i = 0; i < serviceDrafts.length; i++) {
     const s = serviceDrafts[i];
+    const scheduledDate = await computeNextServiceStart(repair.mechanicId, repair.entryDate);
     createdServices.push(
       await db.workshopService.create({
-        data: { repairId: repair.id, description: s.description.trim(), scheduledDate: s.scheduledDate ? new Date(s.scheduledDate) : null, order: i },
+        data: { repairId: repair.id, description: s.description.trim(), durationMinutes: s.durationMinutes ?? null, scheduledDate, order: i },
       })
     );
   }

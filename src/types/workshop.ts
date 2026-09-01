@@ -15,19 +15,26 @@ export interface WorkshopSession {
 }
 
 /** One concrete job within a repair (e.g. "Plaquettes", "Pneus") — its own
- * description, mechanic-set scheduled date/time, status, and chrono. A
- * repair can have several running independently. */
+ * description, estimated duration, computed schedule, status, and chrono.
+ * A repair can have several running independently. */
 export interface WorkshopService {
   id: string;
   repairId: string;
   description: string;
+  /** Estimate given at creation, used only to compute scheduledDate (see
+   * workshopScheduling.ts) — never re-derived from the actual chrono. */
+  durationMinutes: number | null;
+  /** Computed once at creation from the assigned mechanic's queue —
+   * never entered directly, never recalculated afterwards. */
   scheduledDate: string | null;
   status: WorkshopServiceStatus;
   completedAt: string | null;
   order: number;
   createdAt: string;
   updatedAt: string;
-  /** This service's own chrono session, if one has ever been started. */
+  /** This service's own chrono session, if one has ever been started
+   * (manually, or auto-started once scheduledDate was reached — see the
+   * workshop-auto-start cron). */
   activeSession: WorkshopSession | null;
 }
 
@@ -38,7 +45,6 @@ export interface WorkshopRepair {
   model: string;
   year: number | null;
   engineCc: number | null;
-  registration: string | null;
   /** Internal only — never sent to the public TV route (see WorkshopTvRepair). */
   customerPhone: string | null;
   mechanicId: string | null;
@@ -65,7 +71,9 @@ export interface WorkshopStatusHistoryEntry {
 
 export interface WorkshopServiceDraft {
   description: string;
-  scheduledDate: string | null;
+  /** Estimated duration in minutes — the server computes scheduledDate
+   * from this, chaining onto the assigned mechanic's queue. */
+  durationMinutes: number | null;
 }
 
 export type WorkshopRepairDraft = Partial<Omit<WorkshopRepair, "brand" | "model" | "orderNumber" | "services">> &

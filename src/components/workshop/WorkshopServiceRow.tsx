@@ -82,7 +82,10 @@ export function WorkshopServiceRow({ service, onSessionAction, onToggleDone, onD
       {(service.scheduledDate || isPaused || (hasEnded && service.activeSession?.totalWorkSeconds != null)) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-6 text-xs font-medium text-slate-500 dark:text-slate-400">
           {service.scheduledDate && (
-            <span>Prévu le {new Date(service.scheduledDate).toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            <span>
+              Début prévu : {new Date(service.scheduledDate).toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              {service.durationMinutes != null && ` (${service.durationMinutes} min)`}
+            </span>
           )}
           {isPaused && <span className="text-amber-600 dark:text-amber-400">En pause</span>}
           {hasEnded && service.activeSession?.totalWorkSeconds != null && <span>Temps travaillé : {formatWorkshopChrono(service.activeSession.totalWorkSeconds)}</span>}
