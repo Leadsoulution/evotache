@@ -1,11 +1,46 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { fetchWorkshopTvRepairs } from "@/services/workshopApi";
 import { WORKSHOP_STATUS_COLOR, WORKSHOP_STATUS_LABEL } from "@/lib/workshopStats";
+import { MinusIcon, PlusIcon, RefreshIcon } from "@/components/ui/icons";
 import type { WorkshopTvRepair } from "@/types/workshop";
 
 const REFRESH_MS = 8_000;
+const ZOOM_STORAGE_KEY = "atelier-tv-zoom";
+const ZOOM_STEP = 10;
+const ZOOM_MIN = 50;
+const ZOOM_MAX = 200;
+
+/** Every physical TV/screen this runs on renders CSS pixels at a
+ * different apparent size (a 50" TV up close on a wall isn't the same as
+ * a desktop monitor) — there's no way to ask the browser for the "right"
+ * size automatically, so this is a manual, remembered-per-device zoom
+ * instead of a fixed layout. Stored in this browser's localStorage (not
+ * account-wide — deliberately, since it's a property of the physical
+ * screen, not the person), so once someone dials it in on a given TV, it
+ * stays that way across refreshes/reboots without needing to touch it
+ * again. Uses the CSS `zoom` property (Chromium/Safari — what every
+ * smart-TV browser and Chromecast/Fire TV stick in practice runs) so the
+ * whole layout reflows instead of just visually scaling with empty gaps. */
+function useTvZoom() {
+  const [zoom, setZoom] = useState(100);
+
+  useEffect(() => {
+    const stored = Number(localStorage.getItem(ZOOM_STORAGE_KEY));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stored >= ZOOM_MIN && stored <= ZOOM_MAX) setZoom(stored);
+  }, []);
+
+  function apply(next: number) {
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+    setZoom(clamped);
+    localStorage.setItem(ZOOM_STORAGE_KEY, String(clamped));
+  }
+
+  return { zoom, zoomIn: () => apply(zoom + ZOOM_STEP), zoomOut: () => apply(zoom - ZOOM_STEP), reset: () => apply(100) };
+}
 
 /** Unattended client-facing display for a TV in the shop's waiting area —
  * no login, no interaction expected, fixed light theme regardless of the
@@ -19,23 +54,44 @@ const REFRESH_MS = 8_000;
 export function WorkshopTvView() {
   const { data } = useSWR<WorkshopTvRepair[]>("workshop-tv", fetchWorkshopTvRepairs, { refreshInterval: REFRESH_MS });
   const repairs = data ?? [];
+  const { zoom, zoomIn, zoomOut, reset } = useTvZoom();
 
   return (
-    <div className="flex h-screen flex-col gap-8 overflow-hidden bg-slate-100 px-10 py-10 text-slate-900">
-      <header>
-        <h1 className="text-4xl font-bold tracking-tight">Atelier — Suivi des réparations</h1>
-      </header>
+    <>
+      <div className="flex h-screen flex-col gap-8 overflow-hidden bg-slate-100 px-10 py-10 text-slate-900" style={{ zoom: `${zoom}%` }}>
+        <header>
+          <h1 className="text-4xl font-bold tracking-tight">Atelier — Suivi des réparations</h1>
+        </header>
 
-      {repairs.length === 0 ? (
-        <p className="mt-20 text-center text-2xl text-slate-400">Aucune moto en atelier pour le moment.</p>
-      ) : (
-        <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
-          {repairs.map((repair) => (
-            <WorkshopTvCard key={repair.id} repair={repair} />
-          ))}
-        </div>
-      )}
-    </div>
+        {repairs.length === 0 ? (
+          <p className="mt-20 text-center text-2xl text-slate-400">Aucune moto en atelier pour le moment.</p>
+        ) : (
+          <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
+            {repairs.map((repair) => (
+              <WorkshopTvCard key={repair.id} repair={repair} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Deliberately a sibling of the zoomed container, not inside it —
+          this control must stay a consistent, usable size regardless of
+          the zoom level it's adjusting. Dim and corner-tucked since a
+          customer never needs it; whoever installs the TV taps it once
+          and it's done. */}
+      <div className="fixed bottom-3 right-3 z-50 flex items-center gap-1 rounded-full bg-slate-900/70 px-2 py-1.5 text-white opacity-40 shadow-lg transition-opacity hover:opacity-100">
+        <button type="button" onClick={zoomOut} aria-label="Réduire" className="rounded-full p-1.5 hover:bg-white/10">
+          <MinusIcon className="h-4 w-4" />
+        </button>
+        <span className="min-w-[3ch] text-center text-xs font-semibold tabular-nums">{zoom}%</span>
+        <button type="button" onClick={zoomIn} aria-label="Agrandir" className="rounded-full p-1.5 hover:bg-white/10">
+          <PlusIcon className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={reset} aria-label="Réinitialiser (100%)" title="Réinitialiser (100%)" className="ml-1 rounded-full p-1.5 hover:bg-white/10">
+          <RefreshIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </>
   );
 }
 
