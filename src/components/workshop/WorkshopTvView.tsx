@@ -59,8 +59,13 @@ export function WorkshopTvView() {
   return (
     <>
       <div className="flex h-screen flex-col gap-8 overflow-hidden bg-slate-100 px-10 py-10 text-slate-900" style={{ zoom: `${zoom}%` }}>
-        <header>
-          <h1 className="text-4xl font-bold tracking-tight">Atelier — Suivi des réparations</h1>
+        <header className="flex justify-center py-2" style={{ perspective: "600px" }}>
+          <h1
+            className="tv-title-3d bg-gradient-to-br from-indigo-600 via-indigo-500 to-slate-700 bg-clip-text text-5xl font-extrabold tracking-tight text-transparent"
+            style={{ textShadow: "0 6px 24px rgba(79,70,229,0.25)" }}
+          >
+            Atelier — Suivi des réparations
+          </h1>
         </header>
 
         {repairs.length === 0 ? (

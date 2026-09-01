@@ -81,4 +81,31 @@ body {
   .animate-slide-up {
     animation: slide-up 0.2s ease-out;
   }
+
+  /* Atelier TV display only (WorkshopTvView) — a slow, continuous 3D
+     wobble for the title, not a one-shot entrance transition like the
+     animations above. Pure CSS transforms + layered text-shadow (no
+     WebGL/canvas needed for a kiosk header) — perspective lives on the
+     parent wrapper, the rotation on the title itself. */
+  @keyframes tv-title-3d {
+    0%,
+    100% {
+      transform: rotateX(10deg) rotateY(-8deg);
+    }
+    25% {
+      transform: rotateX(-8deg) rotateY(8deg);
+    }
+    50% {
+      transform: rotateX(8deg) rotateY(10deg);
+    }
+    75% {
+      transform: rotateX(-10deg) rotateY(-8deg);
+    }
+  }
+
+  .tv-title-3d {
+    display: inline-block;
+    transform-style: preserve-3d;
+    animation: tv-title-3d 7s ease-in-out infinite;
+  }
 }
