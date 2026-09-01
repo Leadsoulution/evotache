@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { canCreateWorkshopRepairs, canDeleteWorkshopRepairs, canEditWorkshopStatus } from "@/config/roleMeta";
 import { toPublicWorkshopRepair, toPublicWorkshopService } from "@/lib/publicWorkshop";
-import { callGhassanForMissingPart } from "@/lib/workshopCallAutomation";
 import type { WorkshopRepair } from "@/types/workshop";
 
 interface RouteContext {
@@ -62,13 +61,6 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     // Reaching a terminal "picked up" status stamps completedDate automatically if not already set.
     if (patch.status === "picked_up" && !existing.completedDate && completedDate === undefined) {
       data.completedDate = new Date();
-    }
-    // Automated internal notification — never let a failed/misconfigured
-    // call block the status change itself, just log it server-side.
-    if (patch.status === "waiting_part") {
-      callGhassanForMissingPart(`${existing.orderNumber} — ${existing.brand} ${existing.model}`).catch((err) =>
-        console.error("callGhassanForMissingPart threw unexpectedly", err)
-      );
     }
   }
 

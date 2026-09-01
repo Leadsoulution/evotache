@@ -118,25 +118,14 @@ export async function listThreeCxUsers(): Promise<ThreeCxRealUser[]> {
   return users;
 }
 
-/** Places an outbound call via 3CX's Call Control API: extension `fromDn`
- * dials `destination` (an internal extension or an external number) —
- * the same effect as someone picking up that extension's phone and
- * dialing manually. Confirmed endpoint shape from 3CX's own Call Control
- * API docs/community examples: `POST /callcontrol/{dn}/makecall` with a
- * `{ reason, destination, timeout }` body — there is no way to also make
- * it auto-play an audio file through this endpoint (3CX's Call Control
- * API doesn't expose the audio stream); that needs a second leg bridged
- * to a Digital Receptionist configured in 3CX itself, which callers of
- * this function do not get for free. */
-export async function makeThreeCxCall(fromDn: string, destination: string, reason: string): Promise<void> {
-  const { pbxUrl, accessToken } = await getValidAccessToken();
-  const response = await fetchThreeCx(`${pbxUrl}/callcontrol/${encodeURIComponent(fromDn)}/makecall`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ reason, destination, timeout: 30 }),
-  });
-  if (!response.ok) throw new Error(`3CX makecall failed (${response.status}): ${await response.text()}`);
-}
+// NOTE — a makeThreeCxCall() wrapping 3CX's Call Control API
+// (POST /callcontrol/{dn}/makecall) briefly lived here to auto-dial
+// Ghassan on "En attente de pièce". Confirmed live: it 403s on this
+// account, because the Call Control API is gated behind a 3CX Enterprise
+// license (this PBX is on Pro) — not fixable from this codebase. Reintroduce
+// it (same shape: POST with a { reason, destination, timeout } body) if
+// this workspace ever upgrades to Enterprise. Until then, calling is done
+// via threeCxCallLink.ts's web-client deep link + a manual click instead.
 
 export async function listCallLog(periodFrom: Date, periodTo: Date): Promise<CallLogEntry[]> {
   const { pbxUrl, accessToken } = await getValidAccessToken();

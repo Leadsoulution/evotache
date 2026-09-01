@@ -86,3 +86,10 @@ export async function fetchWorkshopTvRepairs(): Promise<WorkshopTvRepair[]> {
   if (!response.ok) return [];
   return response.json();
 }
+
+export async function fetchThreeCxPbxUrl(): Promise<string | null> {
+  const response = await fetch("/api/workshop/threecx-pbx-url");
+  if (!response.ok) return null;
+  const data = (await response.json()) as { pbxUrl: string | null };
+  return data.pbxUrl;
+}

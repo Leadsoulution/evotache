@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { XIcon, TrashIcon, PlusIcon } from "@/components/ui/icons";
+import { XIcon, TrashIcon, PlusIcon, PhoneIcon } from "@/components/ui/icons";
 import { fetchWorkshopStatusHistory } from "@/services/workshopApi";
+import { useThreeCxPbxUrl } from "@/hooks/useThreeCxPbxUrl";
+import { threeCxWebClientCallUrl } from "@/lib/threeCxCallLink";
 import { WORKSHOP_STATUS_COLOR, WORKSHOP_STATUS_LABEL, isWorkshopRepairLate } from "@/lib/workshopStats";
 import { WorkshopStatusBadge } from "./WorkshopStatusBadge";
 import { WorkshopStatusMenu } from "./WorkshopStatusMenu";
@@ -11,6 +13,10 @@ import { WorkshopMechanicMenu } from "./WorkshopMechanicMenu";
 import { WorkshopRepairHeader } from "./WorkshopRepairHeader";
 import { WorkshopServiceRow } from "./WorkshopServiceRow";
 import { formatDueDate, fromDateTimeInputValue } from "@/lib/date";
+
+// Fixed to this shop's actual 3CX numbering plan (see the removed
+// workshopCallAutomation.ts note) — Ghassan handles parts, extension 105.
+const GHASSAN_DN = "105";
 import type { WorkshopSessionAction } from "@/services/workshopApi";
 import type { Assignee } from "@/types/task";
 import type { WorkshopRepair, WorkshopService, WorkshopStatus, WorkshopStatusHistoryEntry } from "@/types/workshop";
@@ -47,6 +53,7 @@ export function WorkshopDetailDrawer({
   const [history, setHistory] = useState<WorkshopStatusHistoryEntry[]>([]);
   const [newServiceDescription, setNewServiceDescription] = useState("");
   const [newServiceDate, setNewServiceDate] = useState("");
+  const pbxUrl = useThreeCxPbxUrl();
 
   useEffect(() => {
     if (!repair) return;
@@ -65,6 +72,11 @@ export function WorkshopDetailDrawer({
   if (!repair) return null;
 
   const mechanicById = new Map(mechanics.map((m) => [m.id, m]));
+
+  function openThreeCxCall(phone: string) {
+    if (!pbxUrl) return;
+    window.open(threeCxWebClientCallUrl(pbxUrl, phone), "_blank", "noopener,noreferrer");
+  }
 
   function handleAddService() {
     const description = newServiceDescription.trim();
@@ -108,6 +120,38 @@ export function WorkshopDetailDrawer({
               <WorkshopStatusBadge repair={repair} />
             )}
           </div>
+
+          {/* 3CX can't auto-dial (Call Control API needs an Enterprise
+              license this PBX doesn't have) — this opens the 3CX web
+              client with the number pre-filled; one more click there
+              places the call. */}
+          {repair.status === "waiting_part" && (
+            <button
+              type="button"
+              onClick={() => openThreeCxCall(GHASSAN_DN)}
+              disabled={!pbxUrl}
+              className="inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-indigo-200 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-950"
+              title={pbxUrl ? undefined : "3CX n'est pas connecté"}
+            >
+              <PhoneIcon className="h-3.5 w-3.5" />
+              Appeler Ghassan ({GHASSAN_DN})
+            </button>
+          )}
+          {(repair.status === "waiting_client" || repair.status === "ready") &&
+            (repair.customerPhone ? (
+              <button
+                type="button"
+                onClick={() => openThreeCxCall(repair.customerPhone as string)}
+                disabled={!pbxUrl}
+                className="inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-indigo-200 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-950"
+                title={pbxUrl ? undefined : "3CX n'est pas connecté"}
+              >
+                <PhoneIcon className="h-3.5 w-3.5" />
+                Appeler le client ({repair.customerPhone})
+              </button>
+            ) : (
+              <p className="text-xs text-slate-400">Aucun numéro de client enregistré pour appeler.</p>
+            ))}
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Mécanicien</span>
