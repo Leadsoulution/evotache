@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavBadgeCounts } from "@/hooks/useNavBadgeCounts";
+import { useWorkshopAlarmSound } from "@/hooks/useWorkshopAlarmSound";
 import { AppHeader } from "@/components/AppHeader";
 import { AppSidebar } from "@/components/AppSidebar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const navBadgeCounts = useNavBadgeCounts();
   const isPublicRoute = PUBLIC_ROUTES.has(pathname);
+  useWorkshopAlarmSound();
 
   useEffect(() => {
     if (status === "unauthenticated" && !isPublicRoute) {
