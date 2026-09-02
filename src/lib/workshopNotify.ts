@@ -22,7 +22,12 @@ function repairLabel(repair: RepairLike): string {
  * routine notifications like a chat message. */
 export function notifyMechanicNewService(mechanicId: string | null, repair: RepairLike, serviceDescription: string): void {
   if (!mechanicId) return;
-  void notifyUser(mechanicId, { title: "Nouvelle prestation", body: `${repairLabel(repair)} — ${serviceDescription}`, url: "/atelier", alarm: true });
+  void notifyUser(mechanicId, {
+    title: "Nouvelle prestation",
+    body: `Il y a un autre ${repair.brand} ${repair.model} (${repair.orderNumber}) qui a besoin de : ${serviceDescription}`,
+    url: "/atelier",
+    alarm: true,
+  });
 }
 
 /** "En attente de pièce" → Ghassan, in-app (no phone call — 3CX's Call
