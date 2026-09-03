@@ -712,30 +712,6 @@ model BiometricHoliday {
   @@map("biometric_holidays")
 }
 
-// Singleton payroll settings (same pattern as BiometricSchedule) — the
-// per-day amount docked for an unjustified absence. Lateness is docked
-// separately, by the tiered BiometricLatePenaltyRule table below.
-model BiometricPayrollConfig {
-  id               String   @id @default(cuid())
-  absenceDeduction Float    @default(0)
-  updatedAt        DateTime @updatedAt
-
-  @@map("biometric_payroll_config")
-}
-
-// Tiered lateness penalties: "arriving at least fromMinutes late costs
-// `amount` DH". A late day is charged by the single highest tier it
-// reaches, not the sum of every tier below it (see computePayroll) — so with
-// 5min=-10 and 15min=-30, a 20-minute arrival docks 30 DH, not 40.
-model BiometricLatePenaltyRule {
-  id          String   @id @default(cuid())
-  fromMinutes Int
-  amount      Float
-  createdAt   DateTime @default(now())
-
-  @@map("biometric_late_penalty_rules")
-}
-
 // Single shared config (singleton, same pattern as BackupSheetConfig) for
 // the weekly work-hours window used both to flag late arrivals and to gate
 // the Heures d'ouverture filter preset (see isWithinWorkHours in

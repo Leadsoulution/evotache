@@ -42,21 +42,6 @@ export interface BiometricLeave {
   createdAt: string;
 }
 
-/** How much one unjustified absent day costs, in DH. Lateness is docked
- * separately by the tiered rules below. */
-export interface BiometricPayrollConfig {
-  absenceDeduction: number;
-}
-
-/** "Arriving at least `fromMinutes` late costs `amount` DH." A late day is
- * charged by the single highest tier it reaches, never the sum of the tiers
- * below it (see computePayroll in biometricStats.ts). */
-export interface BiometricLatePenaltyRule {
-  id: string;
-  fromMinutes: number;
-  amount: number;
-}
-
 /** A company-wide public holiday (jour férié) — unlike BiometricLeave, not
  * tied to one empCode: it excuses everyone's absence/lateness that day. */
 export interface BiometricHoliday {

@@ -8,7 +8,6 @@ import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
 import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
 import { useBiometricLeaves } from "@/hooks/useBiometricLeaves";
 import { useBiometricHolidays } from "@/hooks/useBiometricHolidays";
-import { useBiometricPayroll } from "@/hooks/useBiometricPayroll";
 import { usePagination } from "@/hooks/usePagination";
 import { canAccessBiometrics, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
@@ -16,7 +15,6 @@ import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmploye
 import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
 import { createBiometricLeave, deleteBiometricLeave } from "@/services/biometricLeaveApi";
 import { createBiometricHoliday, deleteBiometricHoliday } from "@/services/biometricHolidayApi";
-import { createBiometricLatePenaltyRule, deleteBiometricLatePenaltyRule, saveBiometricPayrollConfig } from "@/services/biometricPayrollApi";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
 import { BiometricScheduleEditor } from "./BiometricScheduleEditor";
@@ -143,7 +141,6 @@ export function BiometricView() {
   const { schedule, refetch: refetchSchedule } = useBiometricSchedule();
   const { leaves, refetch: refetchLeaves } = useBiometricLeaves();
   const { holidays, refetch: refetchHolidays } = useBiometricHolidays();
-  const { config: payrollConfig, rules: penaltyRules, refetch: refetchPayroll } = useBiometricPayroll();
   const toast = useToast();
   const [managingEmployees, setManagingEmployees] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
@@ -232,29 +229,6 @@ export function BiometricView() {
 
   async function handleSaveSalary(empCode: string, salary: number | null) {
     await handleSaveEmployeeOverride(empCode, { monthlySalary: salary });
-  }
-
-  async function handleSaveAbsenceDeduction(amount: number) {
-    try {
-      await saveBiometricPayrollConfig(amount);
-      refetchPayroll();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Echec de la mise a jour.");
-    }
-  }
-
-  async function handleAddPenaltyRule(fromMinutes: number, amount: number) {
-    await createBiometricLatePenaltyRule(fromMinutes, amount);
-    refetchPayroll();
-  }
-
-  async function handleDeletePenaltyRule(id: string) {
-    try {
-      await deleteBiometricLatePenaltyRule(id);
-      refetchPayroll();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Echec de la suppression.");
-    }
   }
 
   function handleSort(field: SortField) {
@@ -449,9 +423,9 @@ export function BiometricView() {
   const payrollRows = useMemo(
     () =>
       isManagerOrAdmin
-        ? computePayroll(events, employees, leaves, holidays, penaltyRules, payrollConfig, schedule, payrollMonthKey, casablancaDateKey(new Date()))
+        ? computePayroll(events, employees, leaves, holidays, schedule, payrollMonthKey, casablancaDateKey(new Date()))
         : [],
-    [isManagerOrAdmin, events, employees, leaves, holidays, penaltyRules, payrollConfig, schedule, payrollMonthKey]
+    [isManagerOrAdmin, events, employees, leaves, holidays, schedule, payrollMonthKey]
   );
 
   useEffect(() => {
@@ -827,12 +801,7 @@ export function BiometricView() {
               rows={payrollRows}
               monthKey={payrollMonthKey}
               onMonthChange={setPayrollMonthKey}
-              absenceDeduction={payrollConfig.absenceDeduction}
-              rules={penaltyRules}
               onSaveSalary={handleSaveSalary}
-              onSaveAbsenceDeduction={handleSaveAbsenceDeduction}
-              onAddRule={handleAddPenaltyRule}
-              onDeleteRule={handleDeletePenaltyRule}
             />
           )}
 

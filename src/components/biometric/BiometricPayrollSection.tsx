@@ -3,43 +3,27 @@
 import { useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Avatar } from "@/components/ui/Avatar";
-import { CashIcon, PencilIcon } from "@/components/ui/icons";
-import { BiometricPayrollRulesEditor } from "./BiometricPayrollRulesEditor";
+import { CashIcon } from "@/components/ui/icons";
 import { BiometricSectionTitle } from "./BiometricSectionTitle";
 import { formatDirham, formatLateDuration } from "@/lib/biometricStats";
 import type { PayrollRow } from "@/lib/biometricStats";
-import type { BiometricLatePenaltyRule } from "@/types/biometric";
 
 interface BiometricPayrollSectionProps {
   rows: PayrollRow[];
   monthKey: string;
   onMonthChange: (monthKey: string) => void;
-  absenceDeduction: number;
-  rules: BiometricLatePenaltyRule[];
   onSaveSalary: (empCode: string, salary: number | null) => Promise<void>;
-  onSaveAbsenceDeduction: (amount: number) => Promise<void>;
-  onAddRule: (fromMinutes: number, amount: number) => Promise<void>;
-  onDeleteRule: (id: string) => Promise<void>;
 }
 
 /** Payroll for one month: each employee's gross pay minus what their
- * lateness and absences cost under the configured rules. Deliberately
- * rendered only for managers/admins (the API refuses it for anyone else) —
- * salary is the one thing on this page a view-only attendance user must not
- * see. */
-export function BiometricPayrollSection({
-  rows,
-  monthKey,
-  onMonthChange,
-  absenceDeduction,
-  rules,
-  onSaveSalary,
-  onSaveAbsenceDeduction,
-  onAddRule,
-  onDeleteRule,
-}: BiometricPayrollSectionProps) {
-  const [editingRules, setEditingRules] = useState(false);
-
+ * lateness and absences cost, purely from their own salary (salaire/26 per
+ * absent day, that divided by 8 per hour late — see computePayroll's own
+ * docs for the exact rule). Nothing to configure here, unlike the previous
+ * fixed-DH/tiered version: the deduction is entirely determined by the
+ * salary set on each employee. Deliberately rendered only for
+ * managers/admins (the API refuses it for anyone else) — salary is the one
+ * thing on this page a view-only attendance user must not see. */
+export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveSalary }: BiometricPayrollSectionProps) {
   const totals = rows.reduce(
     (acc, row) => ({
       salary: acc.salary + (row.monthlySalary ?? 0),
@@ -63,16 +47,11 @@ export function BiometricPayrollSection({
             onChange={(e) => e.target.value && onMonthChange(e.target.value)}
             className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-indigo-950"
           />
-          <button
-            type="button"
-            onClick={() => setEditingRules(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            <PencilIcon className="h-3.5 w-3.5" />
-            Règles
-          </button>
         </div>
       </div>
+      <p className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        1 jour d&apos;absence = salaire ÷ 26 · 1 heure de retard = ce montant ÷ 8
+      </p>
 
       {rows.length === 0 ? (
         <p className="px-4 py-6 text-center text-sm text-slate-400">Aucun employé à afficher.</p>
@@ -153,16 +132,6 @@ export function BiometricPayrollSection({
           </table>
         </div>
       )}
-
-      <BiometricPayrollRulesEditor
-        open={editingRules}
-        absenceDeduction={absenceDeduction}
-        rules={rules}
-        onClose={() => setEditingRules(false)}
-        onSaveAbsenceDeduction={onSaveAbsenceDeduction}
-        onAddRule={onAddRule}
-        onDeleteRule={onDeleteRule}
-      />
     </section>
   );
 }

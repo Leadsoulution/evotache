@@ -1,7 +1,7 @@
 import { COLOR_PALETTE } from "@/config/colorPalette";
 import { casablancaDateKey, casablancaHourMinute, casablancaWallClockToUtc, casablancaWeekday } from "@/lib/casablancaTime";
 import type { BarChartDatum } from "@/components/stats/BarChart";
-import type { BiometricEvent, BiometricHoliday, BiometricLatePenaltyRule, BiometricLeave, BiometricPayrollConfig, BiometricSchedule } from "@/types/biometric";
+import type { BiometricEvent, BiometricHoliday, BiometricLeave, BiometricSchedule } from "@/types/biometric";
 
 // ZKBio Time's punch_state_display vocabulary is set by whatever language
 // the device/software itself is configured in — the API docs show English
@@ -513,16 +513,22 @@ export function isHoliday(dateKey: string, holidays: BiometricHoliday[]): boolea
   return holidays.some((h) => h.date === dateKey);
 }
 
-/** DH docked for arriving `lateMinutes` late — the single highest tier that
- * arrival reaches, never the sum of every tier below it: with 5min=-10 and
- * 15min=-30 configured, a 20-minute arrival costs 30 DH, not 40. No
- * matching tier (or no tiers configured at all) costs nothing. */
-export function penaltyForLateMinutes(lateMinutes: number, rules: BiometricLatePenaltyRule[]): number {
-  let best: BiometricLatePenaltyRule | null = null;
-  for (const rule of rules) {
-    if (lateMinutes >= rule.fromMinutes && (!best || rule.fromMinutes > best.fromMinutes)) best = rule;
-  }
-  return best?.amount ?? 0;
+// A fixed month always has 26 working days and each of those an 8-hour day,
+// by the shop's own rule — not derived from the actual calendar (which
+// varies month to month) or from anyone's real schedule length.
+const WORK_DAYS_PER_MONTH = 26;
+const WORK_HOURS_PER_DAY = 8;
+
+/** DH value of one working day for this salary: salaire / 26. Null when no
+ * salary is set — there is nothing to prorate against. */
+export function dailyRate(monthlySalary: number | null): number | null {
+  return monthlySalary === null ? null : monthlySalary / WORK_DAYS_PER_MONTH;
+}
+
+/** DH value of one hour: the daily rate divided by an 8-hour day. */
+export function hourlyRate(monthlySalary: number | null): number | null {
+  const daily = dailyRate(monthlySalary);
+  return daily === null ? null : daily / WORK_HOURS_PER_DAY;
 }
 
 export interface PayrollRow {
@@ -543,7 +549,14 @@ export interface PayrollRow {
 }
 
 /** Month-end payroll per employee: gross pay minus what lateness and
- * absences cost, for `monthKey` ("YYYY-MM").
+ * absences cost, for `monthKey` ("YYYY-MM") — computed purely from each
+ * employee's own salary, on the shop's fixed rule: a month is always 26
+ * working days, so one absent day costs salaire/26, and one hour late
+ * costs that day rate divided by an 8-hour day (salaire/26/8). Prorated
+ * continuously by the actual lateness duration — 30 minutes late costs
+ * half the hourly rate, not a flat per-tier amount. An employee with no
+ * salary set gets 0 DH of deduction (there's nothing to prorate against),
+ * while their day/hour counts are still computed normally.
  *
  * `events` must be the *full* history, not just that month's — absences come
  * from computeMonthlyAbsences, which needs everything to know when tracking
@@ -556,8 +569,6 @@ export function computePayroll(
   employees: BiometricEmployee[],
   leaves: BiometricLeave[],
   holidays: BiometricHoliday[],
-  rules: BiometricLatePenaltyRule[],
-  config: BiometricPayrollConfig,
   defaultSchedule: BiometricSchedule,
   monthKey: string,
   todayKey: string
@@ -574,6 +585,7 @@ export function computePayroll(
     if (employee.hidden) continue;
     const employeeLeaves = leaves.filter((l) => l.empCode === employee.empCode);
 
+    const hourRate = hourlyRate(employee.monthlySalary);
     let lateDays = 0;
     let lateSeconds = 0;
     let lateDeduction = 0;
@@ -583,7 +595,7 @@ export function computePayroll(
       if (isHoliday(row.date, holidays)) continue;
       lateDays += 1;
       lateSeconds += row.lateSeconds;
-      lateDeduction += penaltyForLateMinutes(Math.floor(row.lateSeconds / 60), rules);
+      if (hourRate !== null) lateDeduction += (row.lateSeconds / 3600) * hourRate;
     }
 
     // Working days of the month covered by a leave — shown next to the
@@ -596,7 +608,8 @@ export function computePayroll(
     }
 
     const absenceDays = absencesByEmp.get(employee.empCode) ?? 0;
-    const absenceDeduction = absenceDays * config.absenceDeduction;
+    const dayRate = dailyRate(employee.monthlySalary);
+    const absenceDeduction = dayRate === null ? 0 : absenceDays * dayRate;
     const totalDeduction = lateDeduction + absenceDeduction;
     rows.push({
       empCode: employee.empCode,
