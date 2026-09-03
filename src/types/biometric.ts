@@ -29,3 +29,30 @@ export interface BiometricSchedule {
   fridayBreakEnd: string;
   saturdayEndTime: string;
 }
+
+/** A booked leave period (congé) for one employee. `startDate`/`endDate`
+ * are inclusive "YYYY-MM-DD" Casablanca calendar days — a single-day leave
+ * has both equal. Days inside a leave never count as an absence. */
+export interface BiometricLeave {
+  id: string;
+  empCode: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+/** How much one unjustified absent day costs, in DH. Lateness is docked
+ * separately by the tiered rules below. */
+export interface BiometricPayrollConfig {
+  absenceDeduction: number;
+}
+
+/** "Arriving at least `fromMinutes` late costs `amount` DH." A late day is
+ * charged by the single highest tier it reaches, never the sum of the tiers
+ * below it (see computePayroll in biometricStats.ts). */
+export interface BiometricLatePenaltyRule {
+  id: string;
+  fromMinutes: number;
+  amount: number;
+}

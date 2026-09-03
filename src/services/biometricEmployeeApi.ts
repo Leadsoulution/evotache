@@ -17,6 +17,10 @@ export interface BiometricEmployeeOverridePatch {
   fridayBreakStart?: string | null;
   fridayBreakEnd?: string | null;
   saturdayEndTime?: string | null;
+  saturdayOff?: boolean;
+  /** null clears the salary (back to "not set"), which is deliberately
+   * distinct from 0 — see the route's own handling. */
+  monthlySalary?: number | null;
 }
 
 export async function saveBiometricEmployeeOverride(empCode: string, patch: BiometricEmployeeOverridePatch): Promise<BiometricEmployeeOverride> {

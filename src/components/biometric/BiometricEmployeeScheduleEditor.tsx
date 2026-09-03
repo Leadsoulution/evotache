@@ -24,6 +24,10 @@ const inputClass =
  * others keep following the global schedule automatically. */
 export function BiometricEmployeeScheduleEditor({ open, employee, globalSchedule, onClose, onSave }: BiometricEmployeeScheduleEditorProps) {
   const [custom, setCustom] = useState(false);
+  // Deliberately outside the `custom` toggle: not working Saturdays isn't a
+  // custom set of hours, so someone can keep the company-wide schedule and
+  // still have Saturdays off.
+  const [saturdayOff, setSaturdayOff] = useState(false);
   const [draft, setDraft] = useState<BiometricSchedule>(globalSchedule);
   const [wasOpenFor, setWasOpenFor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -33,6 +37,7 @@ export function BiometricEmployeeScheduleEditor({ open, employee, globalSchedule
     setWasOpenFor(openKey);
     if (openKey && employee) {
       setCustom(Boolean(employee.scheduleOverride));
+      setSaturdayOff(employee.saturdayOff);
       setDraft({ ...globalSchedule, ...employee.scheduleOverride });
     }
   }
@@ -44,6 +49,7 @@ export function BiometricEmployeeScheduleEditor({ open, employee, globalSchedule
     try {
       if (custom) {
         await onSave(employee!.empCode, {
+          saturdayOff,
           startTime: draft.startTime,
           endTime: draft.endTime,
           lunchBreakStart: draft.lunchBreakStart,
@@ -54,6 +60,7 @@ export function BiometricEmployeeScheduleEditor({ open, employee, globalSchedule
         });
       } else {
         await onSave(employee!.empCode, {
+          saturdayOff,
           startTime: null,
           endTime: null,
           lunchBreakStart: null,
@@ -102,6 +109,19 @@ export function BiometricEmployeeScheduleEditor({ open, employee, globalSchedule
           {custom
             ? "Ces heures remplacent le planning global pour cet employé uniquement."
             : "Décoché : cet employé suit le planning global de l'entreprise (grisé ci-dessous)."}
+        </p>
+
+        <label className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={saturdayOff}
+            onChange={(e) => setSaturdayOff(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+          />
+          Ne travaille pas le samedi
+        </label>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Coché : les samedis ne comptent jamais comme une absence pour cet employé.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3">

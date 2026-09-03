@@ -27,10 +27,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
     fridayBreakStart?: string | null;
     fridayBreakEnd?: string | null;
     saturdayEndTime?: string | null;
+    saturdayOff?: boolean;
+    monthlySalary?: number | null;
   } = {};
   if (typeof body.name === "string" || body.name === null) data.name = body.name;
   if (typeof body.color === "string" || body.color === null) data.color = body.color;
   if (typeof body.hidden === "boolean") data.hidden = body.hidden;
+  if (typeof body.saturdayOff === "boolean") data.saturdayOff = body.saturdayOff;
+
+  // null clears the salary (back to "not set", which keeps the employee out
+  // of payroll totals) — distinct from 0, which is a real salary of zero.
+  if (body.monthlySalary === null) {
+    data.monthlySalary = null;
+  } else if (body.monthlySalary !== undefined) {
+    const salary = Number(body.monthlySalary);
+    if (!Number.isFinite(salary) || salary < 0) {
+      return NextResponse.json({ error: "monthlySalary doit être un nombre positif ou null." }, { status: 400 });
+    }
+    data.monthlySalary = salary;
+  }
 
   // Each schedule field is either a valid "HH:mm" string (a custom hour for
   // this employee) or null (clear the override — inherit the global

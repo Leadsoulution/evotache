@@ -1,7 +1,7 @@
 import { COLOR_PALETTE } from "@/config/colorPalette";
 import { casablancaDateKey, casablancaHourMinute, casablancaWallClockToUtc, casablancaWeekday } from "@/lib/casablancaTime";
 import type { BarChartDatum } from "@/components/stats/BarChart";
-import type { BiometricEvent, BiometricSchedule } from "@/types/biometric";
+import type { BiometricEvent, BiometricLatePenaltyRule, BiometricLeave, BiometricPayrollConfig, BiometricSchedule } from "@/types/biometric";
 
 // ZKBio Time's punch_state_display vocabulary is set by whatever language
 // the device/software itself is configured in — the API docs show English
@@ -85,6 +85,13 @@ export interface BiometricEmployee {
    * field. Use resolveEmployeeSchedule() to get the fully-merged schedule
    * actually in effect for this employee. */
   scheduleOverride: Partial<BiometricSchedule> | null;
+  /** Doesn't work Saturdays — a Saturday then never counts as an absence
+   * for them (see isWorkedDay). Independent of scheduleOverride: someone
+   * can keep the company hours and still have Saturdays off. */
+  saturdayOff: boolean;
+  /** Gross monthly pay in DH, or null if none is set — null keeps them out
+   * of the Salaires table rather than showing them at 0. */
+  monthlySalary: number | null;
 }
 
 // Per-employee override stored via /api/biometric/employees — layered onto
@@ -106,6 +113,8 @@ export interface BiometricEmployeeOverride {
   fridayBreakStart: string | null;
   fridayBreakEnd: string | null;
   saturdayEndTime: string | null;
+  saturdayOff: boolean;
+  monthlySalary: number | null;
 }
 
 /** Employees, derived straight from the synced punch events rather than a
@@ -139,6 +148,8 @@ export function deriveEmployees(events: BiometricEvent[], overrides: BiometricEm
         color: override?.color || COLOR_PALETTE[i % COLOR_PALETTE.length],
         hidden: override?.hidden ?? false,
         scheduleOverride: Object.keys(scheduleOverride).length ? scheduleOverride : null,
+        saturdayOff: override?.saturdayOff ?? false,
+        monthlySalary: override?.monthlySalary ?? null,
       };
     });
 }
@@ -416,7 +427,13 @@ export interface MonthlyAbsenceRow {
  * over yet, so there's nothing confirmed to count. `todayKey` is passed in
  * rather than read from `new Date()` so this stays a pure function of its
  * inputs (callers pass `casablancaDateKey(new Date())`). */
-export function computeMonthlyAbsences(events: BiometricEvent[], employees: BiometricEmployee[], monthKey: string, todayKey: string): MonthlyAbsenceRow[] {
+export function computeMonthlyAbsences(
+  events: BiometricEvent[],
+  employees: BiometricEmployee[],
+  leaves: BiometricLeave[],
+  monthKey: string,
+  todayKey: string
+): MonthlyAbsenceRow[] {
   const presentDatesByEmp = new Map<string, Set<string>>();
   const firstPunchDateByEmp = new Map<string, string>();
   for (const event of events) {
@@ -435,13 +452,17 @@ export function computeMonthlyAbsences(events: BiometricEvent[], employees: Biom
     if (employee.hidden) continue;
     const presentDates = presentDatesByEmp.get(employee.empCode) ?? new Set<string>();
     const firstPunchDate = firstPunchDateByEmp.get(employee.empCode) ?? todayKey;
+    const employeeLeaves = leaves.filter((l) => l.empCode === employee.empCode);
     const dates: string[] = [];
     for (let day = 1; day <= lastDayOfMonth; day++) {
       const dateKey = `${monthKey}-${String(day).padStart(2, "0")}`;
       if (dateKey >= todayKey) break;
       if (dateKey < firstPunchDate) continue;
-      const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-      if (weekday === 0) continue;
+      // Sunday, a Saturday for someone who has Saturdays off, and any
+      // booked leave day are all days this employee wasn't expected in —
+      // none of them can be an absence.
+      if (!isWorkedDay(employee, dateKey)) continue;
+      if (isOnLeave(dateKey, employeeLeaves)) continue;
       if (!presentDates.has(dateKey)) dates.push(dateKey);
     }
     if (dates.length > 0) rows.push({ empCode: employee.empCode, name: employee.name, color: employee.color, dates });
@@ -455,4 +476,139 @@ export function formatAbsenceDates(dates: string[]): string {
   const days = dates.map((d) => d.slice(-2));
   if (days.length === 1) return days[0];
   return `${days.slice(0, -1).join(", ")} et ${days[days.length - 1]}`;
+}
+
+/** Weekday (0=Sunday..6=Saturday) of a "YYYY-MM-DD" calendar day. Parsed as
+ * UTC on purpose: the string is already a Casablanca calendar day, so this
+ * is pure date arithmetic — going through the local Date constructor would
+ * put the viewer's own timezone back into a value that no longer has one. */
+export function weekdayOfDateKey(dateKey: string): number {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+/** Whether this employee was expected in on that calendar day: never on a
+ * Sunday, never on a Saturday if they have Saturdays off, otherwise yes.
+ * Leave is checked separately (isOnLeave) since it's a period, not a
+ * recurring weekday. */
+export function isWorkedDay(employee: Pick<BiometricEmployee, "saturdayOff">, dateKey: string): boolean {
+  const weekday = weekdayOfDateKey(dateKey);
+  if (weekday === 0) return false;
+  if (weekday === 6 && employee.saturdayOff) return false;
+  return true;
+}
+
+/** Whether that calendar day falls inside any of the given leave periods
+ * (both ends inclusive). `leaves` must already be narrowed to one employee
+ * — plain string comparison works since both sides are "YYYY-MM-DD". */
+export function isOnLeave(dateKey: string, leaves: BiometricLeave[]): boolean {
+  return leaves.some((l) => dateKey >= l.startDate && dateKey <= l.endDate);
+}
+
+/** DH docked for arriving `lateMinutes` late — the single highest tier that
+ * arrival reaches, never the sum of every tier below it: with 5min=-10 and
+ * 15min=-30 configured, a 20-minute arrival costs 30 DH, not 40. No
+ * matching tier (or no tiers configured at all) costs nothing. */
+export function penaltyForLateMinutes(lateMinutes: number, rules: BiometricLatePenaltyRule[]): number {
+  let best: BiometricLatePenaltyRule | null = null;
+  for (const rule of rules) {
+    if (lateMinutes >= rule.fromMinutes && (!best || rule.fromMinutes > best.fromMinutes)) best = rule;
+  }
+  return best?.amount ?? 0;
+}
+
+export interface PayrollRow {
+  empCode: string;
+  name: string;
+  color: string;
+  monthlySalary: number | null;
+  lateDays: number;
+  lateSeconds: number;
+  lateDeduction: number;
+  absenceDays: number;
+  absenceDeduction: number;
+  leaveDays: number;
+  totalDeduction: number;
+  /** null when this employee has no salary set — deliberately not 0, so the
+   * UI can say "à définir" instead of showing a bogus payslip. */
+  netSalary: number | null;
+}
+
+/** Month-end payroll per employee: gross pay minus what lateness and
+ * absences cost, for `monthKey` ("YYYY-MM").
+ *
+ * `events` must be the *full* history, not just that month's — absences come
+ * from computeMonthlyAbsences, which needs everything to know when tracking
+ * actually started for someone (so days before they were even hired aren't
+ * billed as absences). Days inside a booked leave are charged neither as an
+ * absence nor as lateness: someone who came in anyway while on leave
+ * shouldn't be docked for arriving late on a day they weren't expected. */
+export function computePayroll(
+  events: BiometricEvent[],
+  employees: BiometricEmployee[],
+  leaves: BiometricLeave[],
+  rules: BiometricLatePenaltyRule[],
+  config: BiometricPayrollConfig,
+  defaultSchedule: BiometricSchedule,
+  monthKey: string,
+  todayKey: string
+): PayrollRow[] {
+  const monthEvents = events.filter((e) => casablancaDateKey(e.punchTime).startsWith(monthKey));
+  const attendance = computeDailyAttendance(monthEvents, employees, defaultSchedule);
+  const absencesByEmp = new Map(computeMonthlyAbsences(events, employees, leaves, monthKey, todayKey).map((r) => [r.empCode, r.dates.length]));
+
+  const [year, month] = monthKey.split("-").map(Number);
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const rows: PayrollRow[] = [];
+  for (const employee of employees) {
+    if (employee.hidden) continue;
+    const employeeLeaves = leaves.filter((l) => l.empCode === employee.empCode);
+
+    let lateDays = 0;
+    let lateSeconds = 0;
+    let lateDeduction = 0;
+    for (const row of attendance) {
+      if (row.empCode !== employee.empCode || !row.isLate) continue;
+      if (isOnLeave(row.date, employeeLeaves)) continue;
+      lateDays += 1;
+      lateSeconds += row.lateSeconds;
+      lateDeduction += penaltyForLateMinutes(Math.floor(row.lateSeconds / 60), rules);
+    }
+
+    // Working days of the month covered by a leave — shown next to the
+    // absence count so a low absence count for someone away all month reads
+    // as "on leave", not "never misses a day".
+    let leaveDays = 0;
+    for (let day = 1; day <= lastDayOfMonth; day++) {
+      const dateKey = `${monthKey}-${String(day).padStart(2, "0")}`;
+      if (isWorkedDay(employee, dateKey) && isOnLeave(dateKey, employeeLeaves)) leaveDays += 1;
+    }
+
+    const absenceDays = absencesByEmp.get(employee.empCode) ?? 0;
+    const absenceDeduction = absenceDays * config.absenceDeduction;
+    const totalDeduction = lateDeduction + absenceDeduction;
+    rows.push({
+      empCode: employee.empCode,
+      name: employee.name,
+      color: employee.color,
+      monthlySalary: employee.monthlySalary,
+      lateDays,
+      lateSeconds,
+      lateDeduction,
+      absenceDays,
+      absenceDeduction,
+      leaveDays,
+      totalDeduction,
+      netSalary: employee.monthlySalary === null ? null : employee.monthlySalary - totalDeduction,
+    });
+  }
+
+  return rows.sort((a, b) => b.totalDeduction - a.totalDeduction || a.name.localeCompare(b.name));
+}
+
+/** "1 250,00 DH" — the page's single money formatter, so a salary, a
+ * deduction and a net total all read the same way. */
+export function formatDirham(amount: number): string {
+  return `${amount.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH`;
 }

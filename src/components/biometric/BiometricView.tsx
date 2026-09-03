@@ -6,14 +6,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBiometricEvents } from "@/hooks/useBiometricEvents";
 import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
 import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
+import { useBiometricLeaves } from "@/hooks/useBiometricLeaves";
+import { useBiometricPayroll } from "@/hooks/useBiometricPayroll";
 import { usePagination } from "@/hooks/usePagination";
 import { canAccessBiometrics, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
 import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmployeeApi";
 import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
+import { createBiometricLeave, deleteBiometricLeave } from "@/services/biometricLeaveApi";
+import { createBiometricLatePenaltyRule, deleteBiometricLatePenaltyRule, saveBiometricPayrollConfig } from "@/services/biometricPayrollApi";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
 import { BiometricScheduleEditor } from "./BiometricScheduleEditor";
+import { BiometricPayrollSection } from "./BiometricPayrollSection";
 import { BiometricDateRangePicker } from "./BiometricDateRangePicker";
 import { BiometricTimeRangePicker } from "./BiometricTimeRangePicker";
 import { FilterMenu } from "@/components/ui/FilterMenu";
@@ -35,6 +40,7 @@ import {
   STATUS_LABEL,
   computeDailyAttendance,
   computeMonthlyAbsences,
+  computePayroll,
   countByEmployee,
   countByStatus,
   countLateByEmployee,
@@ -132,6 +138,8 @@ export function BiometricView() {
   const { events, stats, loading } = useBiometricEvents();
   const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
   const { schedule, refetch: refetchSchedule } = useBiometricSchedule();
+  const { leaves, refetch: refetchLeaves } = useBiometricLeaves();
+  const { config: payrollConfig, rules: penaltyRules, refetch: refetchPayroll } = useBiometricPayroll();
   const toast = useToast();
   const [managingEmployees, setManagingEmployees] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
@@ -152,6 +160,10 @@ export function BiometricView() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [selectedEmpCode, setSelectedEmpCode] = useState<string | null>(null);
   const [absenceMonthKey, setAbsenceMonthKey] = useState(() => casablancaDateKey(new Date()).slice(0, 7));
+  // Its own month, independent of the Absences section's: payroll is
+  // typically reviewed for the month that just closed while absences are
+  // still being checked for the current one.
+  const [payrollMonthKey, setPayrollMonthKey] = useState(() => casablancaDateKey(new Date()).slice(0, 7));
 
   // Employees, derived from the synced punch events themselves — shown as
   // an avatar-row selector matching the Calls page's ThreeCxUserSelectorBar,
@@ -181,6 +193,48 @@ export function BiometricView() {
       toast.success("Heures de travail mises à jour.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Échec de la mise à jour.");
+    }
+  }
+
+  async function handleAddLeave(empCode: string, startDate: string, endDate: string, reason: string | null) {
+    await createBiometricLeave({ empCode, startDate, endDate, reason });
+    refetchLeaves();
+    toast.success("Conge enregistre.");
+  }
+
+  async function handleDeleteLeave(id: string) {
+    try {
+      await deleteBiometricLeave(id);
+      refetchLeaves();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Echec de la suppression.");
+    }
+  }
+
+  async function handleSaveSalary(empCode: string, salary: number | null) {
+    await handleSaveEmployeeOverride(empCode, { monthlySalary: salary });
+  }
+
+  async function handleSaveAbsenceDeduction(amount: number) {
+    try {
+      await saveBiometricPayrollConfig(amount);
+      refetchPayroll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Echec de la mise a jour.");
+    }
+  }
+
+  async function handleAddPenaltyRule(fromMinutes: number, amount: number) {
+    await createBiometricLatePenaltyRule(fromMinutes, amount);
+    refetchPayroll();
+  }
+
+  async function handleDeletePenaltyRule(id: string) {
+    try {
+      await deleteBiometricLatePenaltyRule(id);
+      refetchPayroll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Echec de la suppression.");
     }
   }
 
@@ -367,8 +421,18 @@ export function BiometricView() {
   // page. Absence = no punch at all, any terminal — deliberately not
   // scoped to the main entrance (see computeMonthlyAbsences's docs).
   const monthlyAbsences = useMemo(
-    () => computeMonthlyAbsences(events, employees, absenceMonthKey, casablancaDateKey(new Date())),
-    [events, employees, absenceMonthKey]
+    () => computeMonthlyAbsences(events, employees, leaves, absenceMonthKey, casablancaDateKey(new Date())),
+    [events, employees, leaves, absenceMonthKey]
+  );
+
+  // Payroll is manager/admin-only (the API refuses it for anyone else), so
+  // it isn't computed at all for a view-only attendance user.
+  const payrollRows = useMemo(
+    () =>
+      isManagerOrAdmin
+        ? computePayroll(events, employees, leaves, penaltyRules, payrollConfig, schedule, payrollMonthKey, casablancaDateKey(new Date()))
+        : [],
+    [isManagerOrAdmin, events, employees, leaves, penaltyRules, payrollConfig, schedule, payrollMonthKey]
   );
 
   useEffect(() => {
@@ -515,8 +579,11 @@ export function BiometricView() {
             open={managingEmployees}
             employees={employees}
             globalSchedule={schedule}
+            leaves={leaves}
             onClose={() => setManagingEmployees(false)}
             onSave={handleSaveEmployeeOverride}
+            onAddLeave={handleAddLeave}
+            onDeleteLeave={handleDeleteLeave}
           />
 
           <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-5 dark:bg-slate-950">
@@ -731,6 +798,20 @@ export function BiometricView() {
               </div>
             )}
           </section>
+
+          {isManagerOrAdmin && (
+            <BiometricPayrollSection
+              rows={payrollRows}
+              monthKey={payrollMonthKey}
+              onMonthChange={setPayrollMonthKey}
+              absenceDeduction={payrollConfig.absenceDeduction}
+              rules={penaltyRules}
+              onSaveSalary={handleSaveSalary}
+              onSaveAbsenceDeduction={handleSaveAbsenceDeduction}
+              onAddRule={handleAddPenaltyRule}
+              onDeleteRule={handleDeletePenaltyRule}
+            />
+          )}
 
           <BiometricScheduleEditor open={editingSchedule} schedule={schedule} onClose={() => setEditingSchedule(false)} onSave={handleSaveSchedule} />
 

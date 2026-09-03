@@ -6,32 +6,38 @@ import { createPortal } from "react-dom";
 import { ColorSwatchPicker } from "@/components/admin/ColorSwatchPicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
-import { ClockIcon, EyeIcon, TrashIcon, XIcon } from "@/components/ui/icons";
+import { CalendarIcon, ClockIcon, EyeIcon, TrashIcon, XIcon } from "@/components/ui/icons";
 import { BiometricEmployeeScheduleEditor } from "./BiometricEmployeeScheduleEditor";
+import { BiometricEmployeeLeaveEditor } from "./BiometricEmployeeLeaveEditor";
 import { cn } from "@/lib/cn";
 import type { BiometricEmployee } from "@/lib/biometricStats";
-import type { BiometricSchedule } from "@/types/biometric";
+import type { BiometricLeave, BiometricSchedule } from "@/types/biometric";
 import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmployeeApi";
 
 interface BiometricEmployeeManagerProps {
   open: boolean;
   employees: BiometricEmployee[];
   globalSchedule: BiometricSchedule;
+  leaves: BiometricLeave[];
   onClose: () => void;
   onSave: (empCode: string, patch: BiometricEmployeeOverridePatch) => Promise<void>;
+  onAddLeave: (empCode: string, startDate: string, endDate: string, reason: string | null) => Promise<void>;
+  onDeleteLeave: (id: string) => Promise<void>;
 }
 
 /** Manage-employees modal for the Biométrie page — mirrors ThreeCxUserManager
  * (src/components/calls/ThreeCxUserManager.tsx): lets the auto-detected
  * employees be renamed, recolored, or hidden (a soft "delete": attendance
  * history stays, only the picker/charts stop showing that employee). */
-export function BiometricEmployeeManager({ open, employees, globalSchedule, onClose, onSave }: BiometricEmployeeManagerProps) {
+export function BiometricEmployeeManager({ open, employees, globalSchedule, leaves, onClose, onSave, onAddLeave, onDeleteLeave }: BiometricEmployeeManagerProps) {
   const [pendingHideCode, setPendingHideCode] = useState<string | null>(null);
   const [schedulingCode, setSchedulingCode] = useState<string | null>(null);
+  const [leaveCode, setLeaveCode] = useState<string | null>(null);
   if (!open) return null;
 
   const pendingEmployee = employees.find((e) => e.empCode === pendingHideCode) ?? null;
   const schedulingEmployee = employees.find((e) => e.empCode === schedulingCode) ?? null;
+  const leaveEmployee = employees.find((e) => e.empCode === leaveCode) ?? null;
 
   return createPortal(
     <div className="fixed inset-0 z-[90] flex animate-fade-in items-center justify-center bg-black/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -53,7 +59,15 @@ export function BiometricEmployeeManager({ open, employees, globalSchedule, onCl
         <ul className="overflow-y-auto">
           {employees.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">Aucun employé détecté pour l&apos;instant.</li>}
           {employees.map((e) => (
-            <EmployeeRow key={e.empCode} employee={e} onSave={onSave} onRequestHide={() => setPendingHideCode(e.empCode)} onRequestSchedule={() => setSchedulingCode(e.empCode)} />
+            <EmployeeRow
+              key={e.empCode}
+              employee={e}
+              leaveCount={leaves.filter((l) => l.empCode === e.empCode).length}
+              onSave={onSave}
+              onRequestHide={() => setPendingHideCode(e.empCode)}
+              onRequestSchedule={() => setSchedulingCode(e.empCode)}
+              onRequestLeave={() => setLeaveCode(e.empCode)}
+            />
           ))}
         </ul>
 
@@ -63,6 +77,15 @@ export function BiometricEmployeeManager({ open, employees, globalSchedule, onCl
           globalSchedule={globalSchedule}
           onClose={() => setSchedulingCode(null)}
           onSave={onSave}
+        />
+
+        <BiometricEmployeeLeaveEditor
+          open={leaveCode !== null}
+          employee={leaveEmployee}
+          leaves={leaves}
+          onClose={() => setLeaveCode(null)}
+          onAdd={onAddLeave}
+          onDelete={onDeleteLeave}
         />
 
         <ConfirmDialog
@@ -89,12 +112,14 @@ export function BiometricEmployeeManager({ open, employees, globalSchedule, onCl
 
 interface EmployeeRowProps {
   employee: BiometricEmployee;
+  leaveCount: number;
   onSave: (empCode: string, patch: BiometricEmployeeOverridePatch) => Promise<void>;
   onRequestHide: () => void;
   onRequestSchedule: () => void;
+  onRequestLeave: () => void;
 }
 
-function EmployeeRow({ employee, onSave, onRequestHide, onRequestSchedule }: EmployeeRowProps) {
+function EmployeeRow({ employee, leaveCount, onSave, onRequestHide, onRequestSchedule, onRequestLeave }: EmployeeRowProps) {
   const [name, setName] = useState(employee.name);
 
   function commit() {
@@ -135,9 +160,27 @@ function EmployeeRow({ employee, onSave, onRequestHide, onRequestSchedule }: Emp
           employee.scheduleOverride ? "text-indigo-500 dark:text-indigo-400" : "text-slate-400"
         )}
         aria-label={`Heures de travail de ${employee.name}`}
-        title={employee.scheduleOverride ? "Horaire personnalisé actif" : "Heures de travail (planning global)"}
+        title={
+          employee.saturdayOff
+            ? "Samedi non travaillé" + (employee.scheduleOverride ? " · horaire personnalisé" : "")
+            : employee.scheduleOverride
+              ? "Horaire personnalisé actif"
+              : "Heures de travail (planning global)"
+        }
       >
         <ClockIcon className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onRequestLeave}
+        className={cn(
+          "rounded-md p-1.5 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950 dark:hover:text-indigo-400",
+          leaveCount > 0 ? "text-indigo-500 dark:text-indigo-400" : "text-slate-400"
+        )}
+        aria-label={`Congés de ${employee.name}`}
+        title={leaveCount > 0 ? `${leaveCount} congé${leaveCount > 1 ? "s" : ""} enregistré${leaveCount > 1 ? "s" : ""}` : "Congés"}
+      >
+        <CalendarIcon className="h-4 w-4" />
       </button>
       {employee.hidden ? (
         <button

@@ -665,9 +665,61 @@ model BiometricEmployeeOverride {
   fridayBreakStart String?
   fridayBreakEnd   String?
   saturdayEndTime  String?
+  // Some people simply don't work Saturdays — independent of the custom
+  // work-hours override above (someone can keep the global hours and still
+  // have Saturdays off). A Saturday then never counts as an absence for
+  // them, see computeMonthlyAbsences.
+  saturdayOff      Boolean  @default(false)
+  // Gross monthly pay in DH, used by the Salaires section. Null means "not
+  // set yet" (no payroll row for this employee), which is deliberately
+  // distinct from 0.
+  monthlySalary    Float?
   updatedAt        DateTime @updatedAt
 
   @@map("biometric_employee_overrides")
+}
+
+// A booked leave period for one employee (congé). Dates are "YYYY-MM-DD"
+// Casablanca calendar-day strings rather than DateTime, for the same reason
+// absences are keyed that way (casablancaDateKey): a leave day is a calendar
+// fact, so comparing day strings avoids re-deriving a timezone from an
+// instant on every read. `endDate` is inclusive — a one-day leave has
+// startDate === endDate.
+model BiometricLeave {
+  id        String   @id @default(cuid())
+  empCode   String
+  startDate String
+  endDate   String
+  reason    String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([empCode])
+  @@map("biometric_leaves")
+}
+
+// Singleton payroll settings (same pattern as BiometricSchedule) — the
+// per-day amount docked for an unjustified absence. Lateness is docked
+// separately, by the tiered BiometricLatePenaltyRule table below.
+model BiometricPayrollConfig {
+  id               String   @id @default(cuid())
+  absenceDeduction Float    @default(0)
+  updatedAt        DateTime @updatedAt
+
+  @@map("biometric_payroll_config")
+}
+
+// Tiered lateness penalties: "arriving at least fromMinutes late costs
+// `amount` DH". A late day is charged by the single highest tier it
+// reaches, not the sum of every tier below it (see computePayroll) — so with
+// 5min=-10 and 15min=-30, a 20-minute arrival docks 30 DH, not 40.
+model BiometricLatePenaltyRule {
+  id          String   @id @default(cuid())
+  fromMinutes Int
+  amount      Float
+  createdAt   DateTime @default(now())
+
+  @@map("biometric_late_penalty_rules")
 }
 
 // Single shared config (singleton, same pattern as BackupSheetConfig) for
