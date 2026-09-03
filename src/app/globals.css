@@ -108,4 +108,38 @@ body {
     transform-style: preserve-3d;
     animation: tv-title-3d 7s ease-in-out infinite;
   }
+
+  /* Biométrie section headers (BiometricSectionTitle) — a gentler cousin of
+     tv-title-3d: read up close on a dashboard rather than across a room, so
+     the wobble is subtler and faster, paired with a one-shot pop-in on
+     mount instead of the TV title's plain fade. */
+  @keyframes section-title-3d {
+    0%,
+    100% {
+      transform: rotateX(6deg) rotateY(-5deg);
+    }
+    50% {
+      transform: rotateX(-6deg) rotateY(5deg);
+    }
+  }
+
+  @keyframes section-title-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.85) translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .section-title-3d {
+    display: inline-block;
+    transform-style: preserve-3d;
+    animation:
+      section-title-pop 0.4s ease-out,
+      section-title-3d 5s ease-in-out 0.4s infinite;
+  }
 }
+

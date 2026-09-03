@@ -698,6 +698,20 @@ model BiometricLeave {
   @@map("biometric_leaves")
 }
 
+// A company-wide public holiday (jour ferie) — unlike BiometricLeave, this
+// isn't tied to one empCode: it excuses every employee's absence and
+// lateness that day, not just one person's. A single "YYYY-MM-DD" (most
+// Moroccan public holidays are one day; a 2-day one like Aid gets two rows).
+model BiometricHoliday {
+  id        String   @id @default(cuid())
+  date      String
+  name      String
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@map("biometric_holidays")
+}
+
 // Singleton payroll settings (same pattern as BiometricSchedule) — the
 // per-day amount docked for an unjustified absence. Lateness is docked
 // separately, by the tiered BiometricLatePenaltyRule table below.

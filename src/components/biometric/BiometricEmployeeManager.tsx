@@ -11,7 +11,7 @@ import { BiometricEmployeeScheduleEditor } from "./BiometricEmployeeScheduleEdit
 import { BiometricEmployeeLeaveEditor } from "./BiometricEmployeeLeaveEditor";
 import { cn } from "@/lib/cn";
 import type { BiometricEmployee } from "@/lib/biometricStats";
-import type { BiometricLeave, BiometricSchedule } from "@/types/biometric";
+import type { BiometricHoliday, BiometricLeave, BiometricSchedule } from "@/types/biometric";
 import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmployeeApi";
 
 interface BiometricEmployeeManagerProps {
@@ -19,17 +19,32 @@ interface BiometricEmployeeManagerProps {
   employees: BiometricEmployee[];
   globalSchedule: BiometricSchedule;
   leaves: BiometricLeave[];
+  holidays: BiometricHoliday[];
   onClose: () => void;
   onSave: (empCode: string, patch: BiometricEmployeeOverridePatch) => Promise<void>;
   onAddLeave: (empCode: string, startDate: string, endDate: string, reason: string | null) => Promise<void>;
   onDeleteLeave: (id: string) => Promise<void>;
+  onAddHoliday: (date: string, name: string) => Promise<void>;
+  onDeleteHoliday: (id: string) => Promise<void>;
 }
 
 /** Manage-employees modal for the Biométrie page — mirrors ThreeCxUserManager
  * (src/components/calls/ThreeCxUserManager.tsx): lets the auto-detected
  * employees be renamed, recolored, or hidden (a soft "delete": attendance
  * history stays, only the picker/charts stop showing that employee). */
-export function BiometricEmployeeManager({ open, employees, globalSchedule, leaves, onClose, onSave, onAddLeave, onDeleteLeave }: BiometricEmployeeManagerProps) {
+export function BiometricEmployeeManager({
+  open,
+  employees,
+  globalSchedule,
+  leaves,
+  holidays,
+  onClose,
+  onSave,
+  onAddLeave,
+  onDeleteLeave,
+  onAddHoliday,
+  onDeleteHoliday,
+}: BiometricEmployeeManagerProps) {
   const [pendingHideCode, setPendingHideCode] = useState<string | null>(null);
   const [schedulingCode, setSchedulingCode] = useState<string | null>(null);
   const [leaveCode, setLeaveCode] = useState<string | null>(null);
@@ -83,9 +98,12 @@ export function BiometricEmployeeManager({ open, employees, globalSchedule, leav
           open={leaveCode !== null}
           employee={leaveEmployee}
           leaves={leaves}
+          holidays={holidays}
           onClose={() => setLeaveCode(null)}
           onAdd={onAddLeave}
           onDelete={onDeleteLeave}
+          onAddHoliday={onAddHoliday}
+          onDeleteHoliday={onDeleteHoliday}
         />
 
         <ConfirmDialog

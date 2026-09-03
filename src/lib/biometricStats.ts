@@ -1,7 +1,7 @@
 import { COLOR_PALETTE } from "@/config/colorPalette";
 import { casablancaDateKey, casablancaHourMinute, casablancaWallClockToUtc, casablancaWeekday } from "@/lib/casablancaTime";
 import type { BarChartDatum } from "@/components/stats/BarChart";
-import type { BiometricEvent, BiometricLatePenaltyRule, BiometricLeave, BiometricPayrollConfig, BiometricSchedule } from "@/types/biometric";
+import type { BiometricEvent, BiometricHoliday, BiometricLatePenaltyRule, BiometricLeave, BiometricPayrollConfig, BiometricSchedule } from "@/types/biometric";
 
 // ZKBio Time's punch_state_display vocabulary is set by whatever language
 // the device/software itself is configured in — the API docs show English
@@ -431,6 +431,7 @@ export function computeMonthlyAbsences(
   events: BiometricEvent[],
   employees: BiometricEmployee[],
   leaves: BiometricLeave[],
+  holidays: BiometricHoliday[],
   monthKey: string,
   todayKey: string
 ): MonthlyAbsenceRow[] {
@@ -463,6 +464,7 @@ export function computeMonthlyAbsences(
       // none of them can be an absence.
       if (!isWorkedDay(employee, dateKey)) continue;
       if (isOnLeave(dateKey, employeeLeaves)) continue;
+      if (isHoliday(dateKey, holidays)) continue;
       if (!presentDates.has(dateKey)) dates.push(dateKey);
     }
     if (dates.length > 0) rows.push({ empCode: employee.empCode, name: employee.name, color: employee.color, dates });
@@ -503,6 +505,12 @@ export function isWorkedDay(employee: Pick<BiometricEmployee, "saturdayOff">, da
  * — plain string comparison works since both sides are "YYYY-MM-DD". */
 export function isOnLeave(dateKey: string, leaves: BiometricLeave[]): boolean {
   return leaves.some((l) => dateKey >= l.startDate && dateKey <= l.endDate);
+}
+
+/** Whether that calendar day is a company-wide public holiday — applies to
+ * every employee alike, unlike isOnLeave which is per-person. */
+export function isHoliday(dateKey: string, holidays: BiometricHoliday[]): boolean {
+  return holidays.some((h) => h.date === dateKey);
 }
 
 /** DH docked for arriving `lateMinutes` late — the single highest tier that
@@ -547,6 +555,7 @@ export function computePayroll(
   events: BiometricEvent[],
   employees: BiometricEmployee[],
   leaves: BiometricLeave[],
+  holidays: BiometricHoliday[],
   rules: BiometricLatePenaltyRule[],
   config: BiometricPayrollConfig,
   defaultSchedule: BiometricSchedule,
@@ -555,7 +564,7 @@ export function computePayroll(
 ): PayrollRow[] {
   const monthEvents = events.filter((e) => casablancaDateKey(e.punchTime).startsWith(monthKey));
   const attendance = computeDailyAttendance(monthEvents, employees, defaultSchedule);
-  const absencesByEmp = new Map(computeMonthlyAbsences(events, employees, leaves, monthKey, todayKey).map((r) => [r.empCode, r.dates.length]));
+  const absencesByEmp = new Map(computeMonthlyAbsences(events, employees, leaves, holidays, monthKey, todayKey).map((r) => [r.empCode, r.dates.length]));
 
   const [year, month] = monthKey.split("-").map(Number);
   const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -571,6 +580,7 @@ export function computePayroll(
     for (const row of attendance) {
       if (row.empCode !== employee.empCode || !row.isLate) continue;
       if (isOnLeave(row.date, employeeLeaves)) continue;
+      if (isHoliday(row.date, holidays)) continue;
       lateDays += 1;
       lateSeconds += row.lateSeconds;
       lateDeduction += penaltyForLateMinutes(Math.floor(row.lateSeconds / 60), rules);

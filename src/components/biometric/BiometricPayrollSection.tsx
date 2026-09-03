@@ -3,8 +3,9 @@
 import { useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Avatar } from "@/components/ui/Avatar";
-import { PencilIcon } from "@/components/ui/icons";
+import { CashIcon, PencilIcon } from "@/components/ui/icons";
 import { BiometricPayrollRulesEditor } from "./BiometricPayrollRulesEditor";
+import { BiometricSectionTitle } from "./BiometricSectionTitle";
 import { formatDirham, formatLateDuration } from "@/lib/biometricStats";
 import type { PayrollRow } from "@/lib/biometricStats";
 import type { BiometricLatePenaltyRule } from "@/types/biometric";
@@ -52,8 +53,8 @@ export function BiometricPayrollSection({
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
         <div>
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Salaires</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Salaire mensuel moins les retards et les absences du mois</p>
+          <BiometricSectionTitle icon={<CashIcon className="h-5 w-5 text-emerald-500" />}>Salaires</BiometricSectionTitle>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Salaire mensuel moins les retards et les absences du mois</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -68,24 +69,24 @@ export function BiometricPayrollSection({
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <PencilIcon className="h-3.5 w-3.5" />
-            Regles
+            Règles
           </button>
         </div>
       </div>
 
       {rows.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-400">Aucun employe a afficher.</p>
+        <p className="px-4 py-6 text-center text-sm text-slate-400">Aucun employé à afficher.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[880px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                <th scope="col" className="whitespace-nowrap px-4 py-2">Salarie</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Salarié</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2">Salaire (DH)</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2">Retards</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2">Absences</th>
-                <th scope="col" className="whitespace-nowrap px-3 py-2">Deductions</th>
-                <th scope="col" className="whitespace-nowrap px-3 py-2">Net a payer</th>
+                <th scope="col" className="whitespace-nowrap px-3 py-2">Déductions</th>
+                <th scope="col" className="whitespace-nowrap px-3 py-2">Net à payer</th>
               </tr>
             </thead>
             <tbody>
@@ -116,7 +117,7 @@ export function BiometricPayrollSection({
                     ) : (
                       <span className="font-medium tabular-nums text-red-600 dark:text-red-400">{row.absenceDays} j</span>
                     )}
-                    {row.leaveDays > 0 && <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">+{row.leaveDays} j conge</span>}
+                    {row.leaveDays > 0 && <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">+{row.leaveDays} j congé</span>}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     {row.totalDeduction === 0 ? (
@@ -129,7 +130,7 @@ export function BiometricPayrollSection({
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     {row.netSalary === null ? (
-                      <span className="text-xs text-slate-400">Salaire a definir</span>
+                      <span className="text-xs text-slate-400">Salaire à définir</span>
                     ) : (
                       <span className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">{formatDirham(row.netSalary)}</span>
                     )}

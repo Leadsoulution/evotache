@@ -56,11 +56,11 @@ export function BiometricPayrollRulesEditor({
     const from = Number(minutes);
     const value = Number(amount);
     if (!Number.isInteger(from) || from < 0) {
-      setError("Le seuil doit etre un nombre entier de minutes.");
+      setError("Le seuil doit être un nombre entier de minutes.");
       return;
     }
     if (!Number.isFinite(value) || value < 0) {
-      setError("Le montant doit etre un nombre positif.");
+      setError("Le montant doit être un nombre positif.");
       return;
     }
     setSaving(true);
@@ -70,7 +70,7 @@ export function BiometricPayrollRulesEditor({
       setMinutes("");
       setAmount("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Echec de l'ajout.");
+      setError(err instanceof Error ? err.message : "Échec de l'ajout.");
     } finally {
       setSaving(false);
     }
@@ -99,7 +99,7 @@ export function BiometricPayrollRulesEditor({
       >
         <div className="flex items-center justify-between">
           <h2 id="biometric-payroll-rules-title" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Regles de deduction
+            Règles de déduction
           </h2>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Fermer">
             <XIcon className="h-4 w-4" />
@@ -107,7 +107,7 @@ export function BiometricPayrollRulesEditor({
         </div>
 
         <label className="mt-4 block text-sm">
-          <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Montant deduit par jour d&apos;absence (DH)</span>
+          <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Montant déduit par jour d&apos;absence (DH)</span>
           <input
             type="number"
             min={0}
@@ -118,20 +118,20 @@ export function BiometricPayrollRulesEditor({
             className={inputClass}
           />
         </label>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Les jours de conge et les jours non travailles ne comptent jamais comme absence.</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Les jours de congé et les jours non travaillés ne comptent jamais comme absence.</p>
 
         <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Retards</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Chaque jour de retard est facture selon le palier le plus eleve atteint — jamais la somme des paliers.
+          Chaque jour de retard est facturé selon le palier le plus élevé atteint — jamais la somme des paliers.
         </p>
 
         <div className="mt-3 flex items-end gap-2">
           <label className="flex-1 text-sm">
-            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">A partir de (min)</span>
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">À partir de (min)</span>
             <input type="number" min={0} step="1" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="15" className={inputClass} />
           </label>
           <label className="flex-1 text-sm">
-            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Deduction (DH)</span>
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Déduction (DH)</span>
             <input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="30" className={inputClass} />
           </label>
           <button
@@ -147,7 +147,7 @@ export function BiometricPayrollRulesEditor({
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
         {rules.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-400">Aucune regle de retard — les retards ne sont pas deduits pour l&apos;instant.</p>
+          <p className="mt-3 text-sm text-slate-400">Aucune règle de retard — les retards ne sont pas déduits pour l&apos;instant.</p>
         ) : (
           <ul className="mt-3 flex-1 overflow-y-auto">
             {[...rules]
@@ -155,14 +155,14 @@ export function BiometricPayrollRulesEditor({
               .map((rule) => (
                 <li key={rule.id} className="flex items-center gap-2 border-b border-slate-100 py-2 last:border-0 dark:border-slate-800">
                   <span className="flex-1 text-sm text-slate-800 dark:text-slate-100">
-                    A partir de <span className="font-medium tabular-nums">{rule.fromMinutes} min</span> de retard
+                    À partir de <span className="font-medium tabular-nums">{rule.fromMinutes} min</span> de retard
                   </span>
                   <span className="shrink-0 text-sm font-medium tabular-nums text-red-600 dark:text-red-400">-{formatDirham(rule.amount)}</span>
                   <button
                     type="button"
                     onClick={() => onDeleteRule(rule.id)}
                     className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
-                    aria-label="Supprimer cette regle"
+                    aria-label="Supprimer cette règle"
                     title="Supprimer"
                   >
                     <TrashIcon className="h-4 w-4" />

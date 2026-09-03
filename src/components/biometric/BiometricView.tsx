@@ -7,6 +7,7 @@ import { useBiometricEvents } from "@/hooks/useBiometricEvents";
 import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
 import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
 import { useBiometricLeaves } from "@/hooks/useBiometricLeaves";
+import { useBiometricHolidays } from "@/hooks/useBiometricHolidays";
 import { useBiometricPayroll } from "@/hooks/useBiometricPayroll";
 import { usePagination } from "@/hooks/usePagination";
 import { canAccessBiometrics, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
@@ -14,11 +15,13 @@ import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
 import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmployeeApi";
 import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
 import { createBiometricLeave, deleteBiometricLeave } from "@/services/biometricLeaveApi";
+import { createBiometricHoliday, deleteBiometricHoliday } from "@/services/biometricHolidayApi";
 import { createBiometricLatePenaltyRule, deleteBiometricLatePenaltyRule, saveBiometricPayrollConfig } from "@/services/biometricPayrollApi";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
 import { BiometricScheduleEditor } from "./BiometricScheduleEditor";
 import { BiometricPayrollSection } from "./BiometricPayrollSection";
+import { BiometricSectionTitle } from "./BiometricSectionTitle";
 import { BiometricDateRangePicker } from "./BiometricDateRangePicker";
 import { BiometricTimeRangePicker } from "./BiometricTimeRangePicker";
 import { FilterMenu } from "@/components/ui/FilterMenu";
@@ -139,6 +142,7 @@ export function BiometricView() {
   const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
   const { schedule, refetch: refetchSchedule } = useBiometricSchedule();
   const { leaves, refetch: refetchLeaves } = useBiometricLeaves();
+  const { holidays, refetch: refetchHolidays } = useBiometricHolidays();
   const { config: payrollConfig, rules: penaltyRules, refetch: refetchPayroll } = useBiometricPayroll();
   const toast = useToast();
   const [managingEmployees, setManagingEmployees] = useState(false);
@@ -206,6 +210,21 @@ export function BiometricView() {
     try {
       await deleteBiometricLeave(id);
       refetchLeaves();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Echec de la suppression.");
+    }
+  }
+
+  async function handleAddHoliday(date: string, name: string) {
+    await createBiometricHoliday(date, name);
+    refetchHolidays();
+    toast.success("Jour ferie enregistre.");
+  }
+
+  async function handleDeleteHoliday(id: string) {
+    try {
+      await deleteBiometricHoliday(id);
+      refetchHolidays();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Echec de la suppression.");
     }
@@ -421,8 +440,8 @@ export function BiometricView() {
   // page. Absence = no punch at all, any terminal — deliberately not
   // scoped to the main entrance (see computeMonthlyAbsences's docs).
   const monthlyAbsences = useMemo(
-    () => computeMonthlyAbsences(events, employees, leaves, absenceMonthKey, casablancaDateKey(new Date())),
-    [events, employees, leaves, absenceMonthKey]
+    () => computeMonthlyAbsences(events, employees, leaves, holidays, absenceMonthKey, casablancaDateKey(new Date())),
+    [events, employees, leaves, holidays, absenceMonthKey]
   );
 
   // Payroll is manager/admin-only (the API refuses it for anyone else), so
@@ -430,9 +449,9 @@ export function BiometricView() {
   const payrollRows = useMemo(
     () =>
       isManagerOrAdmin
-        ? computePayroll(events, employees, leaves, penaltyRules, payrollConfig, schedule, payrollMonthKey, casablancaDateKey(new Date()))
+        ? computePayroll(events, employees, leaves, holidays, penaltyRules, payrollConfig, schedule, payrollMonthKey, casablancaDateKey(new Date()))
         : [],
-    [isManagerOrAdmin, events, employees, leaves, penaltyRules, payrollConfig, schedule, payrollMonthKey]
+    [isManagerOrAdmin, events, employees, leaves, holidays, penaltyRules, payrollConfig, schedule, payrollMonthKey]
   );
 
   useEffect(() => {
@@ -532,7 +551,8 @@ export function BiometricView() {
               the one question raw punch data can answer that call data
               never could, so it leads the page instead of a KPI-tiles row. */}
           <section className="relative overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-white p-5 shadow-sm dark:border-teal-900/50 dark:from-teal-950/30 dark:via-slate-900 dark:to-slate-900">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <BiometricSectionTitle icon={<UsersIcon className="h-5 w-5 text-teal-500" />}>Présence en direct</BiometricSectionTitle>
+            <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <span className="relative flex h-3 w-3 shrink-0">
                   <span className="motion-safe:absolute motion-safe:inline-flex motion-safe:h-full motion-safe:w-full motion-safe:animate-ping motion-safe:rounded-full motion-safe:bg-teal-400 motion-safe:opacity-75" />
@@ -580,10 +600,13 @@ export function BiometricView() {
             employees={employees}
             globalSchedule={schedule}
             leaves={leaves}
+            holidays={holidays}
             onClose={() => setManagingEmployees(false)}
             onSave={handleSaveEmployeeOverride}
             onAddLeave={handleAddLeave}
             onDeleteLeave={handleDeleteLeave}
+            onAddHoliday={handleAddHoliday}
+            onDeleteHoliday={handleDeleteHoliday}
           />
 
           <section className="sticky top-0 z-10 grid grid-cols-2 gap-3 bg-slate-50 py-2 sm:grid-cols-3 lg:grid-cols-5 dark:bg-slate-950">
@@ -614,10 +637,10 @@ export function BiometricView() {
               <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 dark:border-amber-900/40 dark:bg-amber-950/10">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                      Absents <span className="font-normal text-slate-400">— {dayLabel(presentDay, "aujourd'hui")}</span>
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Aucun pointage ce jour-là</p>
+                    <BiometricSectionTitle icon={<AlertTriangleIcon className="h-5 w-5 text-amber-500" />} suffix={"— " + dayLabel(presentDay, "aujourd'hui")}>
+                      Absents
+                    </BiometricSectionTitle>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Aucun pointage ce jour-là</p>
                   </div>
                   <span className="text-2xl font-bold tabular-nums leading-none text-amber-600 dark:text-amber-400">{absentEmployees.length}</span>
                 </div>
@@ -661,10 +684,10 @@ export function BiometricView() {
           <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
               <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  Détail des présences <span className="font-normal text-slate-400">— {dayLabel(presentDay, "aujourd'hui")}</span>
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <BiometricSectionTitle icon={<ClockIcon className="h-5 w-5 text-indigo-500" />} suffix={"— " + dayLabel(presentDay, "aujourd'hui")}>
+                  Détail des présences
+                </BiometricSectionTitle>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Retard calculé si l&apos;entrée est après {schedule.startTime}
                 </p>
               </div>
@@ -756,8 +779,8 @@ export function BiometricView() {
           <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
               <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Absences</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Jours sans aucun pointage (lundi-samedi), toutes portes confondues</p>
+                <BiometricSectionTitle icon={<CalendarIcon className="h-5 w-5 text-rose-500" />}>Les absences ce mois</BiometricSectionTitle>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Jours sans aucun pointage (lundi-samedi), toutes portes confondues</p>
               </div>
               <input
                 type="month"

@@ -56,3 +56,11 @@ export interface BiometricLatePenaltyRule {
   fromMinutes: number;
   amount: number;
 }
+
+/** A company-wide public holiday (jour férié) — unlike BiometricLeave, not
+ * tied to one empCode: it excuses everyone's absence/lateness that day. */
+export interface BiometricHoliday {
+  id: string;
+  date: string;
+  name: string;
+}

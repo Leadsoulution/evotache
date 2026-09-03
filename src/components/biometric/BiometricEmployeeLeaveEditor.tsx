@@ -4,15 +4,18 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { TrashIcon, XIcon } from "@/components/ui/icons";
 import type { BiometricEmployee } from "@/lib/biometricStats";
-import type { BiometricLeave } from "@/types/biometric";
+import type { BiometricHoliday, BiometricLeave } from "@/types/biometric";
 
 interface BiometricEmployeeLeaveEditorProps {
   open: boolean;
   employee: BiometricEmployee | null;
   leaves: BiometricLeave[];
+  holidays: BiometricHoliday[];
   onClose: () => void;
   onAdd: (empCode: string, startDate: string, endDate: string, reason: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onAddHoliday: (date: string, name: string) => Promise<void>;
+  onDeleteHoliday: (id: string) => Promise<void>;
 }
 
 const inputClass =
@@ -30,13 +33,17 @@ function formatDateKey(dateKey: string): string {
  * alongside the work-hours editor. Days covered here never count as an
  * absence, and are never docked from pay (see computeMonthlyAbsences /
  * computePayroll). */
-export function BiometricEmployeeLeaveEditor({ open, employee, leaves, onClose, onAdd, onDelete }: BiometricEmployeeLeaveEditorProps) {
+export function BiometricEmployeeLeaveEditor({ open, employee, leaves, holidays, onClose, onAdd, onDelete, onAddHoliday, onDeleteHoliday }: BiometricEmployeeLeaveEditorProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wasOpenFor, setWasOpenFor] = useState<string | null>(null);
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayName, setHolidayName] = useState("");
+  const [holidayError, setHolidayError] = useState<string | null>(null);
+  const [savingHoliday, setSavingHoliday] = useState(false);
 
   const openKey = open && employee ? employee.empCode : null;
   if (openKey !== wasOpenFor) {
@@ -50,6 +57,25 @@ export function BiometricEmployeeLeaveEditor({ open, employee, leaves, onClose, 
   if (!open || !employee) return null;
 
   const employeeLeaves = leaves.filter((l) => l.empCode === employee.empCode).sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const sortedHolidays = [...holidays].sort((a, b) => b.date.localeCompare(a.date));
+
+  async function handleAddHoliday() {
+    if (!holidayDate || !holidayName.trim()) {
+      setHolidayError("Choisis une date et un nom.");
+      return;
+    }
+    setSavingHoliday(true);
+    setHolidayError(null);
+    try {
+      await onAddHoliday(holidayDate, holidayName.trim());
+      setHolidayDate("");
+      setHolidayName("");
+    } catch (err) {
+      setHolidayError(err instanceof Error ? err.message : "Échec de l'enregistrement.");
+    } finally {
+      setSavingHoliday(false);
+    }
+  }
 
   async function handleAdd() {
     if (!employee) return;
@@ -85,7 +111,7 @@ export function BiometricEmployeeLeaveEditor({ open, employee, leaves, onClose, 
         role="dialog"
         aria-modal="true"
         aria-labelledby="biometric-leave-title"
-        className="flex max-h-[85vh] w-full max-w-md animate-scale-in flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="flex max-h-[85vh] w-full max-w-md animate-scale-in flex-col overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
       >
         <div className="flex items-center justify-between">
           <h2 id="biometric-leave-title" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -151,6 +177,56 @@ export function BiometricEmployeeLeaveEditor({ open, employee, leaves, onClose, 
             ))}
           </ul>
         )}
+
+        <div className="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Jours fériés (toute l&apos;équipe)</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            S&apos;applique à tous les employés, pas seulement à {employee.name} — jamais compté comme une absence ni un retard pour personne.
+          </p>
+          <div className="mt-2 flex items-end gap-2">
+            <label className="flex-1 text-sm">
+              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Date</span>
+              <input type="date" value={holidayDate} onChange={(e) => setHolidayDate(e.target.value)} className={inputClass} />
+            </label>
+            <label className="flex-[2] text-sm">
+              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Nom</span>
+              <input value={holidayName} onChange={(e) => setHolidayName(e.target.value)} placeholder="Fête du Travail" className={inputClass} />
+            </label>
+            <button
+              type="button"
+              onClick={handleAddHoliday}
+              disabled={savingHoliday || !holidayDate || !holidayName.trim()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Ajouter
+            </button>
+          </div>
+          {holidayError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{holidayError}</p>}
+
+          {sortedHolidays.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-400">Aucun jour férié enregistré.</p>
+          ) : (
+            <ul className="mt-2 max-h-40 overflow-y-auto">
+              {sortedHolidays.map((holiday) => (
+                <li key={holiday.id} className="flex items-center gap-2 border-b border-slate-100 py-2 last:border-0 dark:border-slate-800">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-slate-800 dark:text-slate-100">{formatDateKey(holiday.date)}</p>
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">{holiday.name}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteHoliday(holiday.id)}
+                    className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+                    aria-label="Supprimer ce jour férié"
+                    title="Supprimer"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="mt-5 flex justify-end">
           <button
