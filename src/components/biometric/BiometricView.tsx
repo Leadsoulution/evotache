@@ -231,6 +231,10 @@ export function BiometricView() {
     await handleSaveEmployeeOverride(empCode, { monthlySalary: salary });
   }
 
+  async function handleSaveVirement(empCode: string, amount: number | null) {
+    await handleSaveEmployeeOverride(empCode, { monthlyVirement: amount });
+  }
+
   function handleSort(field: SortField) {
     if (field === sortField) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -802,6 +806,7 @@ export function BiometricView() {
               monthKey={payrollMonthKey}
               onMonthChange={setPayrollMonthKey}
               onSaveSalary={handleSaveSalary}
+              onSaveVirement={handleSaveVirement}
             />
           )}
 

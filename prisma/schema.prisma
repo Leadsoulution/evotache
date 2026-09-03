@@ -674,6 +674,11 @@ model BiometricEmployeeOverride {
   // set yet" (no payroll row for this employee), which is deliberately
   // distinct from 0.
   monthlySalary    Float?
+  // Fixed portion of the net pay handed over by bank transfer each month —
+  // set per employee (not everyone gets one), the rest of the net is paid
+  // in cash (see computePayroll: espece = net - virement). Independent of
+  // monthlySalary/deductions, which can vary month to month.
+  monthlyVirement  Float?
   updatedAt        DateTime @updatedAt
 
   @@map("biometric_employee_overrides")

@@ -21,6 +21,8 @@ export interface BiometricEmployeeOverridePatch {
   /** null clears the salary (back to "not set"), which is deliberately
    * distinct from 0 — see the route's own handling. */
   monthlySalary?: number | null;
+  /** Same null-clears pattern as monthlySalary. */
+  monthlyVirement?: number | null;
 }
 
 export async function saveBiometricEmployeeOverride(empCode: string, patch: BiometricEmployeeOverridePatch): Promise<BiometricEmployeeOverride> {

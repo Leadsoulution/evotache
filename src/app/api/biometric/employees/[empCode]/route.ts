@@ -29,6 +29,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
     saturdayEndTime?: string | null;
     saturdayOff?: boolean;
     monthlySalary?: number | null;
+    monthlyVirement?: number | null;
   } = {};
   if (typeof body.name === "string" || body.name === null) data.name = body.name;
   if (typeof body.color === "string" || body.color === null) data.color = body.color;
@@ -45,6 +46,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
       return NextResponse.json({ error: "monthlySalary doit être un nombre positif ou null." }, { status: 400 });
     }
     data.monthlySalary = salary;
+  }
+
+  // Same null-clears-back-to-"not set" pattern as monthlySalary.
+  if (body.monthlyVirement === null) {
+    data.monthlyVirement = null;
+  } else if (body.monthlyVirement !== undefined) {
+    const virement = Number(body.monthlyVirement);
+    if (!Number.isFinite(virement) || virement < 0) {
+      return NextResponse.json({ error: "monthlyVirement doit être un nombre positif ou null." }, { status: 400 });
+    }
+    data.monthlyVirement = virement;
   }
 
   // Each schedule field is either a valid "HH:mm" string (a custom hour for

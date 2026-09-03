@@ -92,6 +92,9 @@ export interface BiometricEmployee {
   /** Gross monthly pay in DH, or null if none is set — null keeps them out
    * of the Salaires table rather than showing them at 0. */
   monthlySalary: number | null;
+  /** Fixed part of the net pay handed over by bank transfer each month —
+   * null means everything is paid in cash (see computePayroll's espece). */
+  monthlyVirement: number | null;
 }
 
 // Per-employee override stored via /api/biometric/employees — layered onto
@@ -115,6 +118,7 @@ export interface BiometricEmployeeOverride {
   saturdayEndTime: string | null;
   saturdayOff: boolean;
   monthlySalary: number | null;
+  monthlyVirement: number | null;
 }
 
 /** Employees, derived straight from the synced punch events rather than a
@@ -150,6 +154,7 @@ export function deriveEmployees(events: BiometricEvent[], overrides: BiometricEm
         scheduleOverride: Object.keys(scheduleOverride).length ? scheduleOverride : null,
         saturdayOff: override?.saturdayOff ?? false,
         monthlySalary: override?.monthlySalary ?? null,
+        monthlyVirement: override?.monthlyVirement ?? null,
       };
     });
 }
@@ -538,25 +543,37 @@ export interface PayrollRow {
   monthlySalary: number | null;
   lateDays: number;
   lateSeconds: number;
+  /** Hours of salary actually docked for lateness — the sum of each late
+   * day's own ceil(retard/1h), not the continuous duration. */
+  lateHoursDeducted: number;
   lateDeduction: number;
   absenceDays: number;
   absenceDeduction: number;
   leaveDays: number;
+  holidayDays: number;
   totalDeduction: number;
   /** null when this employee has no salary set — deliberately not 0, so the
    * UI can say "à définir" instead of showing a bogus payslip. */
   netSalary: number | null;
+  /** Fixed monthly bank-transfer amount, straight from the employee's own
+   * setting — not derived from netSalary. */
+  virementAmount: number | null;
+  /** netSalary minus virementAmount (treating an unset virement as 0) — the
+   * rest paid in cash. Null only when netSalary itself is null. */
+  especeAmount: number | null;
 }
 
 /** Month-end payroll per employee: gross pay minus what lateness and
  * absences cost, for `monthKey` ("YYYY-MM") — computed purely from each
  * employee's own salary, on the shop's fixed rule: a month is always 26
- * working days, so one absent day costs salaire/26, and one hour late
- * costs that day rate divided by an 8-hour day (salaire/26/8). Prorated
- * continuously by the actual lateness duration — 30 minutes late costs
- * half the hourly rate, not a flat per-tier amount. An employee with no
- * salary set gets 0 DH of deduction (there's nothing to prorate against),
- * while their day/hour counts are still computed normally.
+ * working days, so one absent day costs salaire/26. Lateness is charged
+ * per day, rounded UP to the next whole hour — arriving up to 1h late
+ * costs 1h of salary that day, up to 2h late costs 2h, and so on (10 min
+ * late on one day plus 15 min late on another both round up to 1h each,
+ * for 2h total that month — never a continuous fraction of an hour). An
+ * employee with no salary set gets 0 DH of deduction (there's nothing to
+ * prorate against), while their day/hour counts are still computed
+ * normally.
  *
  * `events` must be the *full* history, not just that month's — absences come
  * from computeMonthlyAbsences, which needs everything to know when tracking
@@ -588,29 +605,37 @@ export function computePayroll(
     const hourRate = hourlyRate(employee.monthlySalary);
     let lateDays = 0;
     let lateSeconds = 0;
-    let lateDeduction = 0;
+    let lateHoursDeducted = 0;
     for (const row of attendance) {
       if (row.empCode !== employee.empCode || !row.isLate) continue;
       if (isOnLeave(row.date, employeeLeaves)) continue;
       if (isHoliday(row.date, holidays)) continue;
       lateDays += 1;
       lateSeconds += row.lateSeconds;
-      if (hourRate !== null) lateDeduction += (row.lateSeconds / 3600) * hourRate;
+      // Rounded UP per day, not prorated: 10 min and 59 min both cost 1h,
+      // 61 min costs 2h.
+      lateHoursDeducted += Math.ceil(row.lateSeconds / 3600);
     }
+    const lateDeduction = hourRate === null ? 0 : lateHoursDeducted * hourRate;
 
-    // Working days of the month covered by a leave — shown next to the
-    // absence count so a low absence count for someone away all month reads
-    // as "on leave", not "never misses a day".
+    // Working days of the month covered by a leave, and separately by a
+    // holiday — shown as their own columns so a low absence count for
+    // someone away all month reads as "on leave"/"jour férié", not "never
+    // misses a day".
     let leaveDays = 0;
+    let holidayDays = 0;
     for (let day = 1; day <= lastDayOfMonth; day++) {
       const dateKey = `${monthKey}-${String(day).padStart(2, "0")}`;
-      if (isWorkedDay(employee, dateKey) && isOnLeave(dateKey, employeeLeaves)) leaveDays += 1;
+      if (!isWorkedDay(employee, dateKey)) continue;
+      if (isOnLeave(dateKey, employeeLeaves)) leaveDays += 1;
+      if (isHoliday(dateKey, holidays)) holidayDays += 1;
     }
 
     const absenceDays = absencesByEmp.get(employee.empCode) ?? 0;
     const dayRate = dailyRate(employee.monthlySalary);
     const absenceDeduction = dayRate === null ? 0 : absenceDays * dayRate;
     const totalDeduction = lateDeduction + absenceDeduction;
+    const netSalary = employee.monthlySalary === null ? null : employee.monthlySalary - totalDeduction;
     rows.push({
       empCode: employee.empCode,
       name: employee.name,
@@ -618,12 +643,16 @@ export function computePayroll(
       monthlySalary: employee.monthlySalary,
       lateDays,
       lateSeconds,
+      lateHoursDeducted,
       lateDeduction,
       absenceDays,
       absenceDeduction,
       leaveDays,
+      holidayDays,
       totalDeduction,
-      netSalary: employee.monthlySalary === null ? null : employee.monthlySalary - totalDeduction,
+      netSalary,
+      virementAmount: employee.monthlyVirement,
+      especeAmount: netSalary === null ? null : netSalary - (employee.monthlyVirement ?? 0),
     });
   }
 
