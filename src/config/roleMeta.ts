@@ -8,9 +8,33 @@ interface RoleMeta {
   bgColor: string;
 }
 
+// The 4 generally-selectable roles — used by every role picker that should
+// list roles for arbitrary users (UserFormDialog's create/edit form, the
+// default RoleMenu options). super_admin is deliberately excluded here: it
+// only ever appears as an option on SUPER_ADMIN_USER_ID's own row (see
+// RoleMenu's `allowSuperAdmin` prop), never as a generally-assignable role.
 export const ROLE_ORDER: Role[] = ["admin", "member", "member_limited", "viewer"];
 
+// Every role including super_admin — only for read-only documentation
+// (RolePermissionsCard's capability matrix), never for a picker: nobody
+// should be able to *choose* super_admin except on that one account's own
+// row (see RoleMenu's allowSuperAdmin prop).
+export const ALL_ROLE_ORDER: Role[] = ["super_admin", ...ROLE_ORDER];
+
+// Meant for exactly one account — full admin control plus the Salaires
+// (payroll) section of Biométrie, which even a regular admin can no longer
+// see or edit. Enforced server-side (the user-role PATCH route rejects
+// assigning super_admin to any other id), not just a UI convention.
+export const SUPER_ADMIN_USER_ID = "u2"; // "ADM DEV"
+
 export const ROLE_CONFIG: Record<Role, RoleMeta> = {
+  super_admin: {
+    label: "Super Admin",
+    description: "Full admin control, plus the only role that can see or edit the Salaires (payroll) section.",
+    dotColor: "bg-amber-500",
+    textColor: "text-amber-700 dark:text-amber-300",
+    bgColor: "bg-amber-50 dark:bg-amber-950",
+  },
   admin: {
     label: "Admin",
     description: "Full control: manage tasks, workflow, and users & roles.",
@@ -57,21 +81,27 @@ export const CAPABILITIES: Capability[] = [
   { key: "workshop:create", label: "Add a repair to Atelier" },
   { key: "workshop:edit_status", label: "Change repair status & run the chrono" },
   { key: "workshop:delete", label: "Delete a repair" },
+  { key: "payroll:view", label: "View & edit the Salaires (payroll) section of Biométrie" },
 ];
 
+const ADMIN_CAPABILITIES = [
+  "tasks:view",
+  "tasks:create",
+  "tasks:edit",
+  "tasks:edit_status",
+  "tasks:delete",
+  "workflow:manage",
+  "users:manage",
+  "workshop:create",
+  "workshop:edit_status",
+  "workshop:delete",
+] as const;
+
 const ROLE_CAPABILITIES: Record<Role, ReadonlySet<string>> = {
-  admin: new Set([
-    "tasks:view",
-    "tasks:create",
-    "tasks:edit",
-    "tasks:edit_status",
-    "tasks:delete",
-    "workflow:manage",
-    "users:manage",
-    "workshop:create",
-    "workshop:edit_status",
-    "workshop:delete",
-  ]),
+  // Same full set as admin, plus payroll:view — nothing an admin can do
+  // that a super_admin can't, and one thing (Salaires) an admin can't.
+  super_admin: new Set([...ADMIN_CAPABILITIES, "payroll:view"]),
+  admin: new Set(ADMIN_CAPABILITIES),
   member: new Set([
     "tasks:view",
     "tasks:create",
@@ -121,6 +151,10 @@ export function canEditWorkshopStatus(role: Role): boolean {
 
 export function canDeleteWorkshopRepairs(role: Role): boolean {
   return hasCapability(role, "workshop:delete");
+}
+
+export function canViewPayroll(role: Role): boolean {
+  return hasCapability(role, "payroll:view");
 }
 
 interface AccessCheckUser {

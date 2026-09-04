@@ -17,6 +17,12 @@ enum Role {
   member
   member_limited
   viewer
+  // Full admin control plus the Salaires (payroll) section of Biométrie,
+  // which even a regular admin can no longer see or edit. Deliberately
+  // meant for exactly one account (see SUPER_ADMIN_USER_ID in
+  // roleMeta.ts), enforced server-side in the user-role PATCH route, not
+  // just left as a UI convention.
+  super_admin
 }
 
 enum UserStatus {

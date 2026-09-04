@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { toPublicUser } from "@/lib/publicUser";
 import { syncTeamMembership } from "@/lib/teamSync";
-import { canManageUsers } from "@/config/roleMeta";
+import { canManageUsers, SUPER_ADMIN_USER_ID } from "@/config/roleMeta";
 import { Prisma } from "@/generated/prisma/client";
 import type { Role, UserStatus } from "@/types/user";
 
@@ -52,6 +52,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const existing = await db.user.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  // super_admin is meant for exactly one account — the UI already only
+  // offers it on that row (see RoleMenu's allowSuperAdmin prop), but that's
+  // just convenience; this is the actual enforcement.
+  if (body.role === "super_admin" && id !== SUPER_ADMIN_USER_ID) {
+    return NextResponse.json({ error: "Le rôle Super Admin ne peut être attribué qu'à un seul compte." }, { status: 400 });
+  }
 
   const { teamIds, password, ...rest } = body;
   const user = await db.user.update({

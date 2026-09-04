@@ -47,6 +47,11 @@ export async function POST(request: NextRequest) {
   if (!normalizedEmail || !name) {
     return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
   }
+  // super_admin is granted to the one pre-existing account via the PATCH
+  // route, never set on a brand-new user — see that route's own comment.
+  if ((body.role as Role) === "super_admin") {
+    return NextResponse.json({ error: "Le rôle Super Admin ne peut être attribué qu'à un seul compte existant." }, { status: 400 });
+  }
 
   const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) {

@@ -5,6 +5,7 @@ import { RoleMenu } from "./RoleMenu";
 import { UserStatusToggle } from "./UserStatusToggle";
 import { ManagerMenu } from "./ManagerMenu";
 import { PencilIcon, TrashIcon } from "@/components/ui/icons";
+import { SUPER_ADMIN_USER_ID } from "@/config/roleMeta";
 import type { AppUser, Role, UserStatus } from "@/types/user";
 
 interface UserRowProps {
@@ -34,7 +35,12 @@ export function UserRow({ targetUser, isSelf, allUsers, onChangeRole, onChangeSt
         </div>
       </td>
       <td className="px-2 py-2.5">
-        <RoleMenu value={targetUser.role} onChange={(role) => onChangeRole(targetUser.id, role)} disabled={isSelf} />
+        <RoleMenu
+          value={targetUser.role}
+          onChange={(role) => onChangeRole(targetUser.id, role)}
+          disabled={isSelf}
+          allowSuperAdmin={targetUser.id === SUPER_ADMIN_USER_ID}
+        />
       </td>
       <td className="px-2 py-2.5">
         <UserStatusToggle status={targetUser.status} onChange={(status) => onChangeStatus(targetUser.id, status)} disabled={isSelf} />

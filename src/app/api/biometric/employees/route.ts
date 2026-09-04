@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import { canAccessBiometrics } from "@/config/roleMeta";
+import { canAccessBiometrics, canViewPayroll } from "@/config/roleMeta";
 
 export async function GET() {
   const sessionUser = await getSessionUser();
@@ -11,5 +11,12 @@ export async function GET() {
   }
 
   const overrides = await db.biometricEmployeeOverride.findMany();
-  return NextResponse.json(overrides);
+  // Salary/virement must never reach the browser for anyone but the
+  // Salaires-capable role — stripped here (not just hidden in the UI) so
+  // this route structurally can't leak more than that regardless of what
+  // the client-side code does with the response.
+  if (canViewPayroll(sessionUser.role)) return NextResponse.json(overrides);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip these two fields from the response
+  const sanitized = overrides.map(({ monthlySalary: _monthlySalary, monthlyVirement: _monthlyVirement, ...rest }) => rest);
+  return NextResponse.json(sanitized);
 }

@@ -1,4 +1,4 @@
-import { CAPABILITIES, ROLE_CONFIG, ROLE_ORDER, hasCapability } from "@/config/roleMeta";
+import { ALL_ROLE_ORDER, CAPABILITIES, ROLE_CONFIG, hasCapability } from "@/config/roleMeta";
 import { CheckIcon, XIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
@@ -11,7 +11,7 @@ export function RolePermissionsCard() {
             <th scope="col" className="px-4 py-2.5">
               Capability
             </th>
-            {ROLE_ORDER.map((role) => (
+            {ALL_ROLE_ORDER.map((role) => (
               <th key={role} scope="col" className="px-4 py-2.5 text-center">
                 <span className={cn("inline-flex items-center gap-1.5", ROLE_CONFIG[role].textColor)}>
                   <span className={cn("h-1.5 w-1.5 rounded-full", ROLE_CONFIG[role].dotColor)} />
@@ -25,7 +25,7 @@ export function RolePermissionsCard() {
           {CAPABILITIES.map((capability) => (
             <tr key={capability.key} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
               <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{capability.label}</td>
-              {ROLE_ORDER.map((role) => (
+              {ALL_ROLE_ORDER.map((role) => (
                 <td key={role} className="px-4 py-2.5 text-center">
                   {hasCapability(role, capability.key) ? (
                     <CheckIcon className="mx-auto h-4 w-4 text-emerald-500" />

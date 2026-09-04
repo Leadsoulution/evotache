@@ -9,7 +9,7 @@ import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
 import { useBiometricLeaves } from "@/hooks/useBiometricLeaves";
 import { useBiometricHolidays } from "@/hooks/useBiometricHolidays";
 import { usePagination } from "@/hooks/usePagination";
-import { canAccessBiometrics, canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canAccessBiometrics, canManageUsers, canManageWorkflow, canViewPayroll } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
 import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmployeeApi";
 import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
@@ -137,6 +137,9 @@ export function BiometricView() {
   // this page but shouldn't get admin-only actions: editing the working
   // hours schedule or employee display overrides.
   const isManagerOrAdmin = user ? canManageUsers(user.role) || canManageWorkflow(user.role) : false;
+  // Salaires is stricter than isManagerOrAdmin: even a regular admin can no
+  // longer see or edit it, only the one super_admin account.
+  const canSeePayroll = user ? canViewPayroll(user.role) : false;
   const { events, stats, loading } = useBiometricEvents();
   const { overrides, refetch: refetchOverrides } = useBiometricEmployees();
   const { schedule, refetch: refetchSchedule } = useBiometricSchedule();
@@ -424,14 +427,17 @@ export function BiometricView() {
     [events, employees, leaves, holidays, absenceMonthKey]
   );
 
-  // Payroll is manager/admin-only (the API refuses it for anyone else), so
-  // it isn't computed at all for a view-only attendance user.
+  // Payroll is super_admin-only (the API refuses it for anyone else, and
+  // strips salary/virement from the underlying employee-override response
+  // entirely), so it isn't computed at all for anyone else — computing it
+  // client-side would be pointless anyway once the API already omits the
+  // salary/virement fields it needs.
   const payrollRows = useMemo(
     () =>
-      isManagerOrAdmin
+      canSeePayroll
         ? computePayroll(events, employees, leaves, holidays, schedule, payrollMonthKey, casablancaDateKey(new Date()))
         : [],
-    [isManagerOrAdmin, events, employees, leaves, holidays, schedule, payrollMonthKey]
+    [canSeePayroll, events, employees, leaves, holidays, schedule, payrollMonthKey]
   );
 
   useEffect(() => {
@@ -812,7 +818,7 @@ export function BiometricView() {
             onMonthChange={setDailyGridMonthKey}
           />
 
-          {isManagerOrAdmin && (
+          {canSeePayroll && (
             <BiometricPayrollSection
               rows={payrollRows}
               monthKey={payrollMonthKey}

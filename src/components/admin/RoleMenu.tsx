@@ -6,15 +6,20 @@ import { cn } from "@/lib/cn";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import type { Role } from "@/types/user";
 
-const OPTIONS = ROLE_ORDER.map((role) => ({ value: role, label: ROLE_CONFIG[role].label, dotColor: ROLE_CONFIG[role].dotColor }));
+const BASE_OPTIONS = ROLE_ORDER.map((role) => ({ value: role, label: ROLE_CONFIG[role].label, dotColor: ROLE_CONFIG[role].dotColor }));
+const SUPER_ADMIN_OPTION = { value: "super_admin" as const, label: ROLE_CONFIG.super_admin.label, dotColor: ROLE_CONFIG.super_admin.dotColor };
 
 interface RoleMenuProps {
   value: Role;
   onChange: (next: Role) => void;
   disabled?: boolean;
+  /** Only true on SUPER_ADMIN_USER_ID's own row — everywhere else,
+   * super_admin isn't even offered as a choice, not just blocked on save. */
+  allowSuperAdmin?: boolean;
 }
 
-export function RoleMenu({ value, onChange, disabled }: RoleMenuProps) {
+export function RoleMenu({ value, onChange, disabled, allowSuperAdmin }: RoleMenuProps) {
+  const options = allowSuperAdmin ? [...BASE_OPTIONS, SUPER_ADMIN_OPTION] : BASE_OPTIONS;
   const config = ROLE_CONFIG[value];
   const badge = (
     <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium", config.bgColor, config.textColor)}>
@@ -27,7 +32,7 @@ export function RoleMenu({ value, onChange, disabled }: RoleMenuProps) {
 
   return (
     <Menu
-      options={OPTIONS}
+      options={options}
       value={[value]}
       onChange={(next) => onChange(next[0] as Role)}
       ariaLabel="Change role"

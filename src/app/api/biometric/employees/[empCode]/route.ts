@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import { canManageUsers, canManageWorkflow } from "@/config/roleMeta";
+import { canManageUsers, canManageWorkflow, canViewPayroll } from "@/config/roleMeta";
 
 // Upserts the override for an employee — creates it on first edit/hide,
 // updates it thereafter. There's no separate delete: "removing" an
@@ -16,6 +16,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
 
   const { empCode } = await params;
   const body = await request.json();
+
+  // Salary/virement are Salaires-only, even for an otherwise-authorized
+  // admin/member — everything else on this route (name/color/hidden/
+  // schedule/saturdayOff) stays governed by the check above.
+  if ((body.monthlySalary !== undefined || body.monthlyVirement !== undefined) && !canViewPayroll(sessionUser.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const data: {
     name?: string | null;
     color?: string | null;
@@ -81,5 +88,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
     create: { empCode, ...data },
     update: data,
   });
-  return NextResponse.json(override);
+  // Same allowlist as the GET route — a non-payroll edit (e.g. renaming
+  // this employee) must not hand back their salary/virement in the response.
+  if (canViewPayroll(sessionUser.role)) return NextResponse.json(override);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip these two fields from the response
+  const { monthlySalary: _monthlySalary, monthlyVirement: _monthlyVirement, ...sanitized } = override;
+  return NextResponse.json(sanitized);
 }
