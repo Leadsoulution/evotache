@@ -664,3 +664,63 @@ export function computePayroll(
 export function formatDirham(amount: number): string {
   return `${amount.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH`;
 }
+
+/** "10 min" / "1h" / "1h05" / "-" — a compact cell value for the day-by-day
+ * grid (BiometricMonthlyGrid), distinct from formatLateDuration's "1h, 5 min
+ * et 3s" (meant to be read once as a summary, not repeated across 31 narrow
+ * table cells). Zero or negative reads as "-", same convention as an empty
+ * table cell everywhere else on this page. */
+export function formatShortDuration(totalSeconds: number): string {
+  if (totalSeconds <= 0) return "-";
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours}h` : `${hours}h${String(minutes).padStart(2, "0")}`;
+}
+
+export interface EmployeeDayCell {
+  day: number;
+  dateKey: string;
+  lateSeconds: number;
+  pauseSeconds: number;
+  isAbsent: boolean;
+}
+
+/** One cell per calendar day of `monthKey` for a single employee — the data
+ * behind BiometricMonthlyGrid's "retard / temps de pose / absence" rows.
+ * Reuses computeDailyAttendance for retard/pause and computeMonthlyAbsences
+ * for the absence flag, so this stays consistent with every other section
+ * on the page (a day already excluded there — leave, holiday, Saturday off,
+ * before hire — reads as "not absent" here too, not just blank). `events`
+ * must be the full history, same requirement as computeMonthlyAbsences. */
+export function computeEmployeeMonthGrid(
+  events: BiometricEvent[],
+  employee: BiometricEmployee,
+  leaves: BiometricLeave[],
+  holidays: BiometricHoliday[],
+  defaultSchedule: BiometricSchedule,
+  monthKey: string,
+  todayKey: string
+): EmployeeDayCell[] {
+  const monthEvents = events.filter((e) => casablancaDateKey(e.punchTime).startsWith(monthKey));
+  const attendanceByDate = new Map(computeDailyAttendance(monthEvents, [employee], defaultSchedule).map((row) => [row.date, row]));
+  const absentDates = new Set(computeMonthlyAbsences(events, [employee], leaves, holidays, monthKey, todayKey).find((r) => r.empCode === employee.empCode)?.dates ?? []);
+
+  const [year, month] = monthKey.split("-").map(Number);
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const cells: EmployeeDayCell[] = [];
+  for (let day = 1; day <= lastDayOfMonth; day++) {
+    const dateKey = `${monthKey}-${String(day).padStart(2, "0")}`;
+    const row = attendanceByDate.get(dateKey);
+    cells.push({
+      day,
+      dateKey,
+      lateSeconds: row?.isLate ? row.lateSeconds : 0,
+      pauseSeconds: row?.pauseSeconds ?? 0,
+      isAbsent: absentDates.has(dateKey),
+    });
+  }
+  return cells;
+}

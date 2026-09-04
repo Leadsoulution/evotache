@@ -19,6 +19,7 @@ import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
 import { BiometricScheduleEditor } from "./BiometricScheduleEditor";
 import { BiometricPayrollSection } from "./BiometricPayrollSection";
+import { BiometricMonthlyGrid } from "./BiometricMonthlyGrid";
 import { BiometricSectionTitle } from "./BiometricSectionTitle";
 import { BiometricDateRangePicker } from "./BiometricDateRangePicker";
 import { BiometricTimeRangePicker } from "./BiometricTimeRangePicker";
@@ -165,6 +166,7 @@ export function BiometricView() {
   // typically reviewed for the month that just closed while absences are
   // still being checked for the current one.
   const [payrollMonthKey, setPayrollMonthKey] = useState(() => casablancaDateKey(new Date()).slice(0, 7));
+  const [dailyGridMonthKey, setDailyGridMonthKey] = useState(() => casablancaDateKey(new Date()).slice(0, 7));
 
   // Employees, derived from the synced punch events themselves — shown as
   // an avatar-row selector matching the Calls page's ThreeCxUserSelectorBar,
@@ -799,6 +801,16 @@ export function BiometricView() {
               </div>
             )}
           </section>
+
+          <BiometricMonthlyGrid
+            events={events}
+            employees={employees}
+            leaves={leaves}
+            holidays={holidays}
+            defaultSchedule={schedule}
+            monthKey={dailyGridMonthKey}
+            onMonthChange={setDailyGridMonthKey}
+          />
 
           {isManagerOrAdmin && (
             <BiometricPayrollSection
