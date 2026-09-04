@@ -723,6 +723,24 @@ model BiometricHoliday {
   @@map("biometric_holidays")
 }
 
+// One row per (employee, month) for the two occasional payroll amounts
+// that change every month, unlike monthlySalary/monthlyVirement on
+// BiometricEmployeeOverride which stay fixed across months. `advance`
+// (avance sur salaire) is money already handed out this month, so it's
+// subtracted from what's still owed; `bonus` (prime) is added — see
+// computePayroll for the exact Net à payer formula.
+model BiometricPayrollAdjustment {
+  id        String   @id @default(cuid())
+  empCode   String
+  monthKey  String // "YYYY-MM"
+  advance   Float    @default(0)
+  bonus     Float    @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([empCode, monthKey])
+  @@map("biometric_payroll_adjustments")
+}
+
 // Single shared config (singleton, same pattern as BackupSheetConfig) for
 // the weekly work-hours window used both to flag late arrivals and to gate
 // the Heures d'ouverture filter preset (see isWithinWorkHours in

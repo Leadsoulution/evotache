@@ -14,27 +14,34 @@ interface BiometricPayrollSectionProps {
   onMonthChange: (monthKey: string) => void;
   onSaveSalary: (empCode: string, salary: number | null) => Promise<void>;
   onSaveVirement: (empCode: string, amount: number | null) => Promise<void>;
+  /** Avance/prime are per (employee, month), unlike salaire/virement which
+   * stay fixed across months — always a plain number (0 when unset, never
+   * null), see BiometricPayrollAdjustment. */
+  onSaveAdvance: (empCode: string, amount: number) => Promise<void>;
+  onSaveBonus: (empCode: string, amount: number) => Promise<void>;
 }
 
 /** Payroll for one month: each employee's gross pay minus what their
- * lateness and absences cost, purely from their own salary — one absent
- * day costs salaire/26, and lateness is charged per day rounded UP to the
- * next whole hour (see computePayroll's own docs for the exact rule).
- * Virement is a separate, independently-set fixed amount paid by bank
- * transfer each month; espèce is simply what's left of the net after that.
- * Deliberately rendered only for managers/admins (the API refuses it for
- * anyone else) — salary is the one thing on this page a view-only
- * attendance user must not see. */
-export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveSalary, onSaveVirement }: BiometricPayrollSectionProps) {
+ * lateness and absences cost, plus/minus this month's prime/avance, purely
+ * from their own salary — one absent day costs salaire/26, and lateness is
+ * charged per day rounded UP to the next whole hour (see computePayroll's
+ * own docs for the exact rule). Virement is a separate, independently-set
+ * fixed amount paid by bank transfer each month; espèce is simply what's
+ * left of the net after that. Deliberately rendered only for
+ * managers/admins (the API refuses it for anyone else) — salary is the one
+ * thing on this page a view-only attendance user must not see. */
+export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveSalary, onSaveVirement, onSaveAdvance, onSaveBonus }: BiometricPayrollSectionProps) {
   const totals = rows.reduce(
     (acc, row) => ({
       salary: acc.salary + (row.monthlySalary ?? 0),
+      advance: acc.advance + row.advance,
+      bonus: acc.bonus + row.bonus,
       deduction: acc.deduction + row.totalDeduction,
       net: acc.net + (row.netSalary ?? 0),
       virement: acc.virement + (row.virementAmount ?? 0),
       espece: acc.espece + (row.especeAmount ?? 0),
     }),
-    { salary: 0, deduction: 0, net: 0, virement: 0, espece: 0 }
+    { salary: 0, advance: 0, bonus: 0, deduction: 0, net: 0, virement: 0, espece: 0 }
   );
 
   return (
@@ -54,18 +61,21 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
         </div>
       </div>
       <p className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        1 jour d&apos;absence = salaire ÷ 26 · un retard est facturé par jour, arrondi à l&apos;heure supérieure (10 min = 1h, 61 min = 2h)
+        1 jour d&apos;absence = salaire ÷ 26 · un retard est facturé par jour, arrondi à l&apos;heure supérieure (10 min = 1h, 61 min = 2h) · Net à payer = salaire -
+        déductions + prime - avance
       </p>
 
       {rows.length === 0 ? (
         <p className="px-4 py-6 text-center text-sm text-slate-400">Aucun employé à afficher.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] border-collapse text-sm">
+          <table className="w-full min-w-[1420px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                 <th scope="col" className="whitespace-nowrap px-4 py-2">Salarié</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2">Salaire (DH)</th>
+                <th scope="col" className="whitespace-nowrap px-3 py-2">Avance sur salaire</th>
+                <th scope="col" className="whitespace-nowrap px-3 py-2">Prime</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2">Retards</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2">Absences</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2">Congé</th>
@@ -87,6 +97,17 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <MoneyInput empCode={row.empCode} value={row.monthlySalary} onSave={onSaveSalary} ariaLabel="Salaire mensuel" />
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <MoneyInput
+                      empCode={row.empCode}
+                      value={row.advance || null}
+                      onSave={(empCode, amount) => onSaveAdvance(empCode, amount ?? 0)}
+                      ariaLabel="Avance sur salaire"
+                    />
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <MoneyInput empCode={row.empCode} value={row.bonus || null} onSave={(empCode, amount) => onSaveBonus(empCode, amount ?? 0)} ariaLabel="Prime" />
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     {row.lateDays === 0 ? (
@@ -140,6 +161,8 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
               <tr className="border-t border-slate-200 bg-slate-50 text-sm font-semibold dark:border-slate-800 dark:bg-slate-800/40">
                 <td className="whitespace-nowrap px-4 py-2 text-slate-600 dark:text-slate-300">Total</td>
                 <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatDirham(totals.salary)}</td>
+                <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatDirham(totals.advance)}</td>
+                <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatDirham(totals.bonus)}</td>
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2" />

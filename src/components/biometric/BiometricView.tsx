@@ -8,6 +8,7 @@ import { useBiometricEmployees } from "@/hooks/useBiometricEmployees";
 import { useBiometricSchedule } from "@/hooks/useBiometricSchedule";
 import { useBiometricLeaves } from "@/hooks/useBiometricLeaves";
 import { useBiometricHolidays } from "@/hooks/useBiometricHolidays";
+import { useBiometricPayrollAdjustments } from "@/hooks/useBiometricPayrollAdjustments";
 import { usePagination } from "@/hooks/usePagination";
 import { canAccessBiometrics, canManageUsers, canManageWorkflow, canViewPayroll } from "@/config/roleMeta";
 import { saveBiometricEmployeeOverride } from "@/services/biometricEmployeeApi";
@@ -15,6 +16,7 @@ import type { BiometricEmployeeOverridePatch } from "@/services/biometricEmploye
 import { saveBiometricSchedule } from "@/services/biometricScheduleApi";
 import { createBiometricLeave, deleteBiometricLeave } from "@/services/biometricLeaveApi";
 import { createBiometricHoliday, deleteBiometricHoliday } from "@/services/biometricHolidayApi";
+import { saveBiometricPayrollAdjustment } from "@/services/biometricPayrollAdjustmentApi";
 import { BiometricEmployeeSelectorBar } from "./BiometricEmployeeSelectorBar";
 import { BiometricEmployeeManager } from "./BiometricEmployeeManager";
 import { BiometricScheduleEditor } from "./BiometricScheduleEditor";
@@ -170,6 +172,7 @@ export function BiometricView() {
   // still being checked for the current one.
   const [payrollMonthKey, setPayrollMonthKey] = useState(() => casablancaDateKey(new Date()).slice(0, 7));
   const [dailyGridMonthKey, setDailyGridMonthKey] = useState(() => casablancaDateKey(new Date()).slice(0, 7));
+  const { adjustments: payrollAdjustments, refetch: refetchPayrollAdjustments } = useBiometricPayrollAdjustments(payrollMonthKey);
 
   // Employees, derived from the synced punch events themselves — shown as
   // an avatar-row selector matching the Calls page's ThreeCxUserSelectorBar,
@@ -238,6 +241,26 @@ export function BiometricView() {
 
   async function handleSaveVirement(empCode: string, amount: number | null) {
     await handleSaveEmployeeOverride(empCode, { monthlyVirement: amount });
+  }
+
+  // Avance/prime are per (employee, month) — unlike salaire/virement above,
+  // saved on payrollMonthKey specifically, not the employee override.
+  async function handleSaveAdvance(empCode: string, amount: number) {
+    try {
+      await saveBiometricPayrollAdjustment(empCode, payrollMonthKey, { advance: amount });
+      refetchPayrollAdjustments();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Échec de la mise à jour.");
+    }
+  }
+
+  async function handleSaveBonus(empCode: string, amount: number) {
+    try {
+      await saveBiometricPayrollAdjustment(empCode, payrollMonthKey, { bonus: amount });
+      refetchPayrollAdjustments();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Échec de la mise à jour.");
+    }
   }
 
   function handleSort(field: SortField) {
@@ -435,9 +458,9 @@ export function BiometricView() {
   const payrollRows = useMemo(
     () =>
       canSeePayroll
-        ? computePayroll(events, employees, leaves, holidays, schedule, payrollMonthKey, casablancaDateKey(new Date()))
+        ? computePayroll(events, employees, leaves, holidays, payrollAdjustments, schedule, payrollMonthKey, casablancaDateKey(new Date()))
         : [],
-    [canSeePayroll, events, employees, leaves, holidays, schedule, payrollMonthKey]
+    [canSeePayroll, events, employees, leaves, holidays, payrollAdjustments, schedule, payrollMonthKey]
   );
 
   useEffect(() => {
@@ -825,6 +848,8 @@ export function BiometricView() {
               onMonthChange={setPayrollMonthKey}
               onSaveSalary={handleSaveSalary}
               onSaveVirement={handleSaveVirement}
+              onSaveAdvance={handleSaveAdvance}
+              onSaveBonus={handleSaveBonus}
             />
           )}
 

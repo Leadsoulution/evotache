@@ -1,7 +1,7 @@
 import { COLOR_PALETTE } from "@/config/colorPalette";
 import { casablancaDateKey, casablancaHourMinute, casablancaWallClockToUtc, casablancaWeekday } from "@/lib/casablancaTime";
 import type { BarChartDatum } from "@/components/stats/BarChart";
-import type { BiometricEvent, BiometricHoliday, BiometricLeave, BiometricSchedule } from "@/types/biometric";
+import type { BiometricEvent, BiometricHoliday, BiometricLeave, BiometricPayrollAdjustment, BiometricSchedule } from "@/types/biometric";
 
 // ZKBio Time's punch_state_display vocabulary is set by whatever language
 // the device/software itself is configured in — the API docs show English
@@ -552,8 +552,14 @@ export interface PayrollRow {
   leaveDays: number;
   holidayDays: number;
   totalDeduction: number;
+  /** Avance sur salaire — money already handed out this month, so it's
+   * subtracted from netSalary below. 0 when nothing was entered. */
+  advance: number;
+  /** Prime — added to netSalary below. 0 when nothing was entered. */
+  bonus: number;
   /** null when this employee has no salary set — deliberately not 0, so the
-   * UI can say "à définir" instead of showing a bogus payslip. */
+   * UI can say "à définir" instead of showing a bogus payslip. Formula:
+   * salaire - déductions + prime - avance. */
   netSalary: number | null;
   /** Fixed monthly bank-transfer amount, straight from the employee's own
    * setting — not derived from netSalary. */
@@ -586,10 +592,12 @@ export function computePayroll(
   employees: BiometricEmployee[],
   leaves: BiometricLeave[],
   holidays: BiometricHoliday[],
+  adjustments: BiometricPayrollAdjustment[],
   defaultSchedule: BiometricSchedule,
   monthKey: string,
   todayKey: string
 ): PayrollRow[] {
+  const adjustmentByEmp = new Map(adjustments.filter((a) => a.monthKey === monthKey).map((a) => [a.empCode, a]));
   const monthEvents = events.filter((e) => casablancaDateKey(e.punchTime).startsWith(monthKey));
   const attendance = computeDailyAttendance(monthEvents, employees, defaultSchedule);
   const absencesByEmp = new Map(computeMonthlyAbsences(events, employees, leaves, holidays, monthKey, todayKey).map((r) => [r.empCode, r.dates.length]));
@@ -635,7 +643,9 @@ export function computePayroll(
     const dayRate = dailyRate(employee.monthlySalary);
     const absenceDeduction = dayRate === null ? 0 : absenceDays * dayRate;
     const totalDeduction = lateDeduction + absenceDeduction;
-    const netSalary = employee.monthlySalary === null ? null : employee.monthlySalary - totalDeduction;
+    const advance = adjustmentByEmp.get(employee.empCode)?.advance ?? 0;
+    const bonus = adjustmentByEmp.get(employee.empCode)?.bonus ?? 0;
+    const netSalary = employee.monthlySalary === null ? null : employee.monthlySalary - totalDeduction + bonus - advance;
     rows.push({
       empCode: employee.empCode,
       name: employee.name,
@@ -650,6 +660,8 @@ export function computePayroll(
       leaveDays,
       holidayDays,
       totalDeduction,
+      advance,
+      bonus,
       netSalary,
       virementAmount: employee.monthlyVirement,
       especeAmount: netSalary === null ? null : netSalary - (employee.monthlyVirement ?? 0),

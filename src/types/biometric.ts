@@ -49,3 +49,14 @@ export interface BiometricHoliday {
   date: string;
   name: string;
 }
+
+/** Avance sur salaire / prime for one employee, one month — unlike
+ * monthlySalary/monthlyVirement (fixed across every month), these change
+ * every month, so they're keyed by (empCode, monthKey) rather than living
+ * on the employee override. */
+export interface BiometricPayrollAdjustment {
+  empCode: string;
+  monthKey: string;
+  advance: number;
+  bonus: number;
+}
