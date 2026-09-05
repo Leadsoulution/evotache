@@ -17,10 +17,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
   const { empCode } = await params;
   const body = await request.json();
 
-  // Salary/virement are Salaires-only, even for an otherwise-authorized
-  // admin/member — everything else on this route (name/color/hidden/
-  // schedule/saturdayOff) stays governed by the check above.
-  if ((body.monthlySalary !== undefined || body.monthlyVirement !== undefined) && !canViewPayroll(sessionUser.role)) {
+  // Salary is Salaires-only, even for an otherwise-authorized admin/member —
+  // everything else on this route (name/color/hidden/schedule/saturdayOff)
+  // stays governed by the check above.
+  if (body.monthlySalary !== undefined && !canViewPayroll(sessionUser.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const data: {
@@ -36,7 +36,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
     saturdayEndTime?: string | null;
     saturdayOff?: boolean;
     monthlySalary?: number | null;
-    monthlyVirement?: number | null;
   } = {};
   if (typeof body.name === "string" || body.name === null) data.name = body.name;
   if (typeof body.color === "string" || body.color === null) data.color = body.color;
@@ -53,17 +52,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
       return NextResponse.json({ error: "monthlySalary doit être un nombre positif ou null." }, { status: 400 });
     }
     data.monthlySalary = salary;
-  }
-
-  // Same null-clears-back-to-"not set" pattern as monthlySalary.
-  if (body.monthlyVirement === null) {
-    data.monthlyVirement = null;
-  } else if (body.monthlyVirement !== undefined) {
-    const virement = Number(body.monthlyVirement);
-    if (!Number.isFinite(virement) || virement < 0) {
-      return NextResponse.json({ error: "monthlyVirement doit être un nombre positif ou null." }, { status: 400 });
-    }
-    data.monthlyVirement = virement;
   }
 
   // Each schedule field is either a valid "HH:mm" string (a custom hour for
@@ -89,9 +77,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ em
     update: data,
   });
   // Same allowlist as the GET route — a non-payroll edit (e.g. renaming
-  // this employee) must not hand back their salary/virement in the response.
+  // this employee) must not hand back their salary in the response.
   if (canViewPayroll(sessionUser.role)) return NextResponse.json(override);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip these two fields from the response
-  const { monthlySalary: _monthlySalary, monthlyVirement: _monthlyVirement, ...sanitized } = override;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip this field from the response
+  const { monthlySalary: _monthlySalary, ...sanitized } = override;
   return NextResponse.json(sanitized);
 }

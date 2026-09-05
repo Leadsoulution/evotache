@@ -239,12 +239,10 @@ export function BiometricView() {
     await handleSaveEmployeeOverride(empCode, { monthlySalary: salary });
   }
 
-  async function handleSaveVirement(empCode: string, amount: number | null) {
-    await handleSaveEmployeeOverride(empCode, { monthlyVirement: amount });
-  }
-
-  // Avance/prime are per (employee, month) — unlike salaire/virement above,
-  // saved on payrollMonthKey specifically, not the employee override.
+  // Avance/prime are per (employee, month) — unlike salaire above, saved
+  // on payrollMonthKey specifically, not the employee override. Virement
+  // itself is no longer entered at all (computeVirement derives it from
+  // the salary), so there's no handler for it anymore.
   async function handleSaveAdvance(empCode: string, amount: number) {
     try {
       await saveBiometricPayrollAdjustment(empCode, payrollMonthKey, { advance: amount });
@@ -847,7 +845,6 @@ export function BiometricView() {
               monthKey={payrollMonthKey}
               onMonthChange={setPayrollMonthKey}
               onSaveSalary={handleSaveSalary}
-              onSaveVirement={handleSaveVirement}
               onSaveAdvance={handleSaveAdvance}
               onSaveBonus={handleSaveBonus}
             />

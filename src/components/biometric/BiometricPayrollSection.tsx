@@ -13,9 +13,8 @@ interface BiometricPayrollSectionProps {
   monthKey: string;
   onMonthChange: (monthKey: string) => void;
   onSaveSalary: (empCode: string, salary: number | null) => Promise<void>;
-  onSaveVirement: (empCode: string, amount: number | null) => Promise<void>;
-  /** Avance/prime are per (employee, month), unlike salaire/virement which
-   * stay fixed across months — always a plain number (0 when unset, never
+  /** Avance/prime are per (employee, month), unlike salaire which stays
+   * fixed across months — always a plain number (0 when unset, never
    * null), see BiometricPayrollAdjustment. */
   onSaveAdvance: (empCode: string, amount: number) => Promise<void>;
   onSaveBonus: (empCode: string, amount: number) => Promise<void>;
@@ -25,12 +24,13 @@ interface BiometricPayrollSectionProps {
  * lateness and absences cost, plus/minus this month's prime/avance, purely
  * from their own salary — one absent day costs salaire/26, and lateness is
  * charged per day rounded UP to the next whole hour (see computePayroll's
- * own docs for the exact rule). Virement is a separate, independently-set
- * fixed amount paid by bank transfer each month; espèce is simply what's
- * left of the net after that. Deliberately rendered only for
- * managers/admins (the API refuses it for anyone else) — salary is the one
- * thing on this page a view-only attendance user must not see. */
-export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveSalary, onSaveVirement, onSaveAdvance, onSaveBonus }: BiometricPayrollSectionProps) {
+ * own docs for the exact rule). Virement is computed automatically
+ * (MIN(salaire, 3050), see computeVirement) rather than entered — a salary
+ * at or below the cap goes entirely by transfer, anything above caps out
+ * at 3050 with the rest (espèce) paid in cash. Deliberately rendered only
+ * for managers/admins (the API refuses it for anyone else) — salary is the
+ * one thing on this page a view-only attendance user must not see. */
+export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveSalary, onSaveAdvance, onSaveBonus }: BiometricPayrollSectionProps) {
   const totals = rows.reduce(
     (acc, row) => ({
       salary: acc.salary + (row.monthlySalary ?? 0),
@@ -62,7 +62,7 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
       </div>
       <p className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         1 jour d&apos;absence = salaire ÷ 26 · un retard est facturé par jour, arrondi à l&apos;heure supérieure (10 min = 1h, 61 min = 2h) · Net à payer = salaire -
-        déductions + prime - avance
+        déductions + prime - avance · Virement = MIN(salaire, 3 050 DH)
       </p>
 
       {rows.length === 0 ? (
@@ -145,7 +145,13 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
                     )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    <MoneyInput empCode={row.empCode} value={row.virementAmount} onSave={onSaveVirement} ariaLabel="Montant par virement" />
+                    {row.virementAmount === null ? (
+                      <span className="text-xs text-slate-400">Salaire à définir</span>
+                    ) : (
+                      <span className="tabular-nums text-slate-700 dark:text-slate-200" title="MIN(salaire, 3 050 DH), calculé automatiquement">
+                        {formatDirham(row.virementAmount)}
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     {row.especeAmount === null ? (
@@ -182,11 +188,11 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
   );
 }
 
-/** Inline money cell (used for both Salaire and Virement) — committed on
- * blur/Enter rather than per keystroke, same as the employee rename field
- * in the Gérer modal, so the whole payroll table doesn't recompute (and
- * PATCH) on every digit typed. An emptied field clears the value back to
- * "not set" instead of saving 0. */
+/** Inline money cell (used for Salaire, Avance, and Prime — Virement is
+ * computed, not entered) — committed on blur/Enter rather than per
+ * keystroke, same as the employee rename field in the Gérer modal, so the
+ * whole payroll table doesn't recompute (and PATCH) on every digit typed.
+ * An emptied field clears the value back to "not set" instead of saving 0. */
 function MoneyInput({
   empCode,
   value,

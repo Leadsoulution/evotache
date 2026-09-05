@@ -11,12 +11,14 @@ export async function GET() {
   }
 
   const overrides = await db.biometricEmployeeOverride.findMany();
-  // Salary/virement must never reach the browser for anyone but the
-  // Salaires-capable role — stripped here (not just hidden in the UI) so
-  // this route structurally can't leak more than that regardless of what
-  // the client-side code does with the response.
+  // Salary must never reach the browser for anyone but the Salaires-capable
+  // role — stripped here (not just hidden in the UI) so this route
+  // structurally can't leak more than that regardless of what the
+  // client-side code does with the response. Virement is no longer stored
+  // (computed from salary, see computeVirement), so it needs no separate
+  // stripping — it just can't be derived without the salary either.
   if (canViewPayroll(sessionUser.role)) return NextResponse.json(overrides);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip these two fields from the response
-  const sanitized = overrides.map(({ monthlySalary: _monthlySalary, monthlyVirement: _monthlyVirement, ...rest }) => rest);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip this field from the response
+  const sanitized = overrides.map(({ monthlySalary: _monthlySalary, ...rest }) => rest);
   return NextResponse.json(sanitized);
 }

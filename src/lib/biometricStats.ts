@@ -92,9 +92,6 @@ export interface BiometricEmployee {
   /** Gross monthly pay in DH, or null if none is set — null keeps them out
    * of the Salaires table rather than showing them at 0. */
   monthlySalary: number | null;
-  /** Fixed part of the net pay handed over by bank transfer each month —
-   * null means everything is paid in cash (see computePayroll's espece). */
-  monthlyVirement: number | null;
 }
 
 // Per-employee override stored via /api/biometric/employees — layered onto
@@ -118,7 +115,6 @@ export interface BiometricEmployeeOverride {
   saturdayEndTime: string | null;
   saturdayOff: boolean;
   monthlySalary: number | null;
-  monthlyVirement: number | null;
 }
 
 /** Employees, derived straight from the synced punch events rather than a
@@ -154,7 +150,6 @@ export function deriveEmployees(events: BiometricEvent[], overrides: BiometricEm
         scheduleOverride: Object.keys(scheduleOverride).length ? scheduleOverride : null,
         saturdayOff: override?.saturdayOff ?? false,
         monthlySalary: override?.monthlySalary ?? null,
-        monthlyVirement: override?.monthlyVirement ?? null,
       };
     });
 }
@@ -536,6 +531,19 @@ export function hourlyRate(monthlySalary: number | null): number | null {
   return daily === null ? null : daily / WORK_HOURS_PER_DAY;
 }
 
+// Fixed bank-transfer amount for everyone, by the shop's own rule — not
+// configurable per employee.
+const VIREMENT_CAP = 3050;
+
+/** Virement is always MIN(salaire, 3050): a salary at or below the cap
+ * goes entirely by transfer, anything above it caps out at 3050 with the
+ * rest paid in cash (see computePayroll's espece). Computed from the
+ * salary, not stored — null when no salary is set (nothing to derive a
+ * virement from), same "à définir" convention as netSalary. */
+export function computeVirement(monthlySalary: number | null): number | null {
+  return monthlySalary === null ? null : Math.min(monthlySalary, VIREMENT_CAP);
+}
+
 export interface PayrollRow {
   empCode: string;
   name: string;
@@ -561,8 +569,7 @@ export interface PayrollRow {
    * UI can say "à définir" instead of showing a bogus payslip. Formula:
    * salaire - déductions + prime - avance. */
   netSalary: number | null;
-  /** Fixed monthly bank-transfer amount, straight from the employee's own
-   * setting — not derived from netSalary. */
+  /** Computed, not entered: MIN(salaire, 3050) — see computeVirement. */
   virementAmount: number | null;
   /** netSalary minus virementAmount (treating an unset virement as 0) — the
    * rest paid in cash. Null only when netSalary itself is null. */
@@ -646,6 +653,7 @@ export function computePayroll(
     const advance = adjustmentByEmp.get(employee.empCode)?.advance ?? 0;
     const bonus = adjustmentByEmp.get(employee.empCode)?.bonus ?? 0;
     const netSalary = employee.monthlySalary === null ? null : employee.monthlySalary - totalDeduction + bonus - advance;
+    const virementAmount = computeVirement(employee.monthlySalary);
     rows.push({
       empCode: employee.empCode,
       name: employee.name,
@@ -663,8 +671,8 @@ export function computePayroll(
       advance,
       bonus,
       netSalary,
-      virementAmount: employee.monthlyVirement,
-      especeAmount: netSalary === null ? null : netSalary - (employee.monthlyVirement ?? 0),
+      virementAmount,
+      especeAmount: netSalary === null ? null : netSalary - (virementAmount ?? 0),
     });
   }
 
