@@ -535,13 +535,16 @@ export function hourlyRate(monthlySalary: number | null): number | null {
 // configurable per employee.
 const VIREMENT_CAP = 3050;
 
-/** Virement is always MIN(salaire, 3050): a salary at or below the cap
- * goes entirely by transfer, anything above it caps out at 3050 with the
- * rest paid in cash (see computePayroll's espece). Computed from the
- * salary, not stored — null when no salary is set (nothing to derive a
- * virement from), same "à définir" convention as netSalary. */
-export function computeVirement(monthlySalary: number | null): number | null {
-  return monthlySalary === null ? null : Math.min(monthlySalary, VIREMENT_CAP);
+/** Virement is MIN(net à payer, 3050): a net pay at or below the cap goes
+ * entirely by transfer, anything above it caps out at 3050 with the rest
+ * paid in cash (see computePayroll's espece). Based on netSalary — i.e.
+ * *after* déductions/prime/avance — so a deduction reduces the transfer
+ * itself instead of dragging espece into the negative; floored at 0 so a
+ * netSalary pushed below zero by a large avance doesn't produce a negative
+ * virement. Computed, not stored — null when no salary is set (nothing to
+ * derive a virement from), same "à définir" convention as netSalary. */
+export function computeVirement(netSalary: number | null): number | null {
+  return netSalary === null ? null : Math.min(Math.max(netSalary, 0), VIREMENT_CAP);
 }
 
 export interface PayrollRow {
@@ -569,7 +572,7 @@ export interface PayrollRow {
    * UI can say "à définir" instead of showing a bogus payslip. Formula:
    * salaire - déductions + prime - avance. */
   netSalary: number | null;
-  /** Computed, not entered: MIN(salaire, 3050) — see computeVirement. */
+  /** Computed, not entered: MIN(netSalary, 3050) — see computeVirement. */
   virementAmount: number | null;
   /** netSalary minus virementAmount (treating an unset virement as 0) — the
    * rest paid in cash. Null only when netSalary itself is null. */
@@ -653,7 +656,7 @@ export function computePayroll(
     const advance = adjustmentByEmp.get(employee.empCode)?.advance ?? 0;
     const bonus = adjustmentByEmp.get(employee.empCode)?.bonus ?? 0;
     const netSalary = employee.monthlySalary === null ? null : employee.monthlySalary - totalDeduction + bonus - advance;
-    const virementAmount = computeVirement(employee.monthlySalary);
+    const virementAmount = computeVirement(netSalary);
     rows.push({
       empCode: employee.empCode,
       name: employee.name,

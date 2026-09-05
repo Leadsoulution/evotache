@@ -25,11 +25,13 @@ interface BiometricPayrollSectionProps {
  * from their own salary — one absent day costs salaire/26, and lateness is
  * charged per day rounded UP to the next whole hour (see computePayroll's
  * own docs for the exact rule). Virement is computed automatically
- * (MIN(salaire, 3050), see computeVirement) rather than entered — a salary
- * at or below the cap goes entirely by transfer, anything above caps out
- * at 3050 with the rest (espèce) paid in cash. Deliberately rendered only
- * for managers/admins (the API refuses it for anyone else) — salary is the
- * one thing on this page a view-only attendance user must not see. */
+ * (MIN(net à payer, 3050), see computeVirement) rather than entered — a net
+ * pay at or below the cap goes entirely by transfer (so a déduction comes
+ * out of the virement itself, never shown as a negative espèce), anything
+ * above caps out at 3050 with the rest (espèce) paid in cash. Deliberately
+ * rendered only for managers/admins (the API refuses it for anyone else) —
+ * salary is the one thing on this page a view-only attendance user must not
+ * see. */
 export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveSalary, onSaveAdvance, onSaveBonus }: BiometricPayrollSectionProps) {
   const totals = rows.reduce(
     (acc, row) => ({
@@ -62,7 +64,7 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
       </div>
       <p className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         1 jour d&apos;absence = salaire ÷ 26 · un retard est facturé par jour, arrondi à l&apos;heure supérieure (10 min = 1h, 61 min = 2h) · Net à payer = salaire -
-        déductions + prime - avance · Virement = MIN(salaire, 3 050 DH)
+        déductions + prime - avance · Virement = MIN(net à payer, 3 050 DH)
       </p>
 
       {rows.length === 0 ? (
@@ -148,7 +150,7 @@ export function BiometricPayrollSection({ rows, monthKey, onMonthChange, onSaveS
                     {row.virementAmount === null ? (
                       <span className="text-xs text-slate-400">Salaire à définir</span>
                     ) : (
-                      <span className="tabular-nums text-slate-700 dark:text-slate-200" title="MIN(salaire, 3 050 DH), calculé automatiquement">
+                      <span className="tabular-nums text-slate-700 dark:text-slate-200" title="MIN(net à payer, 3 050 DH), calculé automatiquement">
                         {formatDirham(row.virementAmount)}
                       </span>
                     )}

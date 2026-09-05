@@ -25,7 +25,7 @@ export const ALL_ROLE_ORDER: Role[] = ["super_admin", ...ROLE_ORDER];
 // (payroll) section of Biométrie, which even a regular admin can no longer
 // see or edit. Enforced server-side (the user-role PATCH route rejects
 // assigning super_admin to any other id), not just a UI convention.
-export const SUPER_ADMIN_USER_ID = "u2"; // "ADM DEV"
+export const SUPER_ADMIN_USER_ID = "u1"; // "Elmahdi Bouzida"
 
 export const ROLE_CONFIG: Record<Role, RoleMeta> = {
   super_admin: {
