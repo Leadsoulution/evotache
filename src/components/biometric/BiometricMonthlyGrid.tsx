@@ -76,9 +76,7 @@ export function BiometricMonthlyGrid({ events, employees, leaves, holidays, defa
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800">
-                <th scope="col" className={ROW_LABEL_CLASS}>
-                  Nom de salarié
-                </th>
+                <th scope="col" className={ROW_LABEL_CLASS} aria-label="Indicateur" />
                 {cells.map((cell) => (
                   <th
                     key={cell.day}
